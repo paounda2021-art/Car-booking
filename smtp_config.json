@@ -1,0 +1,8 @@
+{
+  "smtpServer": "mail.workd.go.th",
+  "port": 25,
+  "enableSsl": false,
+  "from": "carbooking@workd.go.th",
+  "username": "",
+  "password": ""
+}

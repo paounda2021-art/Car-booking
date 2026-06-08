@@ -1,0 +1,166 @@
+# PowerShell Static Web Server for Windows
+# Run this script to serve index.html, style.css, and app.js locally.
+
+$port = 8080
+$rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $rootDir) { $rootDir = Get-Location }
+
+# Try to find a free port
+while ($true) {
+    try {
+        $listener = New-Object System.Net.HttpListener
+        $listener.Prefixes.Add("http://localhost:$port/")
+        $listener.Start()
+        break
+    } catch {
+        Write-Host "Port $port is in use. Trying next port..."
+        $port++
+        if ($port -gt 8100) {
+            Write-Error "Could not find a free port in range 8080-8100"
+            exit 1
+        }
+    }
+}
+
+Write-Host "=========================================================="
+Write-Host "  Corporate Car Booking System Local Web Server"
+Write-Host "  Listening on: http://localhost:$port/"
+Write-Host "  Root Directory: $rootDir"
+Write-Host "  To stop the server, press Ctrl+C in this console."
+Write-Host "=========================================================="
+
+# Launch the default browser to open the app
+Start-Process "http://localhost:$port/"
+
+try {
+    while ($listener.IsListening) {
+        $context = $listener.GetContext()
+        $request = $context.Request
+        $response = $context.Response
+        $urlPath = $request.Url.LocalPath
+        
+        # API: send-email
+        if ($urlPath -eq "/api/send-email" -and $request.HttpMethod -eq "POST") {
+            try {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $bodyText = $reader.ReadToEnd()
+                $reader.Close()
+
+                $emailData = ConvertFrom-Json $bodyText
+                if (-not $emailData -or -not $emailData.to) {
+                    throw "Invalid request data. Recipient 'to' is required."
+                }
+
+                $configPath = Join-Path $rootDir "smtp_config.json"
+                $config = Get-Content $configPath -Raw | ConvertFrom-Json
+
+                # Start the background job to send SMTP mail asynchronously
+                $job = Start-Job -ScriptBlock {
+                    param($cfg, $to, $subject, $body)
+                    try {
+                        $mail = New-Object System.Net.Mail.MailMessage
+                        $fromAddr = if ($cfg.from) { $cfg.from } else { "carbooking@workd.go.th" }
+                        $mail.From = New-Object System.Net.Mail.MailAddress($fromAddr)
+                        
+                        # Add recipients (can be comma-separated)
+                        $to.Split(',') | ForEach-Object {
+                            if ($_.Trim()) { $mail.To.Add($_.Trim()) }
+                        }
+                        
+                        $mail.Subject = $subject
+                        $mail.Body = $body
+                        $mail.IsBodyHtml = $true
+                        $mail.BodyEncoding = [System.Text.Encoding]::UTF8
+                        $mail.SubjectEncoding = [System.Text.Encoding]::UTF8
+
+                        $smtp = New-Object System.Net.Mail.SmtpClient($cfg.smtpServer, $cfg.port)
+                        $smtp.EnableSsl = $cfg.enableSsl
+                        $smtp.Timeout = 10000 # 10 seconds timeout
+
+                        if ($cfg.username -and $cfg.password) {
+                            $smtp.UseDefaultCredentials = $false
+                            $smtp.Credentials = New-Object System.Net.NetworkCredential($cfg.username, $cfg.password)
+                        } else {
+                            $smtp.UseDefaultCredentials = $false
+                            $smtp.Credentials = $null
+                        }
+
+                        $smtp.Send($mail)
+                        $mail.Dispose()
+                        $smtp.Dispose()
+                    } catch {
+                        Write-Host "Error in background SMTP send: $_"
+                    }
+                } -ArgumentList $config, $emailData.to, $emailData.subject, $emailData.body
+
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Email queued for sending asynchronously"}')
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            } catch {
+                Write-Host "Error queueing email: $_"
+                $response.StatusCode = 500
+                $response.ContentType = "application/json; charset=utf-8"
+                $errObj = @{
+                    status = "error"
+                    message = $_.ToString()
+                } | ConvertTo-Json
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($errObj)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            }
+            $response.Close()
+            continue
+        }
+
+        if ($urlPath -eq "/") { $urlPath = "/index.html" }
+
+        # Resolve clean paths
+        $filePath = Join-Path $rootDir $urlPath.Substring(1)
+        
+        # Security check: Ensure requested file is inside workspace
+        $resolvedPath = [System.IO.Path]::GetFullPath($filePath)
+        $resolvedRoot = [System.IO.Path]::GetFullPath($rootDir)
+        if (-not $resolvedPath.StartsWith($resolvedRoot)) {
+            $response.StatusCode = 403
+            $response.Close()
+            continue
+        }
+
+        if (Test-Path $resolvedPath -PathType Leaf) {
+            $ext = [System.IO.Path]::GetExtension($resolvedPath).ToLower()
+            $mime = switch ($ext) {
+                ".html" { "text/html; charset=utf-8" }
+                ".css"  { "text/css; charset=utf-8" }
+                ".js"   { "application/javascript; charset=utf-8" }
+                ".png"  { "image/png" }
+                ".jpg"  { "image/jpeg" }
+                ".jpeg" { "image/jpeg" }
+                ".svg"  { "image/svg+xml" }
+                ".ico"  { "image/x-icon" }
+                default { "application/octet-stream" }
+            }
+
+            $response.ContentType = $mime
+            $bytes = [System.IO.File]::ReadAllBytes($resolvedPath)
+            $response.ContentLength64 = $bytes.Length
+            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+            $response.StatusCode = 200
+        } else {
+            $response.StatusCode = 404
+            $errBytes = [System.Text.Encoding]::UTF8.GetBytes("<h1>404 Not Found</h1>")
+            $response.ContentType = "text/html; charset=utf-8"
+            $response.ContentLength64 = $errBytes.Length
+            $response.OutputStream.Write($errBytes, 0, $errBytes.Length)
+        }
+        $response.Close()
+    }
+} catch {
+    Write-Host "Server stopped or encountered error: $_"
+} finally {
+    if ($null -ne $listener) {
+        $listener.Stop()
+        $listener.Close()
+    }
+}
