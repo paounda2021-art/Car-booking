@@ -536,59 +536,50 @@ function hasBookingConflict(carId, startDateStr, endDateStr, excludeId = null) {
 
 // User Session Management
 function loginUser(userObj) {
-  // Determine user role in approval workflow based on hardcoded demo mapping or role tags
+  if (!userObj) return;
+
+  // 1. เรียกฟังก์ชันดึงสิทธิ์การอนุมัติ (L1 - L4) ตามตารางชื่อจริง
+  assignUserPermissions(userObj);
+
+  // 2. ตั้งค่าเริ่มต้นสำหรับบทบาท (Default คือ L0)
   let roleKey = 'requester';
   let roleName = 'ผู้เสนอขอจอง (L0)';
-  const username = userObj.username.toLowerCase();
-  
-  if (username === 'siranya.w') {
-    roleKey = 'requester';
-    roleName = 'ผู้เสนอขอจอง (L0)';
-  } else if (username === 'prathum.c') {
-    roleKey = 'supervisor';
-    roleName = 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)';
-  } else if (username === 'chalong.c') {
-    roleKey = 'fleet_admin';
-    roleName = 'ผู้จัดรถ / งานยานพาหนะ (L2)';
-  } else if (username === 'panadon.p') {
-    roleKey = 'director';
-    roleName = 'หัวหน้าสำนักงานบริหารการพัสดุ (หส.พด.) (L3)';
-  } else if (username === 'saisunee.p' || username === 'piyawan.k' || username === 'sarena.m') {
-    roleKey = 'executive';
-    roleName = 'ผู้อำนวยการฝ่ายบัญชีการเงิน (ผฝ.บง.) (L4)';
-  } else {
-    // Default fallback from json property role mapping
-    if (userObj.role === 'admin') {
+
+  // 3. คำนวณหาบทบาทหลัก (roleKey/roleName) อัตโนมัติจากสิทธิ์อนุมัติสูงสุดที่มีในตารางจริง
+  if (userObj.canApprove && userObj.canApprove.length > 0) {
+    const maxLevel = Math.max(...userObj.canApprove);
+
+    if (maxLevel === 1) {
+      roleKey = 'supervisor';
+      roleName = 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)';
+    } else if (maxLevel === 2) {
       roleKey = 'fleet_admin';
       roleName = 'ผู้จัดรถ / งานยานพาหนะ (L2)';
-    } else if (userObj.position && (userObj.position.includes('พัสดุ') || userObj.position.includes('หส.พด.')) && (userObj.position.includes('หัวหน้า') || userObj.position.includes('ผู้อำนวยการ'))) {
+    } else if (maxLevel === 3) {
       roleKey = 'director';
       roleName = 'หัวหน้าสำนักงานบริหารการพัสดุ (หส.พด.) (L3)';
-    } else if (userObj.position && (userObj.position.includes('การเงิน') || userObj.position.includes('บัญชี') || userObj.position.includes('ผฝ.บง.')) && (userObj.position.includes('ผู้อำนวยการ') || userObj.position.includes('ผู้จัดการ'))) {
+    } else if (maxLevel === 4) {
       roleKey = 'executive';
       roleName = 'ผู้อำนวยการฝ่ายบัญชีการเงิน (ผฝ.บง.) (L4)';
-    } else {
-      // Check if their email is in anyone's manager_email, or if their position indicates a manager/head role
-      const isManagerEmail = usersList.some(u => u.manager_email && u.manager_email.toLowerCase() === (userObj.email || '').toLowerCase());
-      const isManagerPosition = userObj.position && (
-        userObj.position.includes('หัวหน้า') || 
-        userObj.position.includes('ผู้จัดการ') || 
-        userObj.position.includes('ผู้อำนวยการ') ||
-        userObj.position.includes('หส.') || 
-        userObj.position.includes('ผฝ.') || 
-        userObj.position.includes('ร.หส.')
-      );
-      
-      if (isManagerEmail || isManagerPosition) {
-        roleKey = 'supervisor';
-        roleName = 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)';
-      } else {
-        roleKey = 'requester';
-        roleName = 'ผู้เสนอเรื่อง';
-      }
+    }
+  } else {
+    // Fallback หากไม่มีระบุในตารางสิทธิ์พิเศษ ให้เช็คตาม role เดิมของระบบ
+    if (userObj.role === 'admin' || userObj.role === 'fleet_admin') {
+      roleKey = 'fleet_admin';
+      roleName = 'ผู้จัดรถ / งานยานพาหนะ (L2)';
+    } else if (userObj.role === 'director') {
+      roleKey = 'director';
+      roleName = 'หัวหน้าสำนักงานบริหารการพัสดุ (หส.พด.) (L3)';
+    } else if (userObj.role === 'executive') {
+      roleKey = 'executive';
+      roleName = 'ผู้อำนวยการฝ่ายบัญชีการเงิน (ผฝ.บง.) (L4)';
+    } else if (userObj.role === 'supervisor') {
+      roleKey = 'supervisor';
+      roleName = 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)';
     }
   }
 
+  // 4. บันทึกข้อมูลเข้าสู่วัตถุหลัก currentUser ของระบบ
   currentUser = {
     employee_id: userObj.employee_id,
     username: userObj.username,
@@ -599,81 +590,91 @@ function loginUser(userObj) {
     division: userObj.department1 || 'ฝบร.',
     role: roleKey,
     roleName: roleName,
+    canApprove: userObj.canApprove || [], // ส่งต่อรายการ L ที่อนุมัติได้ไปด้วย
     email: userObj.email || '',
     manager_email: userObj.manager_email || '',
     sign: userObj.sign || ''
   };
 
+  // บันทึกลง LocalStorage
   localStorage.setItem('current_user', JSON.stringify(currentUser));
   
-  // Update HTML overlay screen
+  // 5. ปรับเปลี่ยนหน้าจอซ่อนหน้า Login เปิดหน้าแอปพลิเคชัน
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app-wrapper').classList.remove('hidden');
 
-  // Update header user profile info
+  // 6. อัปเดตข้อมูลโปรไฟล์ผู้ใช้งานที่มุมขวาบน (Topbar)
   document.getElementById('user-display-name').textContent = currentUser.name;
-  let levelCode = '(L0)';
-  if (currentUser.role === 'supervisor') levelCode = '(L1)';
-  else if (currentUser.role === 'fleet_admin') levelCode = '(L2)';
-  else if (currentUser.role === 'director') levelCode = '(L3)';
-  else if (currentUser.role === 'executive') levelCode = '(L4)';
   
-  document.getElementById('user-role-label').textContent = `${currentUser.position || 'เจ้าหน้าที่'} ${levelCode}`;
+  // คำนวณป้ายสิทธิ์สูงสุดที่จะไปต่อท้ายชื่อตำแหน่งเพื่อความสวยงาม
+  let levelCode = '(L0)';
+  if (currentUser.canApprove && currentUser.canApprove.length > 0) {
+    levelCode = `(L${Math.max(...currentUser.canApprove)})`;
+  }
+  document.getElementById('user-role-label').textContent = `${currentUser.position} ${levelCode}`;
   document.getElementById('user-avatar').textContent = currentUser.name.charAt(0);
 
-  // Set default values in modal request form
+  // 7. กำหนดค่าเริ่มต้นใส่ฟอร์มใบขอรถอัตโนมัติ
   document.getElementById('input-requester').value = currentUser.name;
   document.getElementById('input-position').value = currentUser.position;
   document.getElementById('input-department').value = '-';
   document.getElementById('input-office').value = currentUser.office;
   document.getElementById('input-division').value = currentUser.department;
 
-  // Toggle booking create button visibility (only for L0 requesters and L2 fleet admins)
+  // 8. ควบคุมการเปิด-ปิด ตัวเลือกบทบาทอนุมัติ (Dropdown) และ ปุ่มเขียนใบขอรถ
+  initApprovalSwitcher(); // ควบคุม Dropdown สลับบทบาท (จะทำงานเมื่อมีหลาย L)
+
   const btnOpenBooking = document.getElementById('btn-open-booking');
-  if (currentUser.role === 'requester' || currentUser.role === 'fleet_admin') {
-    btnOpenBooking.classList.remove('hidden');
+  // เช็คว่าคนนี้เป็นผู้อนุมัติระดับสูงล้วนๆ หรือไม่ (L3, L4 เท่านั้นและไม่มี L1 ปน)
+  const isOnlyHighLevelApprover = currentUser.canApprove.length > 0 && currentUser.canApprove.every(lvl => lvl >= 3);
+  
+  if (isOnlyHighLevelApprover) {
+    btnOpenBooking.classList.add('hidden'); // ซ่อนปุ่มเขียนใบถาวรสำหรับ L3, L4
   } else {
-    btnOpenBooking.classList.add('hidden');
+    btnOpenBooking.classList.remove('hidden'); // พนักงานทั่วไป, L1 หรือ L2 สามารถเห็นปุ่มเขียนใบได้ปกติ
   }
 
-  // Toggle header actions
+  // ซ่อนปุ่มเข้าสู่ระบบ / แสดงการ์ดโปรไฟล์
   document.getElementById('btn-top-login').classList.add('hidden');
   document.getElementById('header-user-profile').classList.remove('hidden');
   
+  // ควบคุมปุ่มล้างฐานข้อมูล (เฉพาะ L2 หรือ Admin)
   const btnClearDb = document.getElementById('btn-clear-db');
   if (btnClearDb) {
-    if (currentUser && currentUser.role === 'fleet_admin') {
+    if (currentUser.role === 'fleet_admin') {
       btnClearDb.classList.remove('hidden');
     } else {
       btnClearDb.classList.add('hidden');
     }
   }
 
-  // Populate dropdown and render views
+  // 9. รันฟังก์ชันคำนวณสถิติและโหลดตารางหน้าจอต่างๆ
   populateCarsDropdown();
   updateStats();
   renderDashboard();
   renderBookingsLists();
   renderMonthCalendar();
 
-  // Role based redirection
+  // 10. จัดการสิทธิ์การมองเห็นเมนูด้านซ้าย (Sidebar Redirection)
   const isRequesterOrSupervisor = (currentUser.role === 'requester' || currentUser.role === 'supervisor');
   const reportNavItem = document.getElementById('nav-item-driver-report');
   
-  if (isRequesterOrSupervisor) {
+  if (isRequesterOrSupervisor && !currentUser.canApprove.includes(4)) { 
+    // หากเป็นคนขอทั่วไป หรือหัวหน้างาน L1 (แต่ต้องไม่ใช่รักษาการ L4 แบบคุณซารีนา) ให้ซ่อนแดชบอร์ดวิ่งไปหน้าประวัติแทน
     document.getElementById('nav-dashboard').closest('.nav-item').classList.add('hidden');
     document.getElementById('nav-bookings').closest('.nav-item').classList.remove('hidden');
     document.getElementById('nav-calendar').closest('.nav-item').classList.remove('hidden');
     if (reportNavItem) reportNavItem.classList.add('hidden');
     showView('bookings');
   } else {
+    // ผู้จัดรถ (L2), ผอ.พัสดุ (L3), ผู้บริหาร (L4) ให้เข้าถึงหน้าแดชบอร์ดภาพรวมได้
     document.getElementById('nav-dashboard').closest('.nav-item').classList.remove('hidden');
     document.getElementById('nav-bookings').closest('.nav-item').classList.remove('hidden');
     document.getElementById('nav-calendar').closest('.nav-item').classList.remove('hidden');
     if (reportNavItem) {
       if (currentUser.role === 'fleet_admin') {
         reportNavItem.classList.remove('hidden');
-        populateDriversDropdown(); // Populate drivers dynamically
+        populateDriversDropdown(); // โหลดข้อมูลพนักงานขับรถเฉพาะ L2
       } else {
         reportNavItem.classList.add('hidden');
       }
@@ -682,32 +683,67 @@ function loginUser(userObj) {
   }
 }
 
-function logoutUser() {
-  currentUser = null;
-  localStorage.removeItem('current_user');
-  document.getElementById('form-login').reset();
-  checkLoginStatus();
+// ==========================================
+// ระบบออกจากระบบ (Logout) แบบรัดกุม 100%
+// ==========================================
+const logoutBtn = document.getElementById('btn-logout');
+
+if (logoutBtn) {
+  // ใช้ onclick เพื่อบังคับทับคำสั่งเก่า ป้องกันการกดแล้วทำงานซ้อนกัน
+  logoutBtn.onclick = function() {
+    
+    // 1. ล้างข้อมูลผู้ใช้ออกจากหน่วยความจำเบราว์เซอร์
+    localStorage.removeItem('current_user');
+    sessionStorage.removeItem('activeApprovalLevel');
+    currentUser = null;
+
+    // 2. สั่งซ่อนโปรไฟล์และกล่อง Dropdown ทันที (ให้หน้าจอสะอาดที่สุด)
+    const headerProfile = document.getElementById('header-user-profile');
+    if (headerProfile) {
+      headerProfile.classList.add('hidden');
+    }
+    
+    const approvalContainer = document.getElementById('approval-level-container');
+    if (approvalContainer) {
+      approvalContainer.style.display = 'none';
+      approvalContainer.classList.add('hidden');
+    }
+
+    // 3. ท่าไม้ตาย: สั่งรีเฟรชหน้าเว็บเพื่อกลับสู่หน้าแรก (บุคคลทั่วไป)
+    window.location.reload();
+  };
 }
 
 async function clearDatabase() {
-  if (confirm("⚠️ คุณต้องการล้างข้อมูลการจองทั้งหมดและอีเมลแจ้งเตือนจำลองออกจากระบบหรือไม่?\n\nการลบนี้จะส่งผลกับผู้ใช้งานทุกคนในหน่วยงานและไม่สามารถกู้คืนได้!")) {
+  // 1. แจ้งเตือนยืนยันให้ชัดเจน
+  if (confirm("⚠️ อันตราย: คุณกำลังจะล้าง 'ข้อมูลการจองทั้งหมด' และ 'ประวัติอีเมลจำลอง' ออกจากระบบ!\n\nการกระทำนี้จะส่งผลกับผู้ใช้งานทุกคน และไม่สามารถกู้คืนข้อมูลกลับมาได้\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?")) {
+    
+    // 2. ล้างตัวแปรและข้อมูลใน LocalStorage ฝั่งหน้าเว็บ
     bookings = [];
+    emailLogs = [];
     localStorage.removeItem('bookings_data');
     localStorage.removeItem('email_logs_data');
-    emailLogs = [];
     
+    // ล้างค่าสถานะการสลับบทบาทอนุมัติ (Dropdown) ที่ค้างอยู่
+    sessionStorage.removeItem('activeApprovalLevel'); 
+
+    // 3. แสดงข้อความแจ้งเตือนระหว่างรอ
     showToast("กำลังล้างข้อมูลระบบ...", "warning");
     
+    // 4. ส่งคำสั่งไปล้างข้อมูลในฐานข้อมูล (Cloudflare KV / Server)
     try {
       const response = await fetch('/api/save-bookings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify([])
+        body: JSON.stringify([]) // ส่ง Array ว่างไปทับข้อมูลเดิม
       });
+      
       if (response.ok) {
-        showToast("ล้างข้อมูลสำเร็จแล้ว! กำลังเริ่มระบบใหม่...", "success");
+        showToast("ล้างข้อมูลสำเร็จแล้ว! กำลังโหลดระบบใหม่...", "success");
+        
+        // 5. โหลดหน้าเว็บใหม่เพื่อให้ระบบรับค่าที่ว่างเปล่าไปแสดงผล
         setTimeout(() => {
           window.location.reload();
         }, 1500);
@@ -842,7 +878,6 @@ function updateStats() {
 
   if (statTotalCars) statTotalCars.textContent = `${cars.length} คัน`;
   
-  // Calculate available cars right now (approved OR pending-assigned by L2)
   const now = new Date();
   const busyCarIds = bookings
     .filter(b => (b.status === 'approved' || (b.status === 'pending' && b.currentApprovalLevel >= 3)) && b.travelType === 'fmo_car' && new Date(b.startDate) <= now && new Date(b.endDate) >= now)
@@ -850,17 +885,40 @@ function updateStats() {
   const availCount = cars.filter(c => !busyCarIds.includes(c.id)).length;
   if (statAvailCars) statAvailCars.textContent = `${availCount} คัน`;
 
-  // Calculate pending reviews for current user
+  // 1. ดึงระดับการอนุมัติที่เลือกจาก Dropdown ปัจจุบัน (ค่าเริ่มต้นคือ 'all')
+  const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
   let pendingCount = 0;
-  bookings.forEach(b => {
-    if (b.status === 'pending' && currentUser && !b.waitingForRequesterInput) {
-      if (currentUser.role === 'supervisor' && b.currentApprovalLevel === 1) pendingCount++;
-      if (currentUser.role === 'fleet_admin' && b.currentApprovalLevel === 2) pendingCount++;
-      if (currentUser.role === 'director' && b.currentApprovalLevel === 3) pendingCount++;
-      if (currentUser.role === 'executive' && b.currentApprovalLevel === 4) pendingCount++;
-    }
-  });
 
+  if (currentUser) {
+    bookings.forEach(b => {
+      // ตรวจสอบเงื่อนไขพื้นฐาน: งานที่รออนุมัติและไม่ต้องรอข้อมูลเพิ่มจากผู้ขอ
+      if (b.status === 'pending' && !b.waitingForRequesterInput) {
+        
+        // ตรวจสอบว่า งานเลเวลนี้ (b.currentApprovalLevel) อยู่ในสิทธิ์ที่ User คนนี้อนุมัติได้จริงในตารางจริงไหม
+        const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel);
+        
+        // ตรวจสอบว่า ตรงกับระดับอนุมัติที่เลือกสลับบทบาทใน Dropdown อยู่หรือไม่
+        const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel);
+
+        if (canApproveThisLevel && isSelectedLevel) {
+          // เงื่อนไขคัดกรองพิเศษเพิ่มเติมสำหรับระดับ L1 (Supervisor)
+          if (b.currentApprovalLevel === 1) {
+            const mEmail = (b.managerEmail || '').toLowerCase();
+            const cEmail = (currentUser.email || '').toLowerCase();
+            if (mEmail === cEmail || mEmail === '') {
+              pendingCount++;
+            }
+          } 
+          // เงื่อนไขสำหรับระดับ L2, L3, L4 (ยึดตาม Dropdown ที่เลือกได้ทันที)
+          else {
+            pendingCount++;
+          }
+        }
+      }
+    });
+  }
+
+  // 2. อัปเดตตัวเลขแสดงผลใน Dashboard และแท็บต่างๆ
   if (statPending) statPending.textContent = `${pendingCount} รายการ`;
   if (statTotalBkg) statTotalBkg.textContent = `${bookings.length} รายการ`;
 
@@ -869,7 +927,14 @@ function updateStats() {
   if (pendingBadge) pendingBadge.textContent = pendingCount;
   if (tabPendingBadge) tabPendingBadge.textContent = pendingCount;
 
-  // Calculate and update my bookings count
+  // 3. เพิ่มการอัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่ง (ตามกล่องข้อความแจ้งเตือนจริงของคุณ)
+  const emailBadge = document.getElementById('email-inbox-badge');
+  if (emailBadge) {
+    emailBadge.textContent = pendingCount;
+    emailBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+  }
+
+  // 4. คำนวณจำนวนรายการที่ฉันขอ (L0)
   let myCount = 0;
   if (currentUser) {
     myCount = bookings.filter(b => b.requester === currentUser.name).length;
@@ -877,11 +942,9 @@ function updateStats() {
   const tabMyCountBadge = document.getElementById('tab-my-bookings-count');
   if (tabMyCountBadge) tabMyCountBadge.textContent = myCount;
 
-  // Update all history bookings count
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
   if (tabAllHistoryBadge) tabAllHistoryBadge.textContent = bookings.length;
 }
-
 function renderDashboard() {
   updateStats();
 
@@ -1066,15 +1129,14 @@ function renderTimelineScheduler() {
 
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
-  // Hide "งานรออนุมัติจากคุณ" tab button for L0 requester role
   const pendingTabBtn = document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
+  const myBkgTabBtn = document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
+
   if (pendingTabBtn) {
     if (currentUser && currentUser.role === 'requester') {
       pendingTabBtn.classList.add('hidden');
-      // If it was active, switch to my-bookings tab
       if (pendingTabBtn.classList.contains('active')) {
         pendingTabBtn.classList.remove('active');
-        const myBkgTabBtn = document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
         if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
         document.getElementById('tab-pending-approvals').classList.remove('active');
         const myBkgTab = document.getElementById('tab-my-bookings');
@@ -1082,6 +1144,16 @@ function renderBookingsLists() {
       }
     } else {
       pendingTabBtn.classList.remove('hidden');
+      // สลับหน้าจอมาที่ Tab งานรออนุมัติอัตโนมัติ หากเป็นผู้อนุมัติและมีงานค้าง
+      const pendingBadgeVal = document.getElementById('tab-pending-count');
+      if (pendingBadgeVal && parseInt(pendingBadgeVal.textContent) > 0 && !pendingTabBtn.classList.contains('active')) {
+        if (myBkgTabBtn) myBkgTabBtn.classList.remove('active');
+        pendingTabBtn.classList.add('active');
+        const myBkgTab = document.getElementById('tab-my-bookings');
+        if (myBkgTab) myBkgTab.classList.remove('active');
+        const pendingTab = document.getElementById('tab-pending-approvals');
+        if (pendingTab) pendingTab.classList.add('active');
+      }
     }
   }
 
@@ -1122,13 +1194,11 @@ function renderBookingsLists() {
     const actionBtnText = isPendingForMe ? '✍️ พิจารณาตรวจอนุมัติ' : '👁️ ดูรายละเอียด';
     const actionBtnClass = isPendingForMe ? 'btn-warning' : 'btn-primary';
     
-    // Add print action button if it is approved and logged in as an Admin (L2, L3, L4)
     const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
     const printBtn = (b.status === 'approved' && isAdmin)
       ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
       : '';
 
-    // Step dots list
     let stepsDots = '';
     const isRequesterUser = currentUser && (currentUser.role === 'requester' || b.requester === currentUser.name);
     const maxSteps = (b.travelType === 'public_car' && isRequesterUser) ? 3 : 4;
@@ -1176,13 +1246,19 @@ function renderBookingsLists() {
     
     let isPendingForMe = false;
     if (b.status === 'pending' && currentUser && !b.waitingForRequesterInput) {
-      if (currentUser.role === 'supervisor' && b.currentApprovalLevel === 1) isPendingForMe = true;
-      if (currentUser.role === 'fleet_admin' && b.currentApprovalLevel === 2) isPendingForMe = true;
-      if (currentUser.role === 'director' && b.currentApprovalLevel === 3) isPendingForMe = true;
-      if (currentUser.role === 'executive' && b.currentApprovalLevel === 4) isPendingForMe = true;
+      if (currentUser.role === 'supervisor' && b.currentApprovalLevel === 1) {
+        // แก้ไข: กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
+        const mEmail = (b.managerEmail || '').toLowerCase();
+        const cEmail = (currentUser.email || '').toLowerCase();
+        if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
+          isPendingForMe = true;
+        }
+      }
+      else if (currentUser.role === 'fleet_admin' && b.currentApprovalLevel === 2) isPendingForMe = true;
+      else if (currentUser.role === 'director' && b.currentApprovalLevel === 3) isPendingForMe = true;
+      else if (currentUser.role === 'executive' && b.currentApprovalLevel === 4) isPendingForMe = true;
     }
 
-    // Append to corresponding tab grids
     if (isMyRequest && myContainer) {
       myContainer.appendChild(helperCreateCard(b, isPendingForMe));
     }
@@ -1194,7 +1270,6 @@ function renderBookingsLists() {
     }
   });
 
-  // Show empty messages if no items
   if (myContainer && myContainer.children.length === 0) {
     myContainer.innerHTML = `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
@@ -2483,15 +2558,26 @@ function setupEventListeners() {
   });
 
   // Logout button
-  document.getElementById('btn-logout').addEventListener('click', logoutUser);
+  function logoutUser() {
+  // 1. ล้างข้อมูลผู้ใช้งานออกจากระบบทั้งหมด
+  currentUser = null;
+  localStorage.removeItem('current_user');
+  sessionStorage.removeItem('activeApprovalLevel'); // ล้างค่า Dropdown ที่อาจจะเลือกค้างไว้
 
-  // Clear Database button
-  const btnClearDb = document.getElementById('btn-clear-db');
-  if (btnClearDb) {
-    btnClearDb.addEventListener('click', clearDatabase);
+  // 2. ซ่อนกล่องโปรไฟล์และกล่อง Dropdown ทันที
+  const headerProfile = document.getElementById('header-user-profile');
+  if (headerProfile) {
+    headerProfile.classList.add('hidden');
+  }
+  
+  const approvalContainer = document.getElementById('approval-level-container');
+  if (approvalContainer) {
+    approvalContainer.classList.add('hidden');
   }
 
-
+  // 3. รีโหลดหน้าเว็บ 1 ครั้ง เพื่อเคลียร์ข้อมูลตารางงานและกลับสู่หน้าจอเริ่มต้น (บุคคลทั่วไป)
+  window.location.reload(); 
+}
 
   // Review Approvals action panel buttons
   document.getElementById('btn-approve-request').addEventListener('click', () => handleApprovalAction(true));
@@ -2881,49 +2967,115 @@ function handleSignatureUpload(fileInputId, sigPad, canvasId, placeholderId) {
     fileInput.value = ''; // Clear selection
   });
 }
+// ฟังก์ชันนี้ใช้สำหรับระบุว่าใครสามารถอนุมัติ L ไหนได้บ้าง (ให้เรียกใช้ในฟังก์ชัน Login)
+function assignUserPermissions(userObj) {
+  const username = (userObj.username || '').toLowerCase();
+  userObj.canApprove = []; // สร้าง Array เก็บสิทธิ์
 
-// Simulated Email Inbox UI Updates
-function updateEmailInboxUI() {
-  const badge = document.getElementById('email-inbox-badge');
-  const list = document.getElementById('email-logs-list');
-  if (!badge || !list) return;
-
-  const count = emailLogs.length;
-  if (count > 0) {
-    badge.textContent = count;
-    badge.style.display = 'inline-block';
-  } else {
-    badge.style.display = 'none';
+  // 1. ซารีนา: เป็น L1 กับ รักษาการ L4
+  if (username === 'sarena.m') {
+    userObj.canApprove = [1, 4];
+  } 
+  // 2. ฉลอง, ศักดา: เป็น L2
+  else if (username === 'chalong.c' || username === 'sakda.a') {
+    userObj.canApprove = [2];
+  } 
+  // 3. พนาดร: เป็น L3 (ส่วนสายสุนีย์อยู่ด้านล่างเพราะมี L4 ด้วย)
+  else if (username === 'panadon.p') {
+    userObj.canApprove = [3];
+  } 
+  // 4. สายสุนีย์: เป็น L3 และ L4
+  else if (username === 'saisunee.p') {
+    userObj.canApprove = [3, 4]; // (หากเป็น L1 ด้วยให้เปลี่ยนเป็น [1, 3, 4] ได้เลยครับ)
+  } 
+  // 5. ปิยวรรณ: เป็น L4
+  else if (username === 'piyawan.k') {
+    userObj.canApprove = [4];
+  } 
+  // 6. หัวหน้างาน L1 คนอื่นๆ ทั่วไป (เช่น ตรวจสอบจาก role ใน Database)
+  else if (userObj.role === 'supervisor') {
+    userObj.canApprove = [1];
   }
+}
+// ฟังก์ชันนี้เรียกใช้หลังจาก Login เสร็จ เพื่อเช็คว่าต้องโชว์ Dropdown ไหม
+function initApprovalSwitcher() {
+  const container = document.getElementById('approval-level-container');
+  const switcher = document.getElementById('approval-level-switcher');
+  const bookingBtn = document.getElementById('btn-open-booking');
 
-  if (emailLogs.length === 0) {
-    list.innerHTML = `
-      <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">
-        ยังไม่มีการส่งข้อความแจ้งเตือนอีเมลในเซสชันนี้
-      </div>
-    `;
+  if (!container) return; // ป้องกัน Error ถ้าหา element ไม่เจอ
+
+  // 1. ถ้ายังไม่ได้ Login ให้ซ่อนเด็ดขาด
+  if (!currentUser) {
+    container.classList.add('hidden');
+    container.style.display = 'none'; // บังคับซ่อน
+    if (bookingBtn) bookingBtn.classList.add('hidden');
     return;
   }
 
-  list.innerHTML = emailLogs.map((log, index) => {
-    const timeStr = new Date(log.timestamp).toLocaleString('th-TH');
-    return `
-      <div class="email-log-item" style="border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.02); padding: 1rem; position: relative;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem; border-bottom: 1px dashed var(--border-color); padding-bottom: 0.5rem;">
-          <span style="font-size: 0.75rem; color: var(--text-muted);">${timeStr}</span>
-          <button class="btn btn-secondary btn-sm" onclick="deleteEmailLog(${index})" style="padding: 0.1rem 0.4rem; font-size:0.7rem; border-color:rgba(220,38,38,0.2); color:var(--danger);">ลบ</button>
-        </div>
-        <div style="margin-bottom: 0.5rem; font-size: 0.85rem;">
-          <strong>ถึง:</strong> <span style="color: var(--primary); font-family: monospace;">${log.to}</span><br>
-          <strong>หัวข้อ:</strong> <span style="font-weight: bold; color: var(--text-main);">${log.subject}</span>
-        </div>
-        <button class="btn btn-secondary btn-sm" onclick="toggleEmailBody(${index})" id="btn-toggle-email-${index}" style="width: 100%; text-align: center; margin-top: 0.25rem;">📄 แสดงเนื้อหาอีเมล</button>
-        <div id="email-body-content-${index}" style="display: none; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem; overflow-x: auto; background: white; border-radius: 6px; padding: 1rem; color: #333;">
-          ${log.body}
-        </div>
-      </div>
-    `;
-  }).join('');
+  // รีเซ็ตค่าเป็นทั้งหมด
+  sessionStorage.setItem('activeApprovalLevel', 'all');
+
+  // 2. ถ้าคนนั้นมีสิทธิ์อนุมัติมากกว่า 1 บทบาท (เช่น สายสุนีย์, ซารีนา)
+  if (currentUser.canApprove && currentUser.canApprove.length > 1) {
+    container.classList.remove('hidden');
+    container.style.display = 'block'; // 🚨 ปลดล็อก! บังคับให้โชว์ออกมา
+    
+    switcher.innerHTML = '<option value="all">แสดงงานอนุมัติทั้งหมด</option>';
+    currentUser.canApprove.forEach(level => {
+      let opt = document.createElement('option');
+      opt.value = level;
+      opt.innerHTML = `ทำงานในฐานะ L${level}`;
+      switcher.appendChild(opt);
+    });
+
+    switcher.onchange = (e) => {
+      sessionStorage.setItem('activeApprovalLevel', e.target.value);
+      updateStats();         
+      renderBookingsLists(); 
+    };
+  } 
+  // 3. ถ้ามีบทบาทเดียว หรือไม่มีสิทธิ์อนุมัติ (เช่น ฉลอง, ศักดา หรือพนักงานทั่วไป)
+  else {
+    container.classList.add('hidden');
+    container.style.display = 'none'; // บังคับซ่อน
+  }
+
+  // 4. จัดการปุ่ม + เขียนใบขออนุญาต
+  const isOnlyHighLevelApprover = currentUser.canApprove && currentUser.canApprove.length > 0 && currentUser.canApprove.every(lvl => lvl >= 3);
+  if (isOnlyHighLevelApprover) {
+    if (bookingBtn) bookingBtn.classList.add('hidden');
+  } else {
+    if (bookingBtn) bookingBtn.classList.remove('hidden');
+  }
+}
+// Simulated Email Inbox UI Updates
+function updateEmailInboxUI() {
+  const list = document.getElementById('email-logs-list');
+  if (!list) return;
+
+  // กรองงานที่รอคนนี้อนุมัติจริงๆ
+  const myPendingTasks = bookings.filter(b => {
+    if (b.status !== 'pending' || b.waitingForRequesterInput) return false;
+    if (currentUser.role === 'supervisor' && b.currentApprovalLevel === 1) return true;
+    if (currentUser.role === 'fleet_admin' && b.currentApprovalLevel === 2) return true;
+    if (currentUser.role === 'director' && b.currentApprovalLevel === 3) return true;
+    if (currentUser.role === 'executive' && b.currentApprovalLevel === 4) return true;
+    return false;
+  });
+
+  if (myPendingTasks.length === 0) {
+    list.innerHTML = `<div style="text-align: center; padding: 2rem;">ไม่มีรายการรอคุณอนุมัติในขณะนี้</div>`;
+    return;
+  }
+
+  list.innerHTML = myPendingTasks.map(b => `
+    <div style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px;">
+      <strong>${b.id}</strong>: ${b.purpose}
+      <p style="font-size: 0.8rem; color: #666;">จาก: ${b.requester}</p>
+      <button class="btn btn-primary btn-sm" onclick="openApprovalModal('${b.id}')">ตรวจสอบ</button>
+    </div>
+  `).join('');
 }
 
 window.deleteEmailLog = function(index) {
@@ -2962,11 +3114,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkLoginStatus();
 
   // Show return early success toast if set
-  const postReloadToast = localStorage.getItem('return_early_toast_success');
-  if (postReloadToast) {
-    showToast(postReloadToast, 'success');
-    localStorage.removeItem('return_early_toast_success');
-  }
+ // ตัวอย่างโค้ดตอนที่ระบบดึงข้อมูลผู้ใช้เก่ากลับมาตอนโหลดเว็บ
+const storedUser = localStorage.getItem('current_user');
+if (storedUser) {
+  currentUser = JSON.parse(storedUser);
+  
+  // 🚨 ต้องแน่ใจว่ามีการเรียก 3 คำสั่งนี้เสมอ เพื่อให้ระบบแจกสิทธิ์และโชว์ปุ่มถูกต้อง 🚨
+  assignUserPermissions(currentUser); 
+  initApprovalSwitcher(); 
+  updateStats();
+  // ...
+}
 
   // Simulated Email Inbox event listeners
   const trigger = document.getElementById('email-inbox-trigger');
@@ -3330,3 +3488,12 @@ window.renderMonthCalendar = renderMonthCalendar;
 window.openFillTaxiModal = openFillTaxiModal;
 window.generateDriverReport = generateDriverReport;
 window.populateDriversDropdown = populateDriversDropdown;
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (!localStorage.getItem('current_user')) {
+    const approvalContainer = document.getElementById('approval-level-container');
+    if (approvalContainer) {
+      approvalContainer.classList.add('hidden');
+    }
+  }
+});

@@ -81,35 +81,53 @@
     <main class="main-content">
       
       <!-- Top header bar -->
-      <header class="topbar no-print">
-        <div class="page-title">
-          <h2 id="view-title">ภาพรวมระบบ</h2>
-          <p id="view-subtitle">ระบบจองรถยนต์และขออนุมัติเบิกจ่ายตามฟอร์ม องค์การสะพานปลา</p>
-        </div>
-        <div class="header-actions">
+  <header class="topbar no-print" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem;">
+      
+      <div class="page-title">
+        <h2 id="view-title">รายการจองรถยนต์</h2>
+        <p id="view-subtitle">จัดการ อนุมัติ และติดตามความคืบหน้าคำขอทั้งหมด</p>
+      </div>
 
+      <div class="header-actions" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; width: 320px; flex-shrink: 0;">
+        
+        <button class="btn btn-primary" id="btn-top-login">เข้าสู่ระบบ</button>
 
-          <!-- Logged in state (User Profile & Logout button moved here) -->
-          <div id="header-user-profile" class="header-user-profile hidden">
+        <div id="header-user-profile" class="header-user-profile" style="flex-direction: column; align-items: stretch; gap: 0.75rem; background: rgba(255,255,255,0.65); padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); margin: 0; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div id="email-inbox-trigger" style="position: relative; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.75); border-radius: 50%; width: 36px; height: 36px; border: 1px solid var(--border-color);">
+              <span>🔔</span>
+              <span id="email-inbox-badge" style="position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;">0</span>
+            </div>
             <div class="avatar" id="user-avatar">?</div>
             <div class="user-info">
-              <span class="user-name" id="user-display-name">ผู้ใช้ทั่วไป</span>
-              <span class="user-role-badge" id="user-role-label">ผู้เสนอเรื่อง</span>
+              <span class="user-name" id="user-display-name">ผู้ใช้</span>
+              <span class="user-role-badge" id="user-role-label">ตำแหน่ง</span>
             </div>
-            <button class="btn btn-secondary btn-sm hidden" id="btn-clear-db" style="border-color: #f59e0b; color: #f59e0b; margin-left: 0.5rem; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;" title="ล้างข้อมูลการจองทั้งหมดในระบบ">
-              🗑️ ล้างข้อมูลระบบ
-            </button>
-            <button class="btn btn-secondary btn-sm" id="btn-logout" style="border-color: var(--danger-light); color: var(--danger); margin-left: 0.5rem; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px;">
-              🚪 ออกจากระบบ
-            </button>
           </div>
-
-          <button class="btn btn-primary" id="btn-top-login">🔑 เข้าสู่ระบบ</button>
-          <button class="btn btn-primary hidden" id="btn-open-booking">
-            <span>+</span> เขียนใบขออนุญาตใช้รถ
+          <button class="btn btn-secondary btn-sm" id="btn-logout" style="width: 100%; color: var(--danger); border-color: rgba(220, 38, 38, 0.2);">
+            🚪 ออกจากระบบ
           </button>
         </div>
-      </header>
+
+        <div id="approval-level-container" class="hidden" style="display: none; width: 100%;">
+  <select id="approval-level-switcher" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--primary-color); background-color: #f8fafc; color: var(--primary-color); font-weight: bold;">
+    <option value="all">แสดงงานอนุมัติทั้งหมด</option>
+  </select>
+</div>
+
+<script>
+  if (!localStorage.getItem('current_user')) {
+    document.getElementById('approval-level-container').style.display = 'none';
+    document.getElementById('approval-level-container').classList.add('hidden');
+  }
+</script>
+
+        <button class="btn btn-primary hidden" id="btn-open-booking" style="width: 100%; justify-content: center;">
+          <span>+</span> เขียนใบขออนุญาตใช้รถ
+        </button>
+
+      </div>
+    </header>
 
       <!-- VIEW 1: Dashboard -->
       <section id="view-dashboard" class="view-section">
@@ -175,14 +193,12 @@
 
       </section>
 
-      <!-- VIEW 2: Bookings List and Approvals -->
+       <!-- VIEW 2: Bookings List and Approvals -->
       <section id="view-bookings" class="view-section hidden no-print">
         <div class="tab-container">
-          <div class="tab-nav">
+          <div class="tab-nav" style="display: flex; gap: 2rem; border-bottom: 1px solid var(--border-color); width: 100%; margin-bottom: 1.5rem;">
             <button class="tab-btn active" data-tab="tab-my-bookings">รายการที่ฉันขอ (<span id="tab-my-bookings-count">0</span>)</button>
-            <button class="tab-btn" data-tab="tab-pending-approvals">
-              งานรออนุมัติจากคุณ (<span id="tab-pending-count">0</span>)
-            </button>
+            <button class="tab-btn" data-tab="tab-pending-approvals">งานรออนุมัติจากคุณ (<span id="tab-pending-count">0</span>)</button>
             <button class="tab-btn" data-tab="tab-all-history">ประวัติทั้งหมด (<span id="tab-all-history-count">0</span>)</button>
           </div>
 
@@ -609,13 +625,19 @@
           </div>
           <div class="modal-footer" style="margin-top: 1.5rem; padding: 0.5rem 0 0 0;">
             <button type="button" class="btn btn-secondary" id="btn-cancel-fill-taxi">ยกเลิก</button>
-            <button type="submit" class="btn btn-primary">💾 บันทึกและส่งคืนผู้จัดรถ</button>
+            <button type="submit" class="btn btn-primary">💾 บันทึกเสนอหัวหน้างาน</button>
           </div>
         </form>
       </div>
     </div>
   </div>
-
+      <div id="modal-email-inbox" class="modal-overlay">
+        <div class="modal-box" style="max-width: 600px;">
+          <div class="modal-header">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem;">📧 กล่องข้อความแจ้งเตือน (จำลอง)</h3>
+            <button id="btn-close-email-inbox" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body" id="email-logs-list" style="max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
 
 
   <script src="app.js?v=2.6"></script>
