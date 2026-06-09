@@ -534,12 +534,29 @@ function hasBookingConflict(carId, startDateStr, endDateStr, excludeId = null) {
   });
 }
 
-// User Session Management
 function loginUser(userObj) {
   if (!userObj) return;
 
-  // 1. เรียกฟังก์ชันดึงสิทธิ์การอนุมัติ (L1 - L4) ตามตารางชื่อจริง
+ // 1. ดึงสิทธิ์จากตาราง/ฟังก์ชันกลาง
   assignUserPermissions(userObj);
+
+  // =====================================================================
+  // 🚨 ระบบผู้ช่วยอัจฉริยะ: ดักจับตำแหน่งอัตโนมัติ (ไม่ต้องไปแก้ฐานข้อมูล) 🚨
+  // =====================================================================
+  const positionText = userObj.position || '';
+  
+  // ถ้าในชื่อตำแหน่งมีคำว่า "ร.หส." ให้จัดการอัปเกรดเป็น L1 ทันที
+  if (positionText.includes('ร.หส.')) {
+    if (!userObj.canApprove) {
+      userObj.canApprove = [];
+    }
+    if (!userObj.canApprove.includes(1)) {
+      userObj.canApprove.push(1); // แจกสิทธิ์ L1
+    }
+    userObj.role = 'supervisor'; // ปรับบทบาทเป็นหัวหน้างาน
+  }
+  // =====================================================================
+  // 🚨 --- จบเงื่อนไขพิเศษ --- 🚨
 
   // 2. ตั้งค่าเริ่มต้นสำหรับบทบาท (Default คือ L0)
   let roleKey = 'requester';
@@ -606,13 +623,23 @@ function loginUser(userObj) {
   // 6. อัปเดตข้อมูลโปรไฟล์ผู้ใช้งานที่มุมขวาบน (Topbar)
   document.getElementById('user-display-name').textContent = currentUser.name;
   
-  // คำนวณป้ายสิทธิ์สูงสุดที่จะไปต่อท้ายชื่อตำแหน่งเพื่อความสวยงาม
+  // คำนวณป้ายสิทธิ์สูงสุดที่จะไปต่อท้ายชื่อตำแหน่ง
   let levelCode = '(L0)';
   if (currentUser.canApprove && currentUser.canApprove.length > 0) {
     levelCode = `(L${Math.max(...currentUser.canApprove)})`;
   }
+
+  // 🚨 ท่าไม้ตาย: ดักจับก่อนแสดงผล ถ้าตำแหน่งมีคำว่า "ร.หส." บังคับเป็น L1 ทันที
+  if (currentUser.position && currentUser.position.includes('ร.หส.')) {
+    levelCode = '(L1)';
+    currentUser.role = 'supervisor'; // บังคับเปลี่ยนบทบาท
+    if (!currentUser.canApprove) currentUser.canApprove = [];
+    if (!currentUser.canApprove.includes(1)) currentUser.canApprove.push(1);
+  }
+
   document.getElementById('user-role-label').textContent = `${currentUser.position} ${levelCode}`;
   document.getElementById('user-avatar').textContent = currentUser.name.charAt(0);
+
 
   // 7. กำหนดค่าเริ่มต้นใส่ฟอร์มใบขอรถอัตโนมัติ
   document.getElementById('input-requester').value = currentUser.name;
@@ -2465,10 +2492,14 @@ function setupEventListeners() {
       newBookingId = 'BKG-FMO-' + String(counter).padStart(3, '0');
     }
 
-    const supervisorUser = usersList.find(u => u.username.toLowerCase() === 'prathum.c');
-    const fallbackManagerEmail = supervisorUser ? supervisorUser.email : 'ranida.c@fishmarket.co.th';
-    const managerEmail = currentUser.manager_email || fallbackManagerEmail;
+/// 1. ดึงอีเมลหัวหน้างานจากข้อมูลผู้ใช้ที่ล็อกอิน (ไม่ใช้แผนสำรองแล้ว)
+    const managerEmail = currentUser.manager_email;
 
+    // 2. 🚨 ดักตรวจสอบ: ถ้าไม่มีอีเมลหัวหน้า ให้บล็อกการจองและเด้งแจ้งเตือน
+    if (!managerEmail || managerEmail.trim() === '') {
+      showToast("ไม่อนุญาตให้ทำรายการ: ท่านยังไม่มีข้อมูลอีเมลหัวหน้างานในระบบ กรุณาติดต่อผู้ดูแลระบบ", "error");
+      return; // สั่งยกเลิกการทำงานของฟังก์ชันนี้ทันที ใบจองจะไม่ถูกสร้าง
+    }
     const newBooking = {
       id: newBookingId,
       requester: document.getElementById('input-requester').value,
@@ -2492,7 +2523,7 @@ function setupEventListeners() {
       price,
       goCheck,
       backCheck,
-      status: 'pending',
+      status: 'pending_l1',
       currentApprovalLevel: 1,
       driverName: '',
       signatures: [
