@@ -258,7 +258,7 @@ async function initDatabase() {
   // Try to load bookings from Cloudflare KV database first
   let dbBookingsLoaded = false;
   try {
-    const dbResponse = await fetch('/api/get-bookings');
+    /*const dbResponse = await fetch('/api/get-bookings');//
     if (dbResponse.ok) {
       let dbBookings = await dbResponse.json();
       if (dbBookings && Array.isArray(dbBookings)) {
@@ -276,7 +276,7 @@ async function initDatabase() {
         localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
         dbBookingsLoaded = true;
       }
-    }
+    }*/
   } catch (error) {
     console.error("Failed to load bookings from Cloudflare KV database:", error);
   }
@@ -505,10 +505,15 @@ async function initDatabase() {
   }
 }
 
-async function saveBookings() {
+// ================================================================
+// 1. ฟังก์ชันบันทึกข้อมูล (เซฟลงทั้ง Cloudflare และ สำรองไว้ในเครื่อง)
+// ================================================================
+/*async function saveBookings() {
+  // บันทึกสำรองลง LocalStorage ของเบราว์เซอร์
   localStorage.setItem('bookings_data', JSON.stringify(bookings));
   
   try {
+    // พยายามส่งไปบันทึกที่ฐานข้อมูล Cloudflare (API)
     await fetch('/api/save-bookings', {
       method: 'POST',
       headers: {
@@ -519,8 +524,86 @@ async function saveBookings() {
   } catch (error) {
     console.error("Failed to save bookings to Cloudflare KV database:", error);
   }
+}*/
+
+// ================================================================
+// 2. ฟังก์ชันโหลดข้อมูล (แก้ปัญหาล็อกเอาท์แล้วข้อมูลหายตอนเทสในเครื่อง)
+// ================================================================
+/*async function fetchBookings() {
+  // 🌟 Step 1: ดึงข้อมูลจากความจำเครื่องมาสแตนด์บายไว้ก่อนทันที (ไม่ต้องรอ API)
+  const savedData = localStorage.getItem('bookings_data');
+  if (savedData) {
+    bookings = JSON.parse(savedData);
+  } else {
+    bookings = [];
+  }
+  
+  // อัปเดตสถิติตั้งต้นรอไว้เลย
+  updateStats();
+  if (currentUser) {
+    renderDashboard();
+    renderBookingsLists();
+    renderMonthCalendar();
+  }
+
+  // 🌟 Step 2: ค่อยแอบวิ่งไปขอข้อมูลอัปเดตล่าสุดจาก API (ทำงานอยู่เบื้องหลัง)
+  try {
+    const response = await fetch('/api/get-bookings');
+    if (response.ok) {
+      bookings = await response.json();
+      localStorage.setItem('bookings_data', JSON.stringify(bookings)); // อัปเดตข้อมูลลงเครื่องซ้ำอีกรอบ
+      
+      // สั่งรีเรนเดอร์หน้าจออีกครั้งเมื่อได้ข้อมูลใหม่สดๆ จากเซิร์ฟเวอร์
+      updateStats();
+      if (currentUser) {
+        renderDashboard();
+        renderBookingsLists();
+        renderMonthCalendar();
+      }
+    }
+  } catch (error) {
+    // ถ้ารันในเครื่อง (Local) แล้ว fetch ไม่ผ่าน ก็จะปล่อยผ่านเงียบๆ 
+    // เพราะเรามีข้อมูลสแตนด์บายจาก Step 1 ช้อนไว้เรียบร้อยแล้ว ข้อมูลจะไม่หายแน่นอน
+    console.warn("รันระบบในเครื่อง (Local): ดึงข้อมูลจาก LocalStorage สำเร็จ");
+  }
+}*/
+// ==========================================
+// 1. ฟังก์ชันบันทึกข้อมูล (เซฟลงเครื่องเพียวๆ 100%)
+// ==========================================
+function saveBookings() {
+  // 🛡️ เกราะป้องกันขั้นสุดยอด: ห้ามเอา 0 รายการไปเซฟทับข้อมูลเดิมเด็ดขาด!
+  if (bookings.length === 0) {
+    console.warn("🛑 บล็อกการทำงาน: ป้องกันการเซฟ 0 รายการทับข้อมูลเดิม!");
+    return; // สั่งหยุดการทำงานทันที ไม่ให้มันเซฟลงเครื่อง
+  }
+
+  // ถ้ามีข้อมูล (มากกว่า 0) ค่อยให้เซฟลงเครื่อง
+  localStorage.setItem('bookings_data', JSON.stringify(bookings));
+  console.log("💾 บันทึกข้อมูลสำเร็จ! จำนวนทั้งหมด:", bookings.length, "รายการ");
 }
 
+// ==========================================
+// 2. ฟังก์ชันโหลดข้อมูล (ดึงจากเครื่องเพียวๆ 100%)
+// ==========================================
+function fetchBookings() {
+  const savedData = localStorage.getItem('bookings_data');
+  
+  if (savedData && savedData !== 'undefined') {
+    bookings = JSON.parse(savedData);
+    console.log("📂 ดึงข้อมูลจากเครื่องสำเร็จ! จำนวน:", bookings.length, "รายการ");
+  } else {
+    bookings = [];
+    console.log("📂 ยังไม่มีข้อมูลในระบบ เริ่มต้นใหม่ที่ 0 รายการ");
+  }
+
+  // โหลดเสร็จสั่งโชว์หน้าจอทันที
+  updateStats();
+  if (currentUser) {
+    renderDashboard();
+    renderBookingsLists();
+    renderMonthCalendar();
+  }
+}
 // Check for conflicting bookings for FMO cars
 function hasBookingConflict(carId, startDateStr, endDateStr, excludeId = null) {
   const start = new Date(startDateStr);
@@ -907,7 +990,7 @@ function updateStats() {
   
   const now = new Date();
   const busyCarIds = bookings
-    .filter(b => (b.status === 'approved' || (b.status === 'pending' && b.currentApprovalLevel >= 3)) && b.travelType === 'fmo_car' && new Date(b.startDate) <= now && new Date(b.endDate) >= now)
+    .filter(b => (b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3)) && b.travelType === 'fmo_car' && new Date(b.startDate) <= now && new Date(b.endDate) >= now)
     .map(b => b.carId);
   const availCount = cars.filter(c => !busyCarIds.includes(c.id)).length;
   if (statAvailCars) statAvailCars.textContent = `${availCount} คัน`;
@@ -918,10 +1001,10 @@ function updateStats() {
 
   if (currentUser) {
     bookings.forEach(b => {
-      // ตรวจสอบเงื่อนไขพื้นฐาน: งานที่รออนุมัติและไม่ต้องรอข้อมูลเพิ่มจากผู้ขอ
-      if (b.status === 'pending' && !b.waitingForRequesterInput) {
+      // 🚨 จุดที่แก้ไข: เปลี่ยนเป็นเช็คว่าสถานะ "ขึ้นต้นด้วย pending" (รองรับ pending_l1, pending_l2)
+      if (b.status.startsWith('pending') && !b.waitingForRequesterInput) {
         
-        // ตรวจสอบว่า งานเลเวลนี้ (b.currentApprovalLevel) อยู่ในสิทธิ์ที่ User คนนี้อนุมัติได้จริงในตารางจริงไหม
+        // ตรวจสอบว่า งานเลเวลนี้ (b.currentApprovalLevel) อยู่ในสิทธิ์ที่ User คนนี้อนุมัติได้จริงไหม
         const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel);
         
         // ตรวจสอบว่า ตรงกับระดับอนุมัติที่เลือกสลับบทบาทใน Dropdown อยู่หรือไม่
@@ -954,17 +1037,18 @@ function updateStats() {
   if (pendingBadge) pendingBadge.textContent = pendingCount;
   if (tabPendingBadge) tabPendingBadge.textContent = pendingCount;
 
-  // 3. เพิ่มการอัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่ง (ตามกล่องข้อความแจ้งเตือนจริงของคุณ)
-  const emailBadge = document.getElementById('email-inbox-badge');
+  // 3. เพิ่มการอัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่ง
+  // (น้องเน็ตดักจับคลาส .notification-badge เผื่อไว้ให้ด้วย ป้องกันกระดิ่งไม่ยอมโชว์)
+  const emailBadge = document.getElementById('email-inbox-badge') || document.querySelector('.notification-badge');
   if (emailBadge) {
     emailBadge.textContent = pendingCount;
     emailBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
   }
 
-  // 4. คำนวณจำนวนรายการที่ฉันขอ (L0)
+  // 4. คำนวณจำนวนรายการที่ฉันขอ (L0) - เพิ่มการดักด้วยอีเมลให้แม่นยำขึ้น
   let myCount = 0;
   if (currentUser) {
-    myCount = bookings.filter(b => b.requester === currentUser.name).length;
+    myCount = bookings.filter(b => (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || b.requester === currentUser.name).length;
   }
   const tabMyCountBadge = document.getElementById('tab-my-bookings-count');
   if (tabMyCountBadge) tabMyCountBadge.textContent = myCount;
@@ -984,7 +1068,7 @@ function renderDashboard() {
   cars.forEach(car => {
     // Find if car has an active booking right now (approved OR pending-assigned by L2)
     const activeBkg = bookings.find(b => {
-      const isAssigned = b.status === 'approved' || (b.status === 'pending' && b.currentApprovalLevel >= 3);
+      const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
       if (!isAssigned || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
       return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
     });
@@ -1078,7 +1162,7 @@ function renderTimelineScheduler() {
 
   cars.forEach(car => {
     const carBookings = bookings.filter(b => {
-      const isAssigned = b.status === 'approved' || (b.status === 'pending' && b.currentApprovalLevel >= 3);
+      const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
       return b.travelType === 'fmo_car' && b.carId === car.id && isAssigned;
     });
 
@@ -2484,22 +2568,19 @@ function setupEventListeners() {
     const goCheck = document.getElementById('check-car-go').checked;
     const backCheck = document.getElementById('check-car-back').checked;
 
-    // Auto-generate booking ID
-    let counter = bookings.length + 1;
-    let newBookingId = 'BKG-FMO-' + String(counter).padStart(3, '0');
-    while (bookings.some(b => b.id === newBookingId)) {
-      counter++;
-      newBookingId = 'BKG-FMO-' + String(counter).padStart(3, '0');
-    }
+    // 1. สร้างรหัสใบจองแบบใหม่ (BGK-ปีเดือน-เลขรัน)
+    const newBookingId = generateNewBookingId();
 
-/// 1. ดึงอีเมลหัวหน้างานจากข้อมูลผู้ใช้ที่ล็อกอิน (ไม่ใช้แผนสำรองแล้ว)
+    // 2. ดึงอีเมลหัวหน้างานจากข้อมูลผู้ใช้ที่ล็อกอิน (บังคับต้องมีหัวหน้า)
     const managerEmail = currentUser.manager_email;
 
-    // 2. 🚨 ดักตรวจสอบ: ถ้าไม่มีอีเมลหัวหน้า ให้บล็อกการจองและเด้งแจ้งเตือน
+    // 3. 🚨 ดักตรวจสอบ: ถ้าไม่มีอีเมลหัวหน้า ให้บล็อกการจองและเด้งแจ้งเตือน
     if (!managerEmail || managerEmail.trim() === '') {
       showToast("ไม่อนุญาตให้ทำรายการ: ท่านยังไม่มีข้อมูลอีเมลหัวหน้างานในระบบ กรุณาติดต่อผู้ดูแลระบบ", "error");
-      return; // สั่งยกเลิกการทำงานของฟังก์ชันนี้ทันที ใบจองจะไม่ถูกสร้าง
+      return; // หยุดการทำงานทันที ใบจองจะไม่ถูกสร้าง
     }
+
+    // 4. สร้างชุดข้อมูลใบจองใหม่
     const newBooking = {
       id: newBookingId,
       requester: document.getElementById('input-requester').value,
@@ -2523,7 +2604,7 @@ function setupEventListeners() {
       price,
       goCheck,
       backCheck,
-      status: 'pending_l1',
+      status: 'pending_l1', // 🚨 สถานะรอหัวหน้าอนุมัติ
       currentApprovalLevel: 1,
       driverName: '',
       signatures: [
@@ -2535,6 +2616,7 @@ function setupEventListeners() {
       ]
     };
 
+    // 5. นำใบจองเข้าตารางและสั่งบันทึก
     bookings.push(newBooking);
     saveBookings();
     
@@ -3085,30 +3167,46 @@ function updateEmailInboxUI() {
   const list = document.getElementById('email-logs-list');
   if (!list) return;
 
-  // กรองงานที่รอคนนี้อนุมัติจริงๆ
+  // ==========================================
+  // กรองงานที่รอคนนี้อนุมัติจริงๆ (อัปเดตรองรับ pending_l1 และเช็คอีเมลหัวหน้า)
+  // ==========================================
   const myPendingTasks = bookings.filter(b => {
-    if (b.status !== 'pending' || b.waitingForRequesterInput) return false;
-    if (currentUser.role === 'supervisor' && b.currentApprovalLevel === 1) return true;
+    // 1. ตรวจสอบว่าสถานะขึ้นต้นด้วย pending ไหม และไม่ได้รอข้อมูลจากผู้ขอ
+    if (!b.status.startsWith('pending') || b.waitingForRequesterInput) return false;
+
+    // 2. ถ้าเป็น L1 (Supervisor) ให้เช็คอีเมลว่าตรงกับเราไหม
+    if (currentUser.role === 'supervisor' && b.currentApprovalLevel === 1) {
+      const mEmail = (b.managerEmail || '').toLowerCase();
+      const cEmail = (currentUser.email || '').toLowerCase();
+      return (mEmail === cEmail || mEmail === ''); // ถ้าอีเมลตรงกัน หรือไม่มีอีเมล ให้โชว์
+    }
+
+    // 3. ถ้าเป็นเลเวลอื่นๆ (L2 - L4) ให้เช็คตาม Role ปกติ
     if (currentUser.role === 'fleet_admin' && b.currentApprovalLevel === 2) return true;
     if (currentUser.role === 'director' && b.currentApprovalLevel === 3) return true;
     if (currentUser.role === 'executive' && b.currentApprovalLevel === 4) return true;
+
     return false;
   });
 
+  // ==========================================
+  // วาดหน้าจอ (ถ้าไม่มีงาน หรือ มีงาน)
+  // ==========================================
   if (myPendingTasks.length === 0) {
     list.innerHTML = `<div style="text-align: center; padding: 2rem;">ไม่มีรายการรอคุณอนุมัติในขณะนี้</div>`;
     return;
   }
 
   list.innerHTML = myPendingTasks.map(b => `
-    <div style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px;">
-      <strong>${b.id}</strong>: ${b.purpose}
-      <p style="font-size: 0.8rem; color: #666;">จาก: ${b.requester}</p>
-      <button class="btn btn-primary btn-sm" onclick="openApprovalModal('${b.id}')">ตรวจสอบ</button>
+    <div style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; background-color: #fff;">
+      <strong style="color: var(--primary-color);">${b.id}</strong>: ${b.purpose}
+      <p style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">จาก: ${b.requester}</p>
+      <div style="margin-top: 0.5rem;">
+        <button class="btn btn-primary btn-sm" onclick="openApprovalModal('${b.id}')">ตรวจสอบ</button>
+      </div>
     </div>
   `).join('');
 }
-
 window.deleteEmailLog = function(index) {
   emailLogs.splice(index, 1);
   localStorage.setItem('email_logs_data', JSON.stringify(emailLogs));
@@ -3528,3 +3626,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+// ==========================================
+// ฟังก์ชันสร้างรหัสใบจองแบบใหม่ (BGK-ปีเดือน-เลขรัน)
+// ==========================================
+function generateNewBookingId() {
+  const now = new Date();
+  const yearBE = now.getFullYear() + 543;
+  const yearStr = String(yearBE).slice(-2); 
+  const monthStr = String(now.getMonth() + 1).padStart(2, '0'); 
+  const prefix = `BGK-${yearStr}${monthStr}-`; 
+  
+  const bookingsThisMonth = bookings.filter(b => b.id && b.id.startsWith(prefix));
+  let nextRunningNumber = 1;
+  
+  if (bookingsThisMonth.length > 0) {
+    const maxNumber = Math.max(...bookingsThisMonth.map(b => {
+      const numStr = b.id.substring(prefix.length); 
+      return parseInt(numStr, 10) || 0;
+    }));
+    nextRunningNumber = maxNumber + 1;
+  }
+  
+  const runningStr = String(nextRunningNumber).padStart(3, '0');
+  return `${prefix}${runningStr}`;
+}
+// ==========================================
+// ฟังก์ชันกลาง: ดึงรายการที่รอฉันอนุมัติเท่านั้น
+// ==========================================
+function getMyPendingTasksList() {
+  if (!currentUser) return [];
+  const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+  
+  return bookings.filter(b => {
+    // 🚨 เช็คว่าสถานะขึ้นต้นด้วย pending (รองรับ pending_l1, pending_l2)
+    if (b.status.startsWith('pending') && !b.waitingForRequesterInput) {
+      const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel);
+      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel);
+      
+      if (canApproveThisLevel && isSelectedLevel) {
+        if (b.currentApprovalLevel === 1) {
+          const mEmail = (b.managerEmail || '').toLowerCase();
+          const cEmail = (currentUser.email || '').toLowerCase();
+          return (mEmail === cEmail || mEmail === '');
+        }
+        return true;
+      }
+    }
+    return false;
+  });
+}
