@@ -19,6 +19,9 @@ let calFilterCar = 'all';
 // Active booking ID for approval action
 let activeBookingIdForApproval = null;
 
+// Welfare Car driver license file upload state (base64)
+let uploadedDriverLicenseBase64 = null;
+
 // Simulated Email Notification logs
 let emailLogs = JSON.parse(localStorage.getItem('email_logs_data') || '[]');
 
@@ -31,6 +34,36 @@ function getDriverPhoneByName(driverName) {
   const defaultCar = DEFAULT_CARS.find(c => c.driverName && c.driverName.replace(/\s+/g, '') === searchName);
   if (defaultCar && defaultCar.phone) return defaultCar.phone;
   return '';
+}
+
+// Helper to compress uploaded images via canvas to stay within storage limits
+function compressImage(file, callback) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      const maxDim = 800;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      callback(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 // Asynchronous helper to send email notification via server-side API proxy
@@ -64,6 +97,9 @@ async function sendEmailNotification(toEmail, subject, htmlBody) {
     subject: subject,
     body: formattedHtml
   });
+  if (emailLogs.length > 30) {
+    emailLogs = emailLogs.slice(0, 30);
+  }
   localStorage.setItem('email_logs_data', JSON.stringify(emailLogs));
   updateEmailInboxUI();
 
@@ -282,8 +318,8 @@ async function initDatabase() {
   }
 
   // Clear simulated email logs for production
-  localStorage.removeItem('email_logs_data');
-  emailLogs = [];
+  // localStorage.removeItem('email_logs_data');
+  // emailLogs = [];
 
   // Load default bookings mock data if empty or contains old spelling or Mojibake or JPEG signature format, or contains mock IDs
   let bookingsData = localStorage.getItem('bookings_data');
@@ -332,6 +368,11 @@ async function initDatabase() {
       b.department = '-';
       bookingsUpdated = true;
     }
+    // Migrate pending_l1 status to pending
+    if (b.status === 'pending_l1') {
+      b.status = 'pending';
+      bookingsUpdated = true;
+    }
   });
 
   // Fix driver and comments in existing BKG-FMO-001 if loaded
@@ -353,7 +394,7 @@ async function initDatabase() {
     }
   });
 
-  if (!dbBookingsLoaded) {
+  if (!dbBookingsLoaded || bookingsUpdated) {
     saveBookings();
   }
 
@@ -627,9 +668,16 @@ function loginUser(userObj) {
   // 🚨 ระบบผู้ช่วยอัจฉริยะ: ดักจับตำแหน่งอัตโนมัติ (ไม่ต้องไปแก้ฐานข้อมูล) 🚨
   // =====================================================================
   const positionText = userObj.position || '';
+  const usernameLower = (userObj.username || '').toLowerCase();
+  const isSpecialUser = ['saisunee.p', 'sarena.m', 'chalong.c', 'sakda.a', 'panadon.p', 'piyawan.k'].includes(usernameLower);
   
-  // ถ้าในชื่อตำแหน่งมีคำว่า "ร.หส." ให้จัดการอัปเกรดเป็น L1 ทันที
-  if (positionText.includes('ร.หส.')) {
+  // ถ้าในชื่อตำแหน่งมีคำว่า "หัวหน้าสำนักงาน", "หัวหน้าแผนก", "ร.หส.", หรือ "ร.หผ." ให้จัดการอัปเกรดเป็น L1 ทันที
+  if (!isSpecialUser && (
+    positionText.includes('หัวหน้าสำนักงาน') ||
+    positionText.includes('หัวหน้าแผนก') ||
+    positionText.includes('ร.หส.') ||
+    positionText.includes('ร.หผ.')
+  )) {
     if (!userObj.canApprove) {
       userObj.canApprove = [];
     }
@@ -647,18 +695,24 @@ function loginUser(userObj) {
 
   // 3. คำนวณหาบทบาทหลัก (roleKey/roleName) อัตโนมัติจากสิทธิ์อนุมัติสูงสุดที่มีในตารางจริง
   if (userObj.canApprove && userObj.canApprove.length > 0) {
-    const maxLevel = Math.max(...userObj.canApprove);
+    let primaryLevel = Math.max(...userObj.canApprove);
+    const username = (userObj.username || '').toLowerCase();
+    if (username === 'saisunee.p') {
+      primaryLevel = 3; // สายสุนีย์: สถานะหลักคือ L3
+    } else if (username === 'sarena.m') {
+      primaryLevel = 1; // ซารีนา: สถานะหลักคือ L1
+    }
 
-    if (maxLevel === 1) {
+    if (primaryLevel === 1) {
       roleKey = 'supervisor';
       roleName = 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)';
-    } else if (maxLevel === 2) {
+    } else if (primaryLevel === 2) {
       roleKey = 'fleet_admin';
-      roleName = 'ผู้จัดรถ / งานยานพาหนะ (L2)';
-    } else if (maxLevel === 3) {
+      roleName = username === 'sakda.a' ? 'ผู้เสนอขอจองและผู้จัดรถ (L0 & L2)' : 'ผู้จัดรถ / งานยานพาหนะ (L2)';
+    } else if (primaryLevel === 3) {
       roleKey = 'director';
-      roleName = 'หัวหน้าสำนักงานบริหารการพัสดุ (หส.พด.) (L3)';
-    } else if (maxLevel === 4) {
+      roleName = username === 'panadon.p' ? 'ผู้เสนอขอจองและหัวหน้าสำนักงานบริหารการพัสดุ (L0 & L3)' : 'หัวหน้าสำนักงานบริหารการพัสดุ (หส.พด.) (L3)';
+    } else if (primaryLevel === 4) {
       roleKey = 'executive';
       roleName = 'ผู้อำนวยการฝ่ายบัญชีการเงิน (ผฝ.บง.) (L4)';
     }
@@ -685,9 +739,9 @@ function loginUser(userObj) {
     username: userObj.username,
     name: userObj.name,
     position: userObj.position || 'เจ้าหน้าที่',
-    department: userObj.department1 || 'ฝบร.',
-    office: userObj.department2 || 'สกม.',
-    division: userObj.department1 || 'ฝบร.',
+    department: userObj.department1 || userObj.department || 'ฝบร.',
+    office: userObj.department2 || userObj.office || 'สกม.',
+    division: userObj.department1 || userObj.division || userObj.department || 'ฝบร.',
     role: roleKey,
     roleName: roleName,
     canApprove: userObj.canApprove || [], // ส่งต่อรายการ L ที่อนุมัติได้ไปด้วย
@@ -706,14 +760,34 @@ function loginUser(userObj) {
   // 6. อัปเดตข้อมูลโปรไฟล์ผู้ใช้งานที่มุมขวาบน (Topbar)
   document.getElementById('user-display-name').textContent = currentUser.name;
   
-  // คำนวณป้ายสิทธิ์สูงสุดที่จะไปต่อท้ายชื่อตำแหน่ง
+  // คำนวณป้ายสิทธิ์หลักที่จะไปต่อท้ายชื่อตำแหน่ง
   let levelCode = '(L0)';
   if (currentUser.canApprove && currentUser.canApprove.length > 0) {
-    levelCode = `(L${Math.max(...currentUser.canApprove)})`;
+    let displayLevel = Math.max(...currentUser.canApprove);
+    const username = (currentUser.username || '').toLowerCase();
+    if (username === 'saisunee.p') {
+      displayLevel = 3; // สายสุนีย์: สถานะหลักคือ L3
+    } else if (username === 'sarena.m') {
+      displayLevel = 1; // ซารีนา: สถานะหลักคือ L1
+    }
+    
+    if (username === 'sakda.a') {
+      levelCode = '(L0 & L2)';
+    } else if (username === 'panadon.p') {
+      levelCode = '(L0 & L3)';
+    } else {
+      levelCode = `(L${displayLevel})`;
+    }
   }
 
-  // 🚨 ท่าไม้ตาย: ดักจับก่อนแสดงผล ถ้าตำแหน่งมีคำว่า "ร.หส." บังคับเป็น L1 ทันที
-  if (currentUser.position && currentUser.position.includes('ร.หส.')) {
+  // 🚨 ท่าไม้ตาย: ดักจับก่อนแสดงผล ถ้าตำแหน่งมีคำว่า "หัวหน้าสำนักงาน", "หัวหน้าแผนก", "ร.หส.", หรือ "ร.หผ." บังคับเป็น L1 ทันที
+  const isSpecialApprover = currentUser.username && ['saisunee.p', 'sarena.m', 'chalong.c', 'sakda.a', 'panadon.p', 'piyawan.k'].includes(currentUser.username.toLowerCase());
+  if (!isSpecialApprover && currentUser.position && (
+    currentUser.position.includes('หัวหน้าสำนักงาน') ||
+    currentUser.position.includes('หัวหน้าแผนก') ||
+    currentUser.position.includes('ร.หส.') ||
+    currentUser.position.includes('ร.หผ.')
+  )) {
     levelCode = '(L1)';
     currentUser.role = 'supervisor'; // บังคับเปลี่ยนบทบาท
     if (!currentUser.canApprove) currentUser.canApprove = [];
@@ -736,7 +810,10 @@ function loginUser(userObj) {
 
   const btnOpenBooking = document.getElementById('btn-open-booking');
   // เช็คว่าคนนี้เป็นผู้อนุมัติระดับสูงล้วนๆ หรือไม่ (L3, L4 เท่านั้นและไม่มี L1 ปน)
-  const isOnlyHighLevelApprover = currentUser.canApprove.length > 0 && currentUser.canApprove.every(lvl => lvl >= 3);
+  // แต่ยกเว้น พนาดร (panadon.p) ที่เป็น L0 และ L3 ทำให้ต้องเห็นปุ่มเขียนใบเสนอจอง
+  const isOnlyHighLevelApprover = currentUser.canApprove.length > 0 && 
+                                  currentUser.canApprove.every(lvl => lvl >= 3) && 
+                                  (currentUser.username || '').toLowerCase() !== 'panadon.p';
   
   if (isOnlyHighLevelApprover) {
     btnOpenBooking.classList.add('hidden'); // ซ่อนปุ่มเขียนใบถาวรสำหรับ L3, L4
@@ -789,7 +866,14 @@ function loginUser(userObj) {
         reportNavItem.classList.add('hidden');
       }
     }
-    showView('dashboard');
+    
+    // หากมีรายการรออนุมัติสำหรับผู้ใช้คนนี้ (L2, L3, L4) ให้พาไปยังหน้า "งานรออนุมัติจากคุณ" ในหน้า bookings
+    const pendingTasks = getMyPendingTasksList();
+    if (pendingTasks && pendingTasks.length > 0) {
+      showView('bookings');
+    } else {
+      showView('dashboard');
+    }
   }
 }
 
@@ -877,11 +961,11 @@ function checkLoginStatus() {
       return;
     }
     let parsed = JSON.parse(cached);
-    if ((!parsed.sign || parsed.sign.includes('image/jpeg')) && usersList) {
+    if (usersList && usersList.length > 0) {
       const dbUser = usersList.find(u => u.username.toLowerCase() === parsed.username.toLowerCase());
-      if (dbUser && dbUser.sign) {
-        parsed.sign = dbUser.sign;
-        localStorage.setItem('current_user', JSON.stringify(parsed));
+      if (dbUser) {
+        loginUser(dbUser);
+        return;
       }
     }
     loginUser(parsed);
@@ -939,7 +1023,7 @@ function showView(viewName) {
   // Protect dashboard view from unauthorized roles and guests
   if (!currentUser && viewName === 'dashboard') {
     viewName = 'calendar';
-  } else if (currentUser && (currentUser.role === 'requester' || currentUser.role === 'supervisor') && viewName === 'dashboard') {
+  } else if (currentUser && (currentUser.role === 'requester' || (currentUser.role === 'supervisor' && !currentUser.canApprove.includes(4))) && viewName === 'dashboard') {
     viewName = 'bookings';
   }
 
@@ -981,6 +1065,7 @@ function showView(viewName) {
 
 // Update stats on Dashboard
 function updateStats() {
+  autoGenerateMissingEmailLogs();
   const statTotalCars = document.getElementById('stat-total-cars');
   const statAvailCars = document.getElementById('stat-avail-cars');
   const statPending = document.getElementById('stat-pending-approvals');
@@ -1041,8 +1126,10 @@ function updateStats() {
   // (น้องเน็ตดักจับคลาส .notification-badge เผื่อไว้ให้ด้วย ป้องกันกระดิ่งไม่ยอมโชว์)
   const emailBadge = document.getElementById('email-inbox-badge') || document.querySelector('.notification-badge');
   if (emailBadge) {
-    emailBadge.textContent = pendingCount;
-    emailBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+    const activeLogs = getActiveEmailLogs();
+    const count = activeLogs.length;
+    emailBadge.textContent = count;
+    emailBadge.style.display = count > 0 ? 'inline-block' : 'none';
   }
 
   // 4. คำนวณจำนวนรายการที่ฉันขอ (L0) - เพิ่มการดักด้วยอีเมลให้แม่นยำขึ้น
@@ -1054,7 +1141,10 @@ function updateStats() {
   if (tabMyCountBadge) tabMyCountBadge.textContent = myCount;
 
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
-  if (tabAllHistoryBadge) tabAllHistoryBadge.textContent = bookings.length;
+  if (tabAllHistoryBadge) {
+    const historyCount = bookings.filter(b => b.status === 'approved' || b.status === 'rejected').length;
+    tabAllHistoryBadge.textContent = historyCount;
+  }
 }
 function renderDashboard() {
   updateStats();
@@ -1296,7 +1386,13 @@ function renderBookingsLists() {
     let infoStr = '';
     if (b.travelType === 'fmo_car') {
       const carObj = cars.find(c => c.id === b.carId);
-      infoStr = `🚗 ใช้รถยนต์ อสป.: <strong>${carObj ? carObj.name : 'ไม่ระบุ'}</strong> (ทะเบียน ${carObj ? carObj.plate : '-'})`;
+      const prefix = b.controlUnit === 'รถสวัสดิการ' ? '🚗 [รถสวัสดิการ]' : '🚗 ใช้รถยนต์ อสป.';
+      infoStr = `${prefix}: <strong>${carObj ? carObj.name : 'ไม่ระบุ'}</strong> (ทะเบียน ${carObj ? carObj.plate : '-'})`;
+      if (b.driverName && b.driverName !== '-') {
+        const phone = getDriverPhoneByName(b.driverName);
+        const phoneStr = phone ? ` (โทร: ${phone})` : '';
+        infoStr += `<br>👤 พขร.: <strong>${b.driverName}</strong>${phoneStr}`;
+      }
     } else {
       infoStr = `🚐 ใช้รถรับจ้างสาธารณะ: ระยะทาง ${b.distance} กม. (ประมาณราคา ${b.price} บาท)`;
     }
@@ -1312,7 +1408,7 @@ function renderBookingsLists() {
 
     let stepsDots = '';
     const isRequesterUser = currentUser && (currentUser.role === 'requester' || b.requester === currentUser.name);
-    const maxSteps = (b.travelType === 'public_car' && isRequesterUser) ? 3 : 4;
+    const maxSteps = 4;
     for (let i = 1; i <= maxSteps; i++) {
       let dotClass = 'step-dot';
       if (b.currentApprovalLevel > i) dotClass += ' completed';
@@ -1332,7 +1428,7 @@ function renderBookingsLists() {
     card.innerHTML = `
       <div class="booking-card-top">
         <span class="booking-id">${b.id}</span>
-        <span class="booking-requester">${b.requester} ${b.position ? '(' + b.position + ')' : ''}</span>
+        <span class="booking-requester">${b.requester} ${(b.office || b.position) ? '(' + (b.office || b.position) + ')' : ''}</span>
         <span class="badge ${statusClass}">${statusText}</span>
       </div>
       <div class="booking-card-body">
@@ -1356,18 +1452,23 @@ function renderBookingsLists() {
     const isMyRequest = currentUser && b.requester === currentUser.name;
     
     let isPendingForMe = false;
-    if (b.status === 'pending' && currentUser && !b.waitingForRequesterInput) {
-      if (currentUser.role === 'supervisor' && b.currentApprovalLevel === 1) {
-        // แก้ไข: กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
-        const mEmail = (b.managerEmail || '').toLowerCase();
-        const cEmail = (currentUser.email || '').toLowerCase();
-        if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
+    if (b.status.startsWith('pending') && currentUser && !b.waitingForRequesterInput) {
+      const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+      const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel);
+      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel);
+
+      if (canApproveThisLevel && isSelectedLevel) {
+        if (b.currentApprovalLevel === 1) {
+          // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
+          const mEmail = (b.managerEmail || '').toLowerCase();
+          const cEmail = (currentUser.email || '').toLowerCase();
+          if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
+            isPendingForMe = true;
+          }
+        } else {
           isPendingForMe = true;
         }
       }
-      else if (currentUser.role === 'fleet_admin' && b.currentApprovalLevel === 2) isPendingForMe = true;
-      else if (currentUser.role === 'director' && b.currentApprovalLevel === 3) isPendingForMe = true;
-      else if (currentUser.role === 'executive' && b.currentApprovalLevel === 4) isPendingForMe = true;
     }
 
     if (isMyRequest && myContainer) {
@@ -1376,7 +1477,7 @@ function renderBookingsLists() {
     if (isPendingForMe && pendingContainer) {
       pendingContainer.appendChild(helperCreateCard(b, isPendingForMe));
     }
-    if (allContainer) {
+    if (allContainer && (b.status === 'approved' || b.status === 'rejected')) {
       allContainer.appendChild(helperCreateCard(b, isPendingForMe));
     }
   });
@@ -1396,6 +1497,15 @@ function renderBookingsLists() {
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📋</div>
         <div style="font-weight: 600; font-size: 1.05rem; color: var(--text-main);">ไม่มีรายการรออนุมัติ</div>
         <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 0.25rem;">รายการขอใช้รถที่รอการตรวจเห็นชอบและอนุมัติจากคุณจะแสดงขึ้นที่นี่</div>
+      </div>
+    `;
+  }
+  if (allContainer && allContainer.children.length === 0) {
+    allContainer.innerHTML = `
+      <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
+        <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📚</div>
+        <div style="font-weight: 600; font-size: 1.05rem; color: var(--text-main);">ไม่มีประวัติการใช้รถ</div>
+        <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 0.25rem;">รายการจองที่ได้รับการอนุมัติเสร็จสิ้นหรือถูกปฏิเสธแล้วจะแสดงขึ้นที่นี่</div>
       </div>
     `;
   }
@@ -1489,7 +1599,15 @@ function renderMonthCalendar() {
         }
 
         badge.innerHTML = `<span>${icon} ${b.purpose}</span>`;
-        badge.title = `${b.requester} | ${b.purpose}`;
+        const startT = new Date(b.startDate).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+        const endT = new Date(b.endDate).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+        const startD = new Date(b.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+        const endD = new Date(b.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
+        const timeText = startD === endD 
+          ? `${startD} (เวลา ${startT} - ${endT})` 
+          : `${startD} (${startT}) ถึง ${endD} (${endT})`;
+
+        badge.title = `ผู้จอง: ${b.requester || '-'}\nเรื่อง: ${b.purpose || '-'}\nสถานที่: ${b.destination || '-'}\nเวลา: ${timeText}`;
         badge.onclick = (e) => {
           e.stopPropagation();
           openApprovalModal(b.id);
@@ -1598,13 +1716,73 @@ function openApprovalModal(bookingId) {
   document.getElementById('detail-title').textContent = `ใบขออนุญาตใช้รถยนต์ เลขที่ ${booking.id}`;
   document.getElementById('detail-requester').textContent = booking.requester;
   document.getElementById('detail-office').textContent = `${booking.position} / แผนก ${booking.department} ฝ่าย ${booking.division} สังกัด ${booking.office}`;
-  document.getElementById('detail-travel-type').textContent = booking.travelType === 'fmo_car' ? '🚘 รถยนต์ อสป.' : '🚐 รถรับจ้างสาธารณะ';
+  let travelTypeLabel = '🚐 รถรับจ้างสาธารณะ';
+  if (booking.travelType === 'fmo_car') {
+    travelTypeLabel = booking.controlUnit === 'รถสวัสดิการ' ? '🚘 รถยนต์ สวัสดิการ' : '🚘 รถยนต์ อสป.';
+  }
+  document.getElementById('detail-travel-type').textContent = travelTypeLabel;
   
   if (booking.travelType === 'fmo_car') {
     const c = cars.find(car => car.id === booking.carId);
     document.getElementById('detail-car').innerHTML = `เลือกรถยนต์: <strong>${c ? c.name : 'ไม่พบข้อมูล'}</strong> (ทะเบียน: ${c ? c.plate : '-'}) [ทิศทาง: ${booking.goCheck ? 'ไป' : ''}${booking.goCheck && booking.backCheck ? '-' : ''}${booking.backCheck ? 'กลับ' : ''}]`;
   } else {
     document.getElementById('detail-car').innerHTML = `รถสาธารณะ: ระยะทาง <strong>${booking.distance} กม.</strong> (ราคาประมาณ <strong>${booking.price} บาท</strong>) [ทิศทาง: ${booking.goCheck ? 'ไป' : ''}${booking.goCheck && booking.backCheck ? '-' : ''}${booking.backCheck ? 'กลับ' : ''}]`;
+  }
+
+  // เติมข้อมูลพนักงานขับรถและเบอร์โทรศัพท์ (ถ้ามี)
+  const driverRow = document.getElementById('detail-driver-row');
+  const driverEl = document.getElementById('detail-driver');
+  if (driverRow && driverEl) {
+    if (booking.travelType === 'fmo_car' && booking.driverName && booking.driverName !== '-') {
+      const phone = getDriverPhoneByName(booking.driverName);
+      const phoneStr = phone ? ` (เบอร์โทร: ${phone})` : ' (ไม่มีข้อมูลเบอร์โทร)';
+      driverEl.innerHTML = `<strong>${booking.driverName}</strong>${phoneStr}`;
+      driverRow.style.display = 'table-row';
+    } else {
+      driverEl.textContent = '-';
+      driverRow.style.display = 'none';
+    }
+  }
+
+  // เติมข้อมูลสำเนาใบขับขี่ (สำหรับรถสวัสดิการ)
+  const licenseRow = document.getElementById('detail-driver-license-row');
+  const licenseEl = document.getElementById('detail-driver-license');
+  if (licenseRow && licenseEl) {
+    if (booking.controlUnit === 'รถสวัสดิการ' && booking.driverLicenseFile) {
+      if (booking.driverLicenseFile.startsWith('data:application/pdf')) {
+        licenseEl.innerHTML = `<a href="${booking.driverLicenseFile}" target="_blank" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.25rem 0.5rem; font-size:0.8rem; border-radius:4px; font-weight:600; background:var(--primary); color:white; border:none; text-decoration:none;">📄 เปิดดูไฟล์ PDF ใบขับขี่</a>`;
+      } else {
+        licenseEl.innerHTML = `
+          <a href="${booking.driverLicenseFile}" target="_blank" title="คลิกเพื่อดูรูปใหญ่">
+            <img src="${booking.driverLicenseFile}" style="max-width: 120px; max-height: 80px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-color); object-fit: contain;">
+          </a>
+        `;
+      }
+      licenseRow.style.display = 'table-row';
+    } else {
+      licenseEl.textContent = '-';
+      licenseRow.style.display = 'none';
+    }
+  }
+
+  // เติมข้อมูลที่อยู่ผู้ขอใช้รถ (สำหรับรถสวัสดิการ)
+  const addressRow = document.getElementById('detail-welfare-address-row');
+  const addressEl = document.getElementById('detail-welfare-address');
+  if (addressRow && addressEl) {
+    if (booking.controlUnit === 'รถสวัสดิการ') {
+      const addressParts = [];
+      if (booking.addressNo) addressParts.push(`บ้านเลขที่ ${booking.addressNo}`);
+      if (booking.addressMoo) addressParts.push(`หมู่ ${booking.addressMoo}`);
+      if (booking.addressRoad) addressParts.push(`ถนน ${booking.addressRoad}`);
+      if (booking.addressSubdistrict) addressParts.push(`ต./แขวง ${booking.addressSubdistrict}`);
+      if (booking.addressDistrict) addressParts.push(`อ./เขต ${booking.addressDistrict}`);
+      if (booking.addressProvince) addressParts.push(`จ. ${booking.addressProvince}`);
+      addressEl.textContent = addressParts.join(' ') || '-';
+      addressRow.style.display = 'table-row';
+    } else {
+      addressEl.textContent = '-';
+      addressRow.style.display = 'none';
+    }
   }
 
   document.getElementById('detail-route').textContent = booking.destination || booking.purpose || '-';
@@ -1658,64 +1836,79 @@ function openApprovalModal(bookingId) {
   let isMyTurn = false;
   if (booking.status === 'pending' && currentUser && !booking.waitingForRequesterInput) {
     const lvl = booking.currentApprovalLevel;
-    if (currentUser.role === 'supervisor' && lvl === 1) isMyTurn = true;
-    if (currentUser.role === 'fleet_admin' && lvl === 2) {
-      isMyTurn = true;
-      fleetAssignBox.style.display = 'block';
-      
-      const carSelectGroup = document.getElementById('fleet-admin-car-select-group');
-      const driverGroup = document.getElementById('fleet-admin-driver-group');
-      
-      if (carSelectGroup) carSelectGroup.style.display = 'block';
-      
-      const carSelect = document.getElementById('assign-car');
-      carSelect.innerHTML = `
-        <option value="">-- กรุณาเลือกรถยนต์ --</option>
-        <option value="taxi">🚕 รถแท็กซี่ (TAXI)</option>
-      `;
-      cars.forEach(car => {
-        const hasConflict = hasBookingConflict(car.id, booking.startDate, booking.endDate, booking.id);
-        const now = new Date();
-        const isBusyNow = bookings.some(b => {
-          const isAssigned = b.status === 'approved' || (b.status === 'pending' && b.currentApprovalLevel >= 3);
-          if (b.id === booking.id || !isAssigned || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
-          return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
+    const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(lvl);
+    
+    if (canApproveThisLevel) {
+      if (lvl === 1) {
+        // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
+        const mEmail = (booking.managerEmail || '').toLowerCase();
+        const cEmail = (currentUser.email || '').toLowerCase();
+        if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
+          isMyTurn = true;
+        }
+      }
+      else if (lvl === 2) {
+        isMyTurn = true;
+        fleetAssignBox.style.display = 'block';
+        
+        const carSelectGroup = document.getElementById('fleet-admin-car-select-group');
+        const driverGroup = document.getElementById('fleet-admin-driver-group');
+        
+        if (carSelectGroup) carSelectGroup.style.display = 'block';
+        
+        const carSelect = document.getElementById('assign-car');
+        carSelect.innerHTML = `
+          <option value="">-- กรุณาเลือกรถยนต์ --</option>
+          <option value="taxi">🚕 รถแท็กซี่ (TAXI)</option>
+        `;
+        cars.forEach(car => {
+          const hasConflict = hasBookingConflict(car.id, booking.startDate, booking.endDate, booking.id);
+          const now = new Date();
+          const isBusyNow = bookings.some(b => {
+            const isAssigned = b.status === 'approved' || (b.status === 'pending' && b.currentApprovalLevel >= 3);
+            if (b.id === booking.id || !isAssigned || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+            return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
+          });
+
+          let statusText = '';
+          if (hasConflict) {
+            statusText = ' (ไม่ว่างช่วงที่ขอ)';
+          } else {
+            statusText = isBusyNow ? ' (ไม่ว่างขณะนี้/ว่างช่วงที่ขอ)' : ' (ว่าง)';
+          }
+
+          const disabled = hasConflict ? ' disabled style="color:var(--text-muted);"' : '';
+          carSelect.innerHTML += `<option value="${car.id}"${disabled}>${car.name} (${car.plate})${statusText}</option>`;
         });
-
-        let statusText = '';
-        if (hasConflict) {
-          statusText = ' (ไม่ว่างช่วงที่ขอ)';
+        
+        const driverInput = document.getElementById('assign-driver');
+        
+        if (booking.travelType === 'public_car') {
+          carSelect.value = 'taxi';
+          if (driverGroup) driverGroup.style.display = 'block';
+          if (driverInput) {
+            driverInput.value = '-';
+            driverInput.disabled = true;
+          }
         } else {
-          statusText = isBusyNow ? ' (ไม่ว่างขณะนี้/ว่างช่วงที่ขอ)' : ' (ว่าง)';
+          if (driverGroup) driverGroup.style.display = 'block';
+          if (driverInput) {
+            driverInput.value = booking.driverName || (booking.controlUnit === 'รถสวัสดิการ' ? booking.requester : 'นายดีเลิศ สมใจ');
+            driverInput.disabled = false;
+          }
+          carSelect.value = booking.carId || '';
         }
-
-        const disabled = hasConflict ? ' disabled style="color:var(--text-muted);"' : '';
-        carSelect.innerHTML += `<option value="${car.id}"${disabled}>${car.name} (${car.plate})${statusText}</option>`;
-      });
-      
-      const driverInput = document.getElementById('assign-driver');
-      
-      if (booking.travelType === 'public_car') {
-        carSelect.value = 'taxi';
-        if (driverGroup) driverGroup.style.display = 'block';
-        if (driverInput) {
-          driverInput.value = '-';
-          driverInput.disabled = true;
-        }
-      } else {
-        if (driverGroup) driverGroup.style.display = 'block';
-        if (driverInput) {
-          driverInput.value = booking.driverName || 'นายดีเลิศ สมใจ';
-          driverInput.disabled = false;
-        }
-        carSelect.value = booking.carId || '';
+      }
+      else if (lvl === 3) {
+        isMyTurn = true;
+      }
+      else if (lvl === 4) {
+        isMyTurn = true;
       }
     }
-    if (currentUser.role === 'director' && lvl === 3) isMyTurn = true;
-    if (currentUser.role === 'executive' && lvl === 4) isMyTurn = true;
   }
 
-  const showEditPanel = currentUser && currentUser.role === 'fleet_admin' && 
+  const showEditPanel = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2) && 
                         (booking.status === 'approved' || (booking.status === 'pending' && booking.currentApprovalLevel > 2));
 
   if (isMyTurn) {
@@ -1768,7 +1961,7 @@ function openApprovalModal(bookingId) {
       } else {
         editCarSelect.value = booking.carId || '';
         if (editDriverInput) {
-          editDriverInput.value = booking.driverName || 'นายดีเลิศ สมใจ';
+          editDriverInput.value = booking.driverName || (booking.controlUnit === 'รถสวัสดิการ' ? booking.requester : 'นายดีเลิศ สมใจ');
           editDriverInput.disabled = false;
         }
       }
@@ -1786,21 +1979,15 @@ function renderApprovalPipeline(booking) {
 
   const pipelineTitle = document.getElementById('approval-pipeline-title');
   if (pipelineTitle) {
-    if (booking.travelType === 'public_car' && isRequesterUser) {
-      pipelineTitle.textContent = 'ลำดับการอนุมัติ (3 ขั้นตอนสำหรับรถสาธารณะ)';
-    } else {
-      pipelineTitle.textContent = 'ลำดับการอนุมัติ (4 ขั้นตอนตามฟอร์ม อสป.)';
-    }
+    pipelineTitle.textContent = 'ลำดับการอนุมัติ (4 ขั้นตอนตามฟอร์ม อสป.)';
   }
 
   const stepsDef = [
     { level: 1, title: 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)', role: 'supervisor' },
     { level: 2, title: 'ผู้จัดรถ / งานยานพาหนะ (L2)', role: 'fleet_admin' },
-    { level: 3, title: 'หัวหน้าสำนักงานบริหารการพัสดุ (หส.พด.) (L3)', role: 'director' }
+    { level: 3, title: 'หัวหน้าสำนักงานบริหารการพัสดุ (หส.พด.) (L3)', role: 'director' },
+    { level: 4, title: 'ผู้อำนวยการฝ่ายบัญชีการเงิน (ผฝ.บง.) (L4)', role: 'executive' }
   ];
-  if (booking.travelType !== 'public_car' || !isRequesterUser) {
-    stepsDef.push({ level: 4, title: 'ผู้อำนวยการฝ่ายบัญชีการเงิน (ผฝ.บง.) (L4)', role: 'executive' });
-  }
 
   stepsDef.forEach(step => {
     const sig = booking.signatures.find(s => s.level === step.level);
@@ -2161,6 +2348,458 @@ function openReportView(bookingId) {
   const carName = car ? car.name : 'ไม่ระบุ';
   const carPlate = car ? car.plate : '-';
 
+  if (b.controlUnit === 'รถสวัสดิการ') {
+    reportContainer.innerHTML = `
+    <!-- PAGE 1: WELFARE CAR REQUEST FORM -->
+    <div class="welfare-car-report" style="font-family: 'Sarabun', 'TH Sarabun PSK', sans-serif; font-size: 13px; line-height: 1.5; color: #000; padding: 10px 0;">
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+        <div style="font-size: 12px; color: #333;">
+          เลขที่ใบคำขอใช้: <span class="dotted-val" style="min-width: 100px;">${b.id}</span>
+        </div>
+        <div style="text-align: right; font-weight: bold; font-size: 14px;">
+          องค์การสะพานปลา
+        </div>
+      </div>
+      
+      <div style="display: flex; justify-content: flex-end; margin-bottom: 0.75rem;">
+        วันที่ <span class="dotted-val" style="min-width: 180px;">${reqDate}</span>
+      </div>
+
+      <div style="font-weight: bold; font-size: 14.5px; margin-bottom: 0.5rem; text-align: left;">
+        เรื่อง ขอยืมรถยนต์สวัสดิการ
+      </div>
+
+      <div style="font-weight: bold; font-size: 13.5px; margin-bottom: 0.75rem; text-align: left;">
+        เรียน ผู้อำนวยการฝ่ายบัญชีการเงิน ผ่าน หัวหน้าสำนักงานบริหารการพัสดุ
+      </div>
+
+      <!-- Paragraph 1 -->
+      <div style="text-indent: 2.5rem; text-align: justify; margin-bottom: 0.6rem; line-height: 1.7;">
+        1. ข้าพเจ้า <span class="dotted-val" style="min-width: 180px;">${b.requester}</span>
+        ตำแหน่ง <span class="dotted-val" style="min-width: 140px;">${b.position || '-'}</span>
+        สังกัด <span class="dotted-val" style="min-width: 150px;">${b.division || b.department}</span>
+        อยู่บ้านเลขที่ <span class="dotted-val" style="min-width: 50px;">${b.addressNo || '&nbsp;'}</span>
+        หมู่ <span class="dotted-val" style="min-width: 40px;">${b.addressMoo || '&nbsp;'}</span>
+        ถนน <span class="dotted-val" style="min-width: 120px;">${b.addressRoad || '&nbsp;'}</span>
+        ตำบล/แขวง <span class="dotted-val" style="min-width: 100px;">${b.addressSubdistrict || '&nbsp;'}</span>
+        อำเภอ/เขต <span class="dotted-val" style="min-width: 100px;">${b.addressDistrict || '&nbsp;'}</span>
+        จังหวัด <span class="dotted-val" style="min-width: 100px;">${b.addressProvince || '&nbsp;'}</span>
+        พร้อมด้วย <span class="dotted-val" style="min-width: 160px;">${b.passengers || '-'}</span>
+        มีความประสงค์จะขอยืมรถยนต์สวัสดิการ จำนวน <span class="dotted-val" style="min-width: 30px; text-align: center;">1</span> คัน
+        เพื่อใช้ <span class="dotted-val" style="min-width: 180px;">${b.purpose}</span>
+        ไปที่ <span class="dotted-val" style="min-width: 180px;">${b.destination || '-'}</span>
+        โดยให้ <span class="dotted-val" style="min-width: 180px; text-align: center;">${b.driverName || b.requester}</span> เป็นผู้ขับรถ
+        ตั้งแต่วันที่ <span class="dotted-val" style="min-width: 40px; text-align: center;">${startParts.day}</span>
+        เดือน <span class="dotted-val" style="min-width: 90px; text-align: center;">${startParts.month}</span>
+        พ.ศ. <span class="dotted-val" style="min-width: 50px; text-align: center;">${startParts.year}</span>
+        เวลา <span class="dotted-val" style="min-width: 60px; text-align: center;">${startParts.time}</span> นาฬิกา
+        ถึงวันที่ <span class="dotted-val" style="min-width: 40px; text-align: center;">${endParts.day}</span>
+        เดือน <span class="dotted-val" style="min-width: 90px; text-align: center;">${endParts.month}</span>
+        พ.ศ. <span class="dotted-val" style="min-width: 50px; text-align: center;">${endParts.year}</span>
+        เวลา <span class="dotted-val" style="min-width: 60px; text-align: center;">${endParts.time}</span> นาฬิกา
+      </div>
+
+      <!-- Paragraph 2 -->
+      <div style="text-indent: 2.5rem; text-align: justify; margin-bottom: 0.6rem; line-height: 1.7;">
+        2. ข้าพเจ้ายินยอมจ่ายค่าทำการล่วงเวลาหรือค่าทำงานในวันหยุด หรือค่าเบี้ยเลี้ยง ตลอดจนค่าที่พักให้ผู้ขับรถสวัสดิการ และค่าใช้จ่ายต่าง ๆ ตลอดจนรับผิดชอบในความสูญและ/หรือเสียหายที่เกิดขึ้นแก่รถยนต์ในระหว่างที่ยืมใช้ ถ้าข้าพเจ้าบิดพริ้ว ยอมให้องค์การสะพานปลาหักเงินเดือนหรือเงินได้อื่นใดของข้าพเจ้าชดใช้ค่าใช้จ่ายต่าง ๆ จนครบถ้วนทันที
+      </div>
+
+      <!-- Paragraph 3 -->
+      <div style="text-indent: 2.5rem; text-align: justify; margin-bottom: 1.25rem; line-height: 1.7;">
+        3. ข้าพเจ้าขอมอบให้ <span class="dotted-val" style="min-width: 250px;">&nbsp;</span> เป็นผู้รับมอบรถยนต์แทน
+      </div>
+
+      <!-- Borrowers Signature Grid (4 columns) -->
+      <div style="display: flex; justify-content: space-between; margin-bottom: 1.25rem; text-align: center;">
+        <div style="width: 22%;">
+          <div style="height: 35px; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px dotted #000; position: relative;">
+            ${l0SigImg ? `<img src="${l0SigImg}" style="max-height: 35px; max-width: 100%; object-fit: contain;">` : ''}
+          </div>
+          <div style="margin-top: 4px; font-size: 11.5px;">1. ( <span style="font-weight: bold;">${b.requester}</span> )</div>
+          <div style="font-size: 11px; color: #555;">ผู้ขอยืมรถ</div>
+        </div>
+        <div style="width: 22%;">
+          <div style="height: 35px; border-bottom: 1px dotted #000;"></div>
+          <div style="margin-top: 4px; font-size: 11.5px;">2. ( ................................. )</div>
+          <div style="font-size: 11px; color: #555;">ผู้ขอยืมรถ</div>
+        </div>
+        <div style="width: 22%;">
+          <div style="height: 35px; border-bottom: 1px dotted #000;"></div>
+          <div style="margin-top: 4px; font-size: 11.5px;">3. ( ................................. )</div>
+          <div style="font-size: 11px; color: #555;">ผู้ขอยืมรถ</div>
+        </div>
+        <div style="width: 22%;">
+          <div style="height: 35px; border-bottom: 1px dotted #000;"></div>
+          <div style="margin-top: 4px; font-size: 11.5px;">4. ( ................................. )</div>
+          <div style="font-size: 11px; color: #555;">ผู้ขอยืมรถ</div>
+        </div>
+      </div>
+
+      <!-- Driver's License attachment (Page 1) -->
+      <div style="margin-bottom: 1.25rem; border: 1px dashed #000; padding: 0.5rem; border-radius: 4px; display: flex; align-items: center; gap: 1rem; font-size: 12px; background: #fafafa;">
+        <div style="font-weight: bold; min-width: 120px;">สำเนาใบขับขี่ที่แนบ:</div>
+        <div style="flex-grow: 1; text-align: left;">
+          ${b.driverLicenseFile ? (b.driverLicenseFile.startsWith('data:application/pdf') ? 
+            '<span style="font-size: 11px; color: #333;">[เอกสารสำเนาใบขับขี่ประเภท PDF แนบในระบบเรียบร้อยแล้ว]</span>' : 
+            `<img src="${b.driverLicenseFile}" style="max-height: 85px; max-width: 220px; object-fit: contain; border: 1px solid #ccc;">`
+          ) : '<span style="color: red;">[ไม่ได้แนบไฟล์ใบขับขี่]</span>'}
+        </div>
+      </div>
+
+      <!-- Section: บันทึกความเห็นและคำสั่ง -->
+      <div style="border: 1px solid #000; padding: 0.5rem 0.75rem; border-radius: 4px;">
+        <div style="font-weight: bold; text-decoration: underline; margin-bottom: 0.5rem; font-size: 13px; text-align: center;">
+          บันทึกความเห็นและคำสั่ง
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 12px;">
+          <!-- Column 1: L1 and L2 -->
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; border-right: 1px dashed #ccc; padding-right: 0.75rem; text-align: left;">
+            <!-- L1 Supervisor -->
+            <div style="position: relative;">
+              <div style="font-weight: bold; color: #111;">1. ความเห็นของหัวหน้าแผนก/สังกัด (L1)</div>
+              <div style="margin-top: 2px;">
+                ความเห็น: <span class="dotted-val" style="min-width: 140px; text-align: left;">${l1Sig.comment || '-'}</span>
+              </div>
+              <div style="display: flex; align-items: flex-end; gap: 0.25rem; margin-top: 4px;">
+                ลงชื่อ: 
+                <div style="border-bottom: 1px dotted #000; width: 120px; height: 25px; position: relative;">
+                  ${l1SigImg ? `<img src="${l1SigImg}" style="max-height: 25px; max-width: 100%; object-fit: contain; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);">` : ''}
+                </div>
+              </div>
+              <div style="margin-top: 2px;">
+                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${l1Sig.approverName || '........................................'}</span> )
+              </div>
+              <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ${l1Date || '........................................'}</div>
+            </div>
+
+            <!-- L2 Fleet Admin -->
+            <div style="position: relative; border-top: 1px dashed #eee; padding-top: 0.4rem;">
+              <div style="font-weight: bold; color: #111;">2. การจัดสรรรถยนต์สวัสดิการ (L2)</div>
+              <div style="margin-top: 2px;">
+                จัดรถทะเบียน: <span class="dotted-val" style="min-width: 120px;">${carPlate !== '-' ? carPlate : '......................'}</span>
+              </div>
+              <div style="margin-top: 2px;">
+                ผู้ขับรถ: <span class="dotted-val" style="min-width: 140px;">${b.driverName || '................................'}</span>
+              </div>
+              <div style="display: flex; align-items: flex-end; gap: 0.25rem; margin-top: 4px;">
+                ลงชื่อ: 
+                <div style="border-bottom: 1px dotted #000; width: 120px; height: 25px; position: relative;">
+                  ${l2SigImg ? `<img src="${l2SigImg}" style="max-height: 25px; max-width: 100%; object-fit: contain; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);">` : ''}
+                </div>
+                <span>ผู้จัดรถ</span>
+              </div>
+              <div style="margin-top: 2px;">
+                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${l2Sig.approverName || '........................................'}</span> )
+              </div>
+              <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ${l2Date || '........................................'}</div>
+            </div>
+          </div>
+
+          <!-- Column 2: L3 and L4 -->
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; text-align: left;">
+            <!-- L3 Director -->
+            <div style="position: relative;">
+              <div style="font-weight: bold; color: #111;">3. การตรวจสอบของงานพัสดุ / หส.พด. (L3)</div>
+              <div style="margin-top: 2px;">
+                ความเห็น: <span class="dotted-val" style="min-width: 140px; text-align: left;">${l3Sig.comment || '-'}</span>
+              </div>
+              <div style="display: flex; align-items: flex-end; gap: 0.25rem; margin-top: 4px;">
+                ลงชื่อ: 
+                <div style="border-bottom: 1px dotted #000; width: 120px; height: 25px; position: relative;">
+                  ${l3SigImg ? `<img src="${l3SigImg}" style="max-height: 25px; max-width: 100%; object-fit: contain; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);">` : ''}
+                </div>
+                <span>หส.พด.</span>
+              </div>
+              <div style="margin-top: 2px;">
+                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${l3Sig.approverName || '........................................'}</span> )
+              </div>
+              <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ${l3Date || '........................................'}</div>
+            </div>
+
+            <!-- L4 Executive -->
+            <div style="position: relative; border-top: 1px dashed #eee; padding-top: 0.4rem;">
+              <div style="font-weight: bold; color: #111;">4. คำสั่งอนุมัติของผู้อำนวยการกองคลัง (L4)</div>
+              <div style="margin-top: 2px;">
+                คำสั่ง: <span class="dotted-val" style="min-width: 140px; text-align: left;">${l4Sig.comment || 'อนุมัติการยืมใช้รถยนต์สวัสดิการ'}</span>
+              </div>
+              <div style="display: flex; align-items: flex-end; gap: 0.25rem; margin-top: 4px;">
+                ลงชื่อ: 
+                <div style="border-bottom: 1px dotted #000; width: 120px; height: 25px; position: relative;">
+                  ${l4SigImg ? `<img src="${l4SigImg}" style="max-height: 25px; max-width: 100%; object-fit: contain; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);">` : ''}
+                </div>
+                <span>ผู้อนุมัติ</span>
+              </div>
+              <div style="margin-top: 2px;">
+                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${l4Sig.approverName || '........................................'}</span> )
+              </div>
+              <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ${l4Date || '........................................'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE 2: VEHICLE CONDITION CHECKLIST -->
+    <div class="page-break"></div>
+    <div style="padding-top: 0.5rem; font-family: 'Sarabun', 'TH Sarabun PSK', sans-serif; color: #000;">
+      <!-- Title Header -->
+      <div style="text-align: center; line-height: 1.4; margin-bottom: 0.8rem;">
+        <div style="font-weight: bold; font-size: 13px;">องค์การสะพานปลา สำนักงานบริหารการพัสดุ ฝ่ายบัญชีการเงิน</div>
+        <div style="font-weight: bold; font-size: 15px; margin-top: 0.15rem; text-decoration: underline;">ใบตรวจสอบสภาพรถยนต์สวัสดิการ ก่อนและหลังการนำรถไปใช้งาน</div>
+      </div>
+
+      <!-- Header fields -->
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 0.5rem; text-align: left;">
+        <tr>
+          <td style="width: 50%; vertical-align: top; padding: 2px 0;">
+            <strong>ผู้ขอยืมรถ:</strong> <span class="dotted-val" style="min-width: 180px; text-align: left;">${b.requester}</span>
+          </td>
+          <td style="width: 50%; vertical-align: top; padding: 2px 0;">
+            <strong>รถยนต์ ยี่ห้อ/รุ่น:</strong> <span class="dotted-val" style="min-width: 160px; text-align: left;">${carName}</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; padding: 2px 0;">
+            <strong>ตำแหน่ง/สังกัด:</strong> <span class="dotted-val" style="min-width: 180px; text-align: left;">${b.division || b.department}</span>
+          </td>
+          <td style="vertical-align: top; padding: 2px 0;">
+            <strong>เลขทะเบียนรถ:</strong> <span class="dotted-val" style="min-width: 160px; text-align: left;">${carPlate}</span>
+          </td>
+        </tr>
+      </table>
+
+      <!-- 3-Column Checklist Layout -->
+      <div style="display: grid; grid-template-columns: 230px 1fr 230px; gap: 0.5rem; border: 1.5px solid #000; font-size: 11px; text-align: left; padding: 1px;">
+        <!-- Left Column: Before Use -->
+        <div style="border-right: 1.5px solid #000; padding: 4px;">
+          <div style="font-weight: bold; text-align: center; border-bottom: 1.5px solid #000; padding-bottom: 2px; margin-bottom: 4px; font-size: 11.5px; background-color: #f8fafc;">
+            ก่อนนำรถไปใช้งาน
+          </div>
+          
+          <!-- Checklist table -->
+          <table style="width: 100%; border-collapse: collapse; font-size: 10.5px;">
+            <thead>
+              <tr style="border-bottom: 1px solid #000;">
+                <th style="text-align: left; padding: 2px 0;">รายการตรวจสภาพ</th>
+                <th style="width: 35px; text-align: center;">ซ้าย</th>
+                <th style="width: 35px; text-align: center;">ขวา</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${['กันชนหน้า', 'กันชนหลัง', 'ฝากระโปรงหน้า', 'ฝากระโปรงหลัง', 'บังโคลนหน้า', 'บังโคลนหลัง', 'ประตูหน้า', 'ประตูหลัง', 'กระจกมองข้าง', 'หลังคา'].map(item => `
+                <tr style="border-bottom: 1px dashed #ccc;">
+                  <td style="padding: 2px 0;">${item}</td>
+                  <td style="text-align: center;">[ &nbsp; ]</td>
+                  <td style="text-align: center;">[ &nbsp; ]</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; font-size: 10.5px;">
+            รายการเพิ่มเติม
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10.5px; margin-top: 2px;">
+            <thead>
+              <tr style="border-bottom: 1px solid #000;">
+                <th style="text-align: left; padding: 2px 0;">รายการตรวจเพิ่มเติม</th>
+                <th style="width: 35px; text-align: center;">มี</th>
+                <th style="width: 35px; text-align: center;">ไม่มี</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${['น้ำในหม้อน้ำ', 'น้ำมันเครื่อง', 'น้ำมันเบรก', 'น้ำมันเพาเวอร์', 'น้ำกลั่น', 'น้ำมันเกียร์', 'น้ำมันเฟืองท้าย'].map(item => `
+                <tr style="border-bottom: 1px dashed #ccc;">
+                  <td style="padding: 2px 0;">${item}</td>
+                  <td style="text-align: center;">[ &nbsp; ]</td>
+                  <td style="text-align: center;">[ &nbsp; ]</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Middle Column: Visual Gauges and Outlines -->
+        <div style="border-right: 1.5px solid #000; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;">
+          <div style="font-weight: bold; text-align: center; border-bottom: 1.5px solid #000; width: 100%; padding-bottom: 2px; margin-bottom: 6px; font-size: 11.5px; background-color: #f8fafc;">
+            ระดับน้ำมัน / เลขไมล์
+          </div>
+          
+          <!-- Fuel Gauge SVG -->
+          <div style="text-align: center; margin-top: 4px; width: 100%;">
+            <div style="font-size: 9px; font-weight: bold;">ระดับน้ำมัน</div>
+            <svg width="110" height="60" viewBox="0 0 110 60" style="display: block; margin: 2px auto 0 auto;">
+              <!-- Dial Arc -->
+              <path d="M 15 50 A 40 40 0 0 1 95 50" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="2 1"/>
+              <!-- Needle pointing up/half -->
+              <line x1="55" y1="50" x2="55" y2="18" stroke="#000" stroke-width="2" />
+              <polygon points="55,14 52,20 58,20" fill="#000" />
+              <circle cx="55" cy="50" r="4.5" fill="#000" />
+              <!-- Labels -->
+              <text x="5" y="52" font-size="9" font-family="Sarabun" font-weight="bold">E</text>
+              <text x="50" y="10" font-size="9" font-family="Sarabun" font-weight="bold">1/2</text>
+              <text x="98" y="52" font-size="9" font-family="Sarabun" font-weight="bold">F</text>
+            </svg>
+          </div>
+
+          <!-- Odometer reading box -->
+          <div style="border: 1px solid #000; border-radius: 4px; padding: 4px; width: 95%; text-align: center; font-size: 10px; margin: 4px 0; background-color: #fafafa;">
+            <div>ตัวเลขไมล์ ก.ม.</div>
+            <div style="margin-top: 4px; font-weight: bold;">ก่อนใช้: <span class="dotted-val" style="min-width: 60px;">&nbsp;</span></div>
+            <div style="margin-top: 2px; font-weight: bold;">หลังใช้: <span class="dotted-val" style="min-width: 60px;">&nbsp;</span></div>
+          </div>
+
+          <!-- Van outlines SVG -->
+          <div style="width: 100%; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; text-align: center;">
+            <div style="font-size: 9px; font-weight: bold; margin-bottom: 4px;">แผนภาพรอยขีดข่วนตัวถังรถยนต์</div>
+            
+            <svg width="130" height="210" viewBox="0 0 130 210" style="display: block; margin: 0 auto; border: 1px dashed #ccc; background-color: #fff;">
+              <!-- Labels -->
+              <text x="65" y="10" font-size="7" font-family="Sarabun" text-anchor="middle" font-weight="bold">ระบุจุดบกพร่องรอบคัน</text>
+              
+              <!-- Top View of Van -->
+              <g stroke="#333" fill="none" stroke-width="1.1" transform="translate(42, 15)">
+                <rect x="10" y="5" width="26" height="70" rx="5" />
+                <path d="M 12 18 L 34 18 L 32 22 L 14 22 Z" fill="#eee" />
+                <rect x="12" y="70" width="22" height="4" rx="0.5" fill="#eee" />
+                <line x1="10" y1="14" x2="36" y2="14" />
+                <text x="23" y="2" font-size="6" font-family="Sarabun" text-anchor="middle">บน</text>
+              </g>
+              
+              <!-- Front View -->
+              <g stroke="#333" fill="none" stroke-width="1.1" transform="translate(10, 100)">
+                <path d="M 4 8 L 28 8 A 2 2 0 0 1 30 10 L 30 26 A 1.5 1.5 0 0 1 28 28 L 4 28 A 1.5 1.5 0 0 1 2 26 L 2 10 A 2 2 0 0 1 4 8 Z" />
+                <path d="M 3 10 L 29 10 L 27 18 L 5 18 Z" fill="#eee" />
+                <rect x="4" y="22" width="4" height="2" rx="0.5" fill="#fff" />
+                <rect x="24" y="22" width="4" height="2" rx="0.5" fill="#fff" />
+                <text x="16" y="2" font-size="6" font-family="Sarabun" text-anchor="middle">หน้า</text>
+              </g>
+
+              <!-- Back View -->
+              <g stroke="#333" fill="none" stroke-width="1.1" transform="translate(85, 100)">
+                <path d="M 4 8 L 28 8 A 2 2 0 0 1 30 10 L 30 26 A 1.5 1.5 0 0 1 28 28 L 4 28 A 1.5 1.5 0 0 1 2 26 L 2 10 A 2 2 0 0 1 4 8 Z" />
+                <rect x="4" y="10" width="24" height="9" rx="0.5" fill="#eee" />
+                <rect x="3" y="22" width="2" height="4" fill="#ff4d4d" />
+                <rect x="27" y="22" width="2" height="4" fill="#ff4d4d" />
+                <text x="16" y="2" font-size="6" font-family="Sarabun" text-anchor="middle">หลัง</text>
+              </g>
+
+              <!-- Side View -->
+              <g stroke="#333" fill="none" stroke-width="1.1" transform="translate(12, 145)">
+                <path d="M 8 12 L 20 4 L 95 4 A 3 3 0 0 1 98 7 L 98 22 A 1.5 1.5 0 0 1 96 24 L 4 24 A 1.5 1.5 0 0 1 2 22 L 2 16 Z" />
+                <path d="M 10 13 L 20 5 L 35 5 L 35 13 Z" fill="#eee" />
+                <rect x="38" y="5" width="16" height="8" fill="#eee" />
+                <rect x="57" y="5" width="16" height="8" fill="#eee" />
+                <rect x="76" y="5" width="16" height="8" fill="#eee" />
+                <circle cx="20" cy="24" r="5.5" fill="#333" />
+                <circle cx="20" cy="24" r="2" fill="#fff" />
+                <circle cx="80" cy="24" r="5.5" fill="#333" />
+                <circle cx="80" cy="24" r="2" fill="#fff" />
+                <text x="50" y="34" font-size="6" font-family="Sarabun" text-anchor="middle">ข้าง</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Right Column: After Use -->
+        <div style="padding: 4px;">
+          <div style="font-weight: bold; text-align: center; border-bottom: 1.5px solid #000; padding-bottom: 2px; margin-bottom: 4px; font-size: 11.5px; background-color: #f8fafc;">
+            เมื่อยืมส่งคืนรถ
+          </div>
+          
+          <!-- Checklist table -->
+          <table style="width: 100%; border-collapse: collapse; font-size: 10.5px;">
+            <thead>
+              <tr style="border-bottom: 1px solid #000;">
+                <th style="text-align: left; padding: 2px 0;">รายการตรวจสภาพ</th>
+                <th style="width: 35px; text-align: center;">ซ้าย</th>
+                <th style="width: 35px; text-align: center;">ขวา</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${['กันชนหน้า', 'กันชนหลัง', 'ฝากระโปรงหน้า', 'ฝากระโปรงหลัง', 'บังโคลนหน้า', 'บังโคลนหลัง', 'ประตูหน้า', 'ประตูหลัง', 'กระจกมองข้าง', 'หลังคา'].map(item => `
+                <tr style="border-bottom: 1px dashed #ccc;">
+                  <td style="padding: 2px 0;">${item}</td>
+                  <td style="text-align: center;">[ &nbsp; ]</td>
+                  <td style="text-align: center;">[ &nbsp; ]</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div style="font-weight: bold; border-top: 1px solid #000; margin-top: 4px; padding-top: 4px; font-size: 10.5px;">
+            รายการเพิ่มเติม
+          </div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10.5px; margin-top: 2px;">
+            <thead>
+              <tr style="border-bottom: 1px solid #000;">
+                <th style="text-align: left; padding: 2px 0;">รายการตรวจเพิ่มเติม</th>
+                <th style="width: 35px; text-align: center;">มี</th>
+                <th style="width: 35px; text-align: center;">ไม่มี</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${['น้ำในหม้อน้ำ', 'น้ำมันเครื่อง', 'น้ำมันเบรก', 'น้ำมันเพาเวอร์', 'น้ำกลั่น', 'น้ำมันเกียร์', 'น้ำมันเฟืองท้าย'].map(item => `
+                <tr style="border-bottom: 1px dashed #ccc;">
+                  <td style="padding: 2px 0;">${item}</td>
+                  <td style="text-align: center;">[ &nbsp; ]</td>
+                  <td style="text-align: center;">[ &nbsp; ]</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bottom Signature Section for Page 2 -->
+      <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 11px; border: 1.5px solid #000; text-align: left;">
+        <tr>
+          <td style="width: 50%; border-right: 1.5px solid #000; border-bottom: 1.5px solid #000; padding: 6px; vertical-align: top;">
+            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 0.5rem;">ได้รับตรวจสอบสภาพรถและอุปกรณ์ให้ผู้ยืมรับไปใช้งานแล้ว</div>
+            <div style="margin-bottom: 1rem; min-height: 20px; border-bottom: 1px dashed #ccc;">หมายเหตุ: </div>
+            <div style="text-align: center;">
+              ลงชื่อ ................................................................ ผู้ตรวจสอบ<br>
+              ( ................................................................ )<br>
+              วันที่ .........../.........../...........
+            </div>
+          </td>
+          <td style="width: 50%; border-bottom: 1.5px solid #000; padding: 6px; vertical-align: top;">
+            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 0.5rem;">ได้รับรถและตรวจสภาพแล้วถูกต้องทุกรายการ / เว้นแต่</div>
+            <div style="margin-bottom: 1rem; min-height: 20px; border-bottom: 1px dashed #ccc;">ข้อบกพร่องที่พบ: </div>
+            <div style="text-align: center;">
+              ลงชื่อ ................................................................ ผู้ยืม/รับรถ<br>
+              ( <span style="font-weight: bold;">${b.requester}</span> )<br>
+              วันที่ .........../.........../...........
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2" style="padding: 6px; vertical-align: top;">
+            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 0.3rem;">เสนอ หส.พด. (ฝ่ายเจ้าหน้าที่พัสดุ)</div>
+            <div style="margin-bottom: 0.5rem;">ได้ทำการตรวจสอบสภาพรถยนต์สวัสดิการ เรียบร้อยแล้วเมื่อผู้ยืมนำส่งคืน ปรากฏว่า:</div>
+            <div style="border-bottom: 1px dashed #999; height: 18px; margin-bottom: 0.8rem;"></div>
+            <table style="width: 100%; border: none;">
+              <tr>
+                <td style="width: 50%; text-align: center;">
+                  ลงชื่อ ................................................................ ผู้ตรวจสอบ<br>
+                  ( ................................................................ )<br>
+                  ตำแหน่ง ................................................................
+                </td>
+                <td style="width: 50%; text-align: center; vertical-align: bottom;">
+                  วันที่ .........../.........../...........
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+    `;
+    return;
+  }
+
   reportContainer.innerHTML = `
     <!-- HEADER SECTION -->
     <div class="fmo-header-block">
@@ -2209,7 +2848,8 @@ function openReportView(bookingId) {
         ( <span style="font-family: 'Sarabun', sans-serif; font-weight: bold; display: inline-block; width: 12px; text-align: center;">${b.controlUnit === 'สินเชื่อ' ? '✓' : '&nbsp;'}</span> ) สินเชื่อ
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
         ( <span style="font-family: 'Sarabun', sans-serif; font-weight: bold; display: inline-block; width: 12px; text-align: center;">${b.controlUnit === 'ส่งเสริมการประมง' ? '✓' : '&nbsp;'}</span> ) ส่งเสริมการประมง
-        <span class="dotted-fill" style="margin-left: 10px;"></span>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        ( <span style="font-family: 'Sarabun', sans-serif; font-weight: bold; display: inline-block; width: 12px; text-align: center;">${b.controlUnit === 'รถสวัสดิการ' ? '✓' : '&nbsp;'}</span> ) รถสวัสดิการ
       </div>
       <div class="fmo-line" style="margin-top:0.4rem;">
         เรื่อง <span class="dotted-fill" style="text-align:left;">${b.purpose}${b.destination ? ' ณ ' + b.destination : ''}</span>
@@ -2500,6 +3140,39 @@ function setupEventListeners() {
     document.getElementById('check-car-back').checked = true;
     document.getElementById('input-trips').value = 2;
 
+    // Reset driver's license upload state, UI and welfare address fields
+    uploadedDriverLicenseBase64 = null;
+    const licenseSection = document.getElementById('driver-license-section');
+    if (licenseSection) {
+      licenseSection.style.display = 'none';
+      document.getElementById('input-driver-license').value = '';
+      document.getElementById('input-driver-license').removeAttribute('required');
+      document.getElementById('driver-license-filename').textContent = 'ยังไม่ได้เลือกไฟล์';
+      document.getElementById('driver-license-preview-container').style.display = 'none';
+      document.getElementById('driver-license-preview').src = '';
+    }
+    const signatureGrid = document.getElementById('signature-license-grid');
+    if (signatureGrid) {
+      signatureGrid.classList.remove('split-mode');
+    }
+    const addressContainer = document.getElementById('welfare-address-container');
+    if (addressContainer) {
+      addressContainer.style.display = 'none';
+      document.getElementById('input-welfare-address-no').value = '';
+      document.getElementById('input-welfare-address-moo').value = '';
+      document.getElementById('input-welfare-address-road').value = '';
+      document.getElementById('input-welfare-address-subdistrict').value = '';
+      document.getElementById('input-welfare-address-district').value = '';
+      document.getElementById('input-welfare-address-province').value = '';
+      
+      document.getElementById('input-welfare-address-no').removeAttribute('required');
+      document.getElementById('input-welfare-address-subdistrict').removeAttribute('required');
+      document.getElementById('input-welfare-address-district').removeAttribute('required');
+      document.getElementById('input-welfare-address-province').removeAttribute('required');
+    }
+    const radioFmo = document.querySelector('input[name="control-unit"][value="อสป."]');
+    if (radioFmo) radioFmo.checked = true;
+
     // Resize canvas and then load/draw user signature after modal is visible
     setTimeout(() => {
       if (requesterSig) {
@@ -2580,6 +3253,46 @@ function setupEventListeners() {
       return; // หยุดการทำงานทันที ใบจองจะไม่ถูกสร้าง
     }
 
+    const controlUnit = document.querySelector('input[name="control-unit"]:checked').value;
+    let addressNo = '';
+    let addressMoo = '';
+    let addressRoad = '';
+    let addressSubdistrict = '';
+    let addressDistrict = '';
+    let addressProvince = '';
+
+    if (controlUnit === 'รถสวัสดิการ') {
+      addressNo = document.getElementById('input-welfare-address-no').value.trim();
+      addressMoo = document.getElementById('input-welfare-address-moo').value.trim();
+      addressRoad = document.getElementById('input-welfare-address-road').value.trim();
+      addressSubdistrict = document.getElementById('input-welfare-address-subdistrict').value.trim();
+      addressDistrict = document.getElementById('input-welfare-address-district').value.trim();
+      addressProvince = document.getElementById('input-welfare-address-province').value.trim();
+
+      if (!addressNo || !addressSubdistrict || !addressDistrict || !addressProvince) {
+        showToast("กรุณากรอกข้อมูลที่อยู่ผู้ขอใช้รถยนต์สวัสดิการให้ครบถ้วน (บ้านเลขที่, ตำบล, อำเภอ, จังหวัด)", "warning");
+        return;
+      }
+
+      if (!uploadedDriverLicenseBase64) {
+        showToast("กรุณาอัปโหลดสำเนาใบขับขี่เพื่อขอสิทธิ์จองรถสวัสดิการ", "warning");
+        return;
+      }
+      
+      // Enforce 1 request per calendar year per user
+      const startYear = new Date(startDate).getFullYear();
+      const hasExistingBookingInYear = bookings.some(b => 
+        (b.requesterEmail || '').toLowerCase() === (currentUser.email || '').toLowerCase() &&
+        b.controlUnit === 'รถสวัสดิการ' &&
+        b.status !== 'rejected' &&
+        new Date(b.startDate).getFullYear() === startYear
+      );
+      if (hasExistingBookingInYear) {
+        showToast(`ขออภัย! ใน 1 ปี ท่านสามารถใช้สิทธิ์ขอรถสวัสดิการได้เพียง 1 ครั้งเท่านั้น (ท่านมีคำขอสิทธิ์ในระบบสำหรับปี พ.ศ. ${startYear + 543} แล้ว)`, "error");
+        return;
+      }
+    }
+
     // 4. สร้างชุดข้อมูลใบจองใหม่
     const newBooking = {
       id: newBookingId,
@@ -2590,7 +3303,14 @@ function setupEventListeners() {
       department: document.getElementById('input-department').value,
       office: document.getElementById('input-office').value,
       division: document.getElementById('input-division').value,
-      controlUnit: document.querySelector('input[name="control-unit"]:checked').value,
+      controlUnit: controlUnit,
+      driverLicenseFile: controlUnit === 'รถสวัสดิการ' ? uploadedDriverLicenseBase64 : null,
+      addressNo: controlUnit === 'รถสวัสดิการ' ? addressNo : '',
+      addressMoo: controlUnit === 'รถสวัสดิการ' ? addressMoo : '',
+      addressRoad: controlUnit === 'รถสวัสดิการ' ? addressRoad : '',
+      addressSubdistrict: controlUnit === 'รถสวัสดิการ' ? addressSubdistrict : '',
+      addressDistrict: controlUnit === 'รถสวัสดิการ' ? addressDistrict : '',
+      addressProvince: controlUnit === 'รถสวัสดิการ' ? addressProvince : '',
       purpose,
       destination,
       ref,
@@ -2604,7 +3324,7 @@ function setupEventListeners() {
       price,
       goCheck,
       backCheck,
-      status: 'pending_l1', // 🚨 สถานะรอหัวหน้าอนุมัติ
+      status: 'pending', // 🚨 สถานะรอหัวหน้าอนุมัติ
       currentApprovalLevel: 1,
       driverName: '',
       signatures: [
@@ -2624,6 +3344,15 @@ function setupEventListeners() {
     document.getElementById('modal-booking').classList.remove('active');
     document.getElementById('form-create-booking').reset();
     requesterSig.clear();
+
+    // Reset upload state
+    uploadedDriverLicenseBase64 = null;
+    const filenameEl = document.getElementById('driver-license-filename');
+    if (filenameEl) filenameEl.textContent = 'ยังไม่ได้เลือกไฟล์';
+    const previewContainer = document.getElementById('driver-license-preview-container');
+    if (previewContainer) previewContainer.style.display = 'none';
+    const previewEl = document.getElementById('driver-license-preview');
+    if (previewEl) previewEl.src = '';
     // Re-render
     renderDashboard();
     renderBookingsLists();
@@ -2873,6 +3602,86 @@ function setupEventListeners() {
     });
   });
 
+  // Show / hide driver license container and address based on control-unit radio selection
+  document.querySelectorAll('input[name="control-unit"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const licenseSection = document.getElementById('driver-license-section');
+      const licenseInput = document.getElementById('input-driver-license');
+      const signatureGrid = document.getElementById('signature-license-grid');
+      const addressContainer = document.getElementById('welfare-address-container');
+      
+      const addressNo = document.getElementById('input-welfare-address-no');
+      const addressSubdistrict = document.getElementById('input-welfare-address-subdistrict');
+      const addressDistrict = document.getElementById('input-welfare-address-district');
+      const addressProvince = document.getElementById('input-welfare-address-province');
+      
+      if (e.target.value === 'รถสวัสดิการ') {
+        if (licenseSection) licenseSection.style.display = 'block';
+        if (signatureGrid) signatureGrid.classList.add('split-mode');
+        if (addressContainer) addressContainer.style.display = 'block';
+        if (licenseInput) licenseInput.setAttribute('required', 'required');
+        
+        // Make address fields required when Welfare Car is selected
+        if (addressNo) addressNo.setAttribute('required', 'required');
+        if (addressSubdistrict) addressSubdistrict.setAttribute('required', 'required');
+        if (addressDistrict) addressDistrict.setAttribute('required', 'required');
+        if (addressProvince) addressProvince.setAttribute('required', 'required');
+      } else {
+        if (licenseSection) licenseSection.style.display = 'none';
+        if (signatureGrid) signatureGrid.classList.remove('split-mode');
+        if (addressContainer) addressContainer.style.display = 'none';
+        if (licenseInput) licenseInput.removeAttribute('required');
+        
+        // Remove required from address fields when not Welfare Car
+        if (addressNo) addressNo.removeAttribute('required');
+        if (addressSubdistrict) addressSubdistrict.removeAttribute('required');
+        if (addressDistrict) addressDistrict.removeAttribute('required');
+        if (addressProvince) addressProvince.removeAttribute('required');
+      }
+    });
+  });
+
+  // Handle driver's license file upload, verification, and canvas compression
+  const licenseInput = document.getElementById('input-driver-license');
+  if (licenseInput) {
+    licenseInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const filenameEl = document.getElementById('driver-license-filename');
+      const previewContainer = document.getElementById('driver-license-preview-container');
+      const previewEl = document.getElementById('driver-license-preview');
+      
+      if (!file) {
+        if (filenameEl) filenameEl.textContent = 'ยังไม่ได้เลือกไฟล์';
+        if (previewContainer) previewContainer.style.display = 'none';
+        uploadedDriverLicenseBase64 = null;
+        return;
+      }
+      
+      if (filenameEl) filenameEl.textContent = file.name;
+      
+      if (file.type.startsWith('image/')) {
+        compressImage(file, (dataUrl) => {
+          uploadedDriverLicenseBase64 = dataUrl;
+          if (previewEl) previewEl.src = dataUrl;
+          if (previewContainer) previewContainer.style.display = 'block';
+        });
+      } else if (file.type === 'application/pdf') {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          uploadedDriverLicenseBase64 = event.target.result;
+          if (previewContainer) previewContainer.style.display = 'none'; // No image preview for PDF
+        };
+        reader.readAsDataURL(file);
+      } else {
+        showToast("กรุณาเลือกไฟล์รูปภาพหรือ PDF เท่านั้น", "warning");
+        e.target.value = '';
+        if (filenameEl) filenameEl.textContent = 'ยังไม่ได้เลือกไฟล์';
+        if (previewContainer) previewContainer.style.display = 'none';
+        uploadedDriverLicenseBase64 = null;
+      }
+    });
+  }
+
   setupFillTaxiHandler();
 
   // Delegated click event handler for returning car early
@@ -3083,6 +3892,7 @@ function handleSignatureUpload(fileInputId, sigPad, canvasId, placeholderId) {
 // ฟังก์ชันนี้ใช้สำหรับระบุว่าใครสามารถอนุมัติ L ไหนได้บ้าง (ให้เรียกใช้ในฟังก์ชัน Login)
 function assignUserPermissions(userObj) {
   const username = (userObj.username || '').toLowerCase();
+  const positionText = userObj.position || '';
   userObj.canApprove = []; // สร้าง Array เก็บสิทธิ์
 
   // 1. ซารีนา: เป็น L1 กับ รักษาการ L4
@@ -3097,16 +3907,22 @@ function assignUserPermissions(userObj) {
   else if (username === 'panadon.p') {
     userObj.canApprove = [3];
   } 
-  // 4. สายสุนีย์: เป็น L3 และ L4
+  // 4. สายสุนีย์: เป็น L1, L3 และ L4
   else if (username === 'saisunee.p') {
-    userObj.canApprove = [3, 4]; // (หากเป็น L1 ด้วยให้เปลี่ยนเป็น [1, 3, 4] ได้เลยครับ)
+    userObj.canApprove = [1, 3, 4];
   } 
   // 5. ปิยวรรณ: เป็น L4
   else if (username === 'piyawan.k') {
     userObj.canApprove = [4];
   } 
-  // 6. หัวหน้างาน L1 คนอื่นๆ ทั่วไป (เช่น ตรวจสอบจาก role ใน Database)
-  else if (userObj.role === 'supervisor') {
+  // 6. หัวหน้างาน L1 คนอื่นๆ ทั่วไป (เช่น ตรวจสอบจากตำแหน่ง หรือ role ใน Database)
+  else if (
+    userObj.role === 'supervisor' ||
+    positionText.includes('หัวหน้าสำนักงาน') ||
+    positionText.includes('หัวหน้าแผนก') ||
+    positionText.includes('ร.หส.') ||
+    positionText.includes('ร.หผ.')
+  ) {
     userObj.canApprove = [1];
   }
 }
@@ -3155,57 +3971,254 @@ function initApprovalSwitcher() {
   }
 
   // 4. จัดการปุ่ม + เขียนใบขออนุญาต
-  const isOnlyHighLevelApprover = currentUser.canApprove && currentUser.canApprove.length > 0 && currentUser.canApprove.every(lvl => lvl >= 3);
+  // แต่ยกเว้น พนาดร (panadon.p) ที่เป็น L0 และ L3 ทำให้ต้องเห็นปุ่มเขียนใบเสนอจอง
+  const isOnlyHighLevelApprover = currentUser.canApprove && 
+                                  currentUser.canApprove.length > 0 && 
+                                  currentUser.canApprove.every(lvl => lvl >= 3) && 
+                                  (currentUser.username || '').toLowerCase() !== 'panadon.p';
   if (isOnlyHighLevelApprover) {
     if (bookingBtn) bookingBtn.classList.add('hidden');
   } else {
     if (bookingBtn) bookingBtn.classList.remove('hidden');
   }
 }
+// Auto-generate missing email logs for pending bookings that require current user's approval
+function autoGenerateMissingEmailLogs() {
+  if (!currentUser) return;
+  
+  let logsUpdated = false;
+  
+  bookings.forEach(b => {
+    if ((b.status === 'pending' || b.status === 'pending_l1') && !b.waitingForRequesterInput) {
+      const lvl = b.currentApprovalLevel;
+      let isForCurrentUser = false;
+      let targetEmail = '';
+      
+      if (currentUser.canApprove && currentUser.canApprove.includes(lvl)) {
+        if (lvl === 1) {
+          const mEmail = (b.managerEmail || '').toLowerCase();
+          const cEmail = (currentUser.email || '').toLowerCase();
+          if (mEmail === cEmail || mEmail === '') {
+            isForCurrentUser = true;
+            targetEmail = currentUser.email || 'ranida.c@fishmarket.co.th';
+          }
+        } else {
+          isForCurrentUser = true;
+          targetEmail = currentUser.email || '';
+        }
+      }
+      
+      if (isForCurrentUser && targetEmail) {
+        const hasLog = emailLogs.some(log => {
+          const toMatch = (log.to || '').toLowerCase().includes(targetEmail.toLowerCase());
+          const idMatch = (log.subject || '').includes(b.id) || (log.body || '').includes(b.id);
+          return toMatch && idMatch;
+        });
+        
+        if (!hasLog) {
+          let subject = '';
+          let body = '';
+          
+          if (lvl === 1) {
+            subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${b.id} รอการตรวจสอบเห็นชอบ`;
+            body = `
+              <p>เรียน หัวหน้าแผนกผู้ควบคุม,</p>
+              <p>มีรายการเสนอขออนุญาตใช้ยานพาหนะและเบิกจ่ายค่าพาหนะใหม่เสนอเข้ามาในระบบ และรอการพิจารณาตรวจเห็นชอบจากท่านในระดับ <strong>หัวหน้าแผนก (L1)</strong></p>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; font-size: 14px;">
+                <tr><td style="padding: 6px 0; font-weight: bold; width: 140px;">เลขที่คำขอ:</td><td style="padding: 6px 0;">${b.id}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">ผู้เสนอขอจอง:</td><td style="padding: 6px 0;">${b.requester} (${b.position || ''})</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">เรื่อง/วัตถุประสงค์:</td><td style="padding: 6px 0;">${b.purpose}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">สถานที่ปลายทาง:</td><td style="padding: 6px 0;">${b.destination || '-'}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">ช่วงเวลาเดินทาง:</td><td style="padding: 6px 0;">${new Date(b.startDate).toLocaleString('th-TH')} ถึง ${new Date(b.endDate).toLocaleString('th-TH')}</td></tr>
+              </table>
+              <p>ท่านสามารถคลิกเข้าสู่ระบบเพื่อพิจารณาลงความเห็นชอบหรือปฏิเสธคำขอได้ที่ลิงก์ด้านล่างนี้:</p>
+              <div style="text-align: center; margin: 25px 0;">
+                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+              </div>
+            `;
+          } else if (lvl === 2) {
+            subject = `[ระบบจองรถ อสป.] ใบจองเลขที่ ${b.id} ได้รับการเห็นชอบจาก L1 แล้ว รอจัดรถยนต์`;
+            body = `
+              <p>เรียน ผู้จัดรถ / งานยานพาหนะ (L2),</p>
+              <p>มีใบขออนุญาตใช้รถยนต์เลขที่ <strong>${b.id}</strong> ผ่านความเห็นชอบพิจารณาจากระดับหัวหน้างาน (L1) แล้ว ขณะนี้รอการดำเนินการจากท่านในการจัดสรรยานพาหนะและคนขับรถ</p>
+              <div style="text-align: center; margin: 25px 0;">
+                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+              </div>
+            `;
+          } else if (lvl === 3) {
+            subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${b.id} รอการตรวจสอบจาก หส.พด.`;
+            body = `
+              <p>เรียน หัวหน้าแผนกพัสดุ / หส.พด. (L3),</p>
+              <p>มีใบขออนุญาตใช้ยานพาหนะและเบิกจ่ายค่าพาหนะเลขที่ <strong>${b.id}</strong> จัดสรรเสร็จสิ้นและเสนอมายังท่านเพื่อตรวจสอบลงนามอนุมัติใช้ยานพาหนะ</p>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; font-size: 14px;">
+                <tr><td style="padding: 6px 0; font-weight: bold; width: 140px;">เลขที่คำขอ:</td><td style="padding: 6px 0;">${b.id}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">ผู้เสนอขอจอง:</td><td style="padding: 6px 0;">${b.requester}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">สถานที่ปลายทาง:</td><td style="padding: 6px 0;">${b.destination || '-'}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">ประเภทการเดินทาง:</td><td style="padding: 6px 0;">${b.travelType === 'fmo_car' ? 'รถตู้ อสป.' : 'รถรับจ้างสาธารณะ (TAXI)'}</td></tr>
+              </table>
+              <div style="text-align: center; margin: 25px 0;">
+                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+              </div>
+            `;
+          } else if (lvl === 4) {
+            subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${b.id} รอการอนุมัติเบิกจ่ายจาก ผฝ.บง.`;
+            body = `
+              <p>เรียน ผู้อำนวยการฝ่ายการเงิน / ผฝ.บง. (L4),</p>
+              <p>ใบจองใช้ยานพาหนะและขอเบิกค่าใช้จ่ายเลขที่ <strong>${b.id}</strong> ได้รับการตรวจสอบและลงนามจาก หส.พด. (L3) แล้ว รอการอนุมัติวงเงินเบิกจ่ายจากท่าน</p>
+              <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; font-size: 14px;">
+                <tr><td style="padding: 6px 0; font-weight: bold; width: 140px;">เลขที่คำขอ:</td><td style="padding: 6px 0;">${b.id}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">ผู้เสนอขอจอง:</td><td style="padding: 6px 0;">${b.requester}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">สถานที่ปลายทาง:</td><td style="padding: 6px 0;">${b.destination || '-'}</td></tr>
+                <tr><td style="padding: 6px 0; font-weight: bold;">ประเภทการเดินทาง:</td><td style="padding: 6px 0;">${b.travelType === 'fmo_car' ? 'รถตู้ อสป.' : 'รถรับจ้างสาธารณะ (TAXI)'}</td></tr>
+              </table>
+              <div style="text-align: center; margin: 25px 0;">
+                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+              </div>
+            `;
+          }
+          
+          if (subject && body) {
+            const formattedHtml = `
+              <div style="font-family: 'Sarabun', 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+                <div style="border-bottom: 2px solid #0284c7; padding-bottom: 15px; margin-bottom: 20px; text-align: center;">
+                  <h2 style="color: #0f172a; margin: 0 0 5px 0; font-size: 20px;">ระบบจองใช้ยานพาหนะและเบิกจ่ายค่าพาหนะ</h2>
+                  <span style="color: #64748b; font-size: 13px;">องค์การสะพานปลา (FMO)</span>
+                </div>
+                <div style="color: #334155; font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                  ${body}
+                </div>
+                <div style="border-top: 1px solid #e2e8f0; padding-top: 15px; margin-top: 25px; font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.4;">
+                  อีเมลฉบับนี้เป็นการแจ้งเตือนอัตโนมัติจากระบบ กรุณาอย่าตอบกลับอีเมลนี้<br>
+                  องค์การสะพานปลา &copy; 2026
+                </div>
+              </div>
+            `;
+            
+            emailLogs.unshift({
+              timestamp: new Date().toISOString(),
+              to: targetEmail,
+              subject: subject,
+              body: formattedHtml
+            });
+            logsUpdated = true;
+          }
+        }
+      }
+    }
+  });
+  
+  if (logsUpdated) {
+    if (emailLogs.length > 30) {
+      emailLogs = emailLogs.slice(0, 30);
+    }
+    localStorage.setItem('email_logs_data', JSON.stringify(emailLogs));
+  }
+}
+// ดึงข้อมูลแจ้งเตือนที่ยังค้างดำเนินการอยู่สำหรับผู้ใช้งานปัจจุบัน
+function getActiveEmailLogs() {
+  if (!currentUser) return [];
+  const uEmail = currentUser.email.toLowerCase();
+  
+  return emailLogs.filter(log => {
+    // ต้องเป็นข้อความส่งถึงผู้ใช้งานปัจจุบัน
+    if ((log.to || '').toLowerCase() !== uEmail) return false;
+    
+    // ดึงรหัสใบจองออกจากหัวข้อหรือเนื้อความเพื่อเช็คสถานะปัจจุบัน
+    const bookingIdMatch = (log.subject || '').match(/(?:BGK|BKG)-\d+(?:-\d+)?/) || (log.body || '').match(/(?:BGK|BKG)-\d+(?:-\d+)?/);
+    const bookingId = bookingIdMatch ? bookingIdMatch[0] : null;
+    
+    if (bookingId) {
+      const b = bookings.find(x => x.id === bookingId);
+      if (b) {
+        // หากใบจองอนุมัติเสร็จสิ้นหรือปฏิเสธแล้ว การแจ้งเตือนกระดิ่งจะหายไป
+        if (b.status === 'approved' || b.status === 'rejected') {
+          return false;
+        }
+        
+        // หากอยู่ในขั้นตอนผู้จองกรอกข้อมูลค่าพาหนะเพิ่ม
+        if (b.waitingForRequesterInput) {
+          const isRequester = (b.requesterEmail && b.requesterEmail.toLowerCase() === uEmail) || b.requester === currentUser.name;
+          return isRequester; // แสดงสำหรับผู้ขอจองเท่านั้น
+        }
+        
+        // หากอยู่ในขั้นตอนรออนุมัติ แสดงเฉพาะเมื่อถึงคิวของบทบาทตัวเองในการอนุมัติ
+        if (currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel)) {
+          if (b.currentApprovalLevel === 1) {
+            const mEmail = (b.managerEmail || '').toLowerCase();
+            return (mEmail === uEmail || mEmail === '');
+          }
+          return true;
+        }
+        
+        return false; // ผ่านคิวตัวเองไปแล้ว หรือยังไม่ถึงคิว
+      }
+    }
+    return true; // หากไม่มีรหัสใบจองคีย์ไว้ ให้แสดงตามปกติ
+  });
+}
+
 // Simulated Email Inbox UI Updates
 function updateEmailInboxUI() {
+  autoGenerateMissingEmailLogs();
+  const badge = document.getElementById('email-inbox-badge');
   const list = document.getElementById('email-logs-list');
   if (!list) return;
 
-  // ==========================================
-  // กรองงานที่รอคนนี้อนุมัติจริงๆ (อัปเดตรองรับ pending_l1 และเช็คอีเมลหัวหน้า)
-  // ==========================================
-  const myPendingTasks = bookings.filter(b => {
-    // 1. ตรวจสอบว่าสถานะขึ้นต้นด้วย pending ไหม และไม่ได้รอข้อมูลจากผู้ขอ
-    if (!b.status.startsWith('pending') || b.waitingForRequesterInput) return false;
+  // กรองเฉพาะข้อความแจ้งเตือนที่ยังค้างดำเนินการอยู่สำหรับผู้ใช้งานปัจจุบัน
+  const filteredLogs = getActiveEmailLogs();
+  const count = filteredLogs.length;
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
 
-    // 2. ถ้าเป็น L1 (Supervisor) ให้เช็คอีเมลว่าตรงกับเราไหม
-    if (currentUser.role === 'supervisor' && b.currentApprovalLevel === 1) {
-      const mEmail = (b.managerEmail || '').toLowerCase();
-      const cEmail = (currentUser.email || '').toLowerCase();
-      return (mEmail === cEmail || mEmail === ''); // ถ้าอีเมลตรงกัน หรือไม่มีอีเมล ให้โชว์
-    }
-
-    // 3. ถ้าเป็นเลเวลอื่นๆ (L2 - L4) ให้เช็คตาม Role ปกติ
-    if (currentUser.role === 'fleet_admin' && b.currentApprovalLevel === 2) return true;
-    if (currentUser.role === 'director' && b.currentApprovalLevel === 3) return true;
-    if (currentUser.role === 'executive' && b.currentApprovalLevel === 4) return true;
-
-    return false;
-  });
-
-  // ==========================================
-  // วาดหน้าจอ (ถ้าไม่มีงาน หรือ มีงาน)
-  // ==========================================
-  if (myPendingTasks.length === 0) {
-    list.innerHTML = `<div style="text-align: center; padding: 2rem;">ไม่มีรายการรอคุณอนุมัติในขณะนี้</div>`;
+  if (count === 0) {
+    list.innerHTML = `
+      <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">
+        ยังไม่มีข้อความแจ้งเตือนสำหรับคุณในเซสชันนี้
+      </div>
+    `;
     return;
   }
 
-  list.innerHTML = myPendingTasks.map(b => `
-    <div style="border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; background-color: #fff;">
-      <strong style="color: var(--primary-color);">${b.id}</strong>: ${b.purpose}
-      <p style="font-size: 0.8rem; color: #666; margin-top: 0.25rem;">จาก: ${b.requester}</p>
-      <div style="margin-top: 0.5rem;">
-        <button class="btn btn-primary btn-sm" onclick="openApprovalModal('${b.id}')">ตรวจสอบ</button>
+  list.innerHTML = filteredLogs.map((log, index) => {
+    const timeStr = new Date(log.timestamp).toLocaleString('th-TH');
+    
+    // Extract booking ID using regex
+    const bookingIdMatch = (log.subject || '').match(/(?:BGK|BKG)-\d+(?:-\d+)?/) || (log.body || '').match(/(?:BGK|BKG)-\d+(?:-\d+)?/);
+    const bookingId = bookingIdMatch ? bookingIdMatch[0] : null;
+    
+    let modifiedBody = log.body || '';
+    if (bookingId) {
+      // Replace the blue button "เข้าสู่ระบบเพื่อดำเนินการ" with the orange "✍️ พิจารณาตรวจอนุมัติ" button
+      modifiedBody = modifiedBody.replace(
+        /<a\s+href="https:\/\/car-booking\.fishmarket\.co\.th\/"\s+style="background-color:\s*#0284c7;[^>]*>เข้าสู่ระบบเพื่อดำเนินการ<\/a>/g,
+        `<button class="btn btn-warning" onclick="event.preventDefault(); openApprovalModal('${bookingId}'); document.getElementById('modal-email-inbox').classList.remove('active');" style="background-color: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: inline-block; font-family: Sarabun, sans-serif;">✍️ พิจารณาตรวจอนุมัติ</button>`
+      );
+      // Replace the red button "กรอกรายละเอียดค่าพาหนะ" with a button that opens the taxi fill modal
+      modifiedBody = modifiedBody.replace(
+        /<a\s+href="https:\/\/car-booking\.fishmarket\.co\.th\/"\s+style="background-color:\s*#dc2626;[^>]*>กรอกรายละเอียดค่าพาหนะ<\/a>/g,
+        `<button class="btn btn-danger" onclick="event.preventDefault(); openFillTaxiModal('${bookingId}'); document.getElementById('modal-email-inbox').classList.remove('active');" style="background-color: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: inline-block; font-family: Sarabun, sans-serif;">✍️ กรอกรายละเอียดค่าพาหนะ</button>`
+      );
+    }
+
+    return `
+      <div class="email-log-item" style="border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.02); padding: 1rem; position: relative; margin-bottom: 0.5rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem; border-bottom: 1px dashed var(--border-color); padding-bottom: 0.5rem;">
+          <span style="font-size: 0.75rem; color: var(--text-muted);">${timeStr}</span>
+          <button class="btn btn-secondary btn-sm" onclick="deleteEmailLog(${index})" style="padding: 0.1rem 0.4rem; font-size:0.7rem; border-color:rgba(220,38,38,0.2); color:var(--danger);">ลบ</button>
+        </div>
+        <div style="margin-bottom: 0.5rem; font-size: 0.85rem;">
+          <strong>ถึง:</strong> <span style="color: var(--primary); font-family: monospace;">${log.to}</span><br>
+          <strong>หัวข้อ:</strong> <span style="font-weight: bold; color: var(--text-main);">${log.subject}</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="toggleEmailBody(${index})" id="btn-toggle-email-${index}" style="width: 100%; text-align: center; margin-top: 0.25rem;">📄 แสดงเนื้อหาอีเมล</button>
+        <div id="email-body-content-${index}" style="display: none; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem; overflow-x: auto; background: white; border-radius: 6px; padding: 1rem; color: #333;">
+          ${modifiedBody}
+        </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 window.deleteEmailLog = function(index) {
   emailLogs.splice(index, 1);

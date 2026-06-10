@@ -2303,4 +2303,38 @@ input[readonly] {
   margin: 0 auto 2rem auto;
 }
 
+/* Page break styling for printable reports */
+.page-break {
+  page-break-before: always;
+  break-before: page;
+}
+@media print {
+  .page-break {
+    display: block;
+    page-break-before: always;
+    break-before: page;
+  }
+}
+
+/* Signature & Driver License Grid Split Layout */
+.signature-license-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 576px) {
+  .signature-license-grid.split-mode {
+    grid-template-columns: 1fr 1fr;
+    position: relative;
+  }
+  
+  .signature-license-grid.split-mode #driver-license-section {
+    border-right: 2px solid #ef4444; /* Vertical red divider line */
+    padding-right: 1.5rem;
+  }
+}
+
+
 

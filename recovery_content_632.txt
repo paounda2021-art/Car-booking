@@ -1,0 +1,49 @@
+Created At: 2026-06-10T14:14:19Z
+Completed At: 2026-06-10T14:14:19Z
+File Path: `file:///c:/Users/FMO-10/Documents/GitHub/Car-booking/app.js`
+Total Lines: 3955
+Total Bytes: 224130
+Showing lines 2530 to 2570
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+2530: // Set up UI Event Listeners
+2531: function setupEventListeners() {
+2532:   // Dynamic Trips update based on checkboxes
+2533:   const updateTripsCount = (e) => {
+2534:     const goCheckEl = document.getElementById('check-car-go');
+2535:     const backCheckEl = document.getElementById('check-car-back');
+2536:     if (!goCheckEl.checked && !backCheckEl.checked) {
+2537:       if (e) {
+2538:         e.target.checked = true;
+2539:         showToast("กรุณาเลือกรูปแบบการเดินทางอย่างน้อย 1 เส้นทาง (ไป หรือ กลับ)", "warning");
+2540:       }
+2541:     }
+2542:     let trips = 0;
+2543:     if (goCheckEl.checked) trips += 1;
+2544:     if (backCheckEl.checked) trips += 1;
+2545:     document.getElementById('input-trips').value = trips;
+2546:   };
+2547: 
+2548:   document.getElementById('check-car-go').addEventListener('change', updateTripsCount);
+2549:   document.getElementById('check-car-back').addEventListener('change', updateTripsCount);
+2550: 
+2551:   // Navigation sidebar clicks
+2552:   document.querySelectorAll('.nav-link').forEach(link => {
+2553:     link.addEventListener('click', (e) => {
+2554:       e.preventDefault();
+2555:       const viewName = link.getAttribute('data-view');
+2556:       showView(viewName);
+2557:     });
+2558:   });
+2559: 
+2560:   // Modal open/close actions
+2561:   document.getElementById('btn-top-login').addEventListener('click', () => {
+2562:     document.getElementById('login-screen').classList.remove('hidden');
+2563:   });
+2564: 
+2565:   document.getElementById('btn-close-login').addEventListener('click', () => {
+2566:     document.getElementById('login-screen').classList.add('hidden');
+2567:   });
+2568: 
+2569:   document.getElementById('btn-open-booking').addEventListener('click', () => {
+2570:     document.getElementById('modal-booking').classList.add('active');
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

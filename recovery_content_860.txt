@@ -1,0 +1,29 @@
+Created At: 2026-06-10T14:40:52Z
+Completed At: 2026-06-10T14:40:52Z
+File Path: `file:///C:/Users/FMO-10/Documents/GitHub/Car-booking/app.js`
+Total Lines: 4253
+Total Bytes: 245540
+Showing lines 2715 to 2735
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+2715:             วันที่ .........../.........../...........
+2716:           </td>
+2717:         </tr>
+2718:       </table>
+2719:       
+2720:       <div style="margin-top: 1.5rem; font-size: 11px; color: #555; line-height: 1.5; border-top: 1px dashed #bbb; padding-top: 0.5rem; text-align: left;">
+2721:         * หมายเหตุ: ผู้ใช้สิทธิ์รถสวัสดิการมีหน้าที่ตรวจเช็คสภาพรถร่วมกับเจ้าหน้าที่พัสดุ ทั้งก่อนนำรถไปใช้งานและก่อนส่งมอบคืนรถยนต์ทุกครั้ง <br>
+2722:         เสร็จสิ้นขั้นตอนการใช้สิทธิ์แล้ว กรุณาส่งคืนแบบฟอร์มตรวจสอบสภาพนี้แก่หน่วยงานพัสดุเพื่อเก็บรักษาเป็นหลักฐาน
+2723:       </div>
+2724:     </div>
+2725:     ` : ''}
+2726:   `;
+2727: }
+2728: 
+2729: // Set up UI Event Listeners
+2730: function setupEventListeners() {
+2731:   // Dynamic Trips update based on checkboxes
+2732:   const updateTripsCount = (e) => {
+2733:     const goCheckEl = document.getElementById('check-car-go');
+2734:     const backCheckEl = document.getElementById('check-car-back');
+2735:     if (!goCheckEl.checked && !backCheckEl.checked) {
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.

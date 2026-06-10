@@ -1,0 +1,60 @@
+Created At: 2026-06-10T14:39:32Z
+Completed At: 2026-06-10T14:39:32Z
+File Path: `file:///C:/Users/FMO-10/Documents/GitHub/Car-booking/app.js`
+Total Lines: 4253
+Total Bytes: 245540
+Showing lines 2500 to 2750
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+2500:           <span class="checkbox-box">${(b.travelType === 'fmo_car' && l4Sig.status === 'approved') ? '✓' : ''}</span> อนุญาต
+2501:         </div>
+2502: 
+2503:         <div style="display: flex; flex-direction: column; align-items: center; margin-top: 0.8rem; width: 100%;">
+2504:           <div style="display: flex; align-items: flex-end; gap: 0.25rem; width: 100%; justify-content: center; position: relative;">
+2505:             <span>ลงชื่อ</span>
+2506:             <div style="width: 150px; border-bottom: 1px dotted #000; position: relative; height: 35px; text-align: center; display: flex; align-items: center; justify-content: center;">
+2507:               ${(b.travelType === 'fmo_car' && l4SigImg) ? `<img src="${l4SigImg}" style="max-height: 35px; max-width: 100%; object-fit: contain; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);">` : '-'}
+2508:             </div>
+2509:             <span>ผฝ.บง.</span>
+2510:           </div>
+2511:           ${(b.travelType === 'fmo_car' && l4SigImg) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : ''}
+2512:           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
+2513:             วันที่ ${(b.travelType === 'fmo_car' && l4Sig.timestamp) ? l4Date : '-'}
+2514:           </div>
+2515:         </div>
+2516:       </div>
+2517: 
+2518:       <!-- RIGHT COLUMN -->
+2519:       <div class="fmo-column">
+2520:         ${b.travelType =
+<truncated 19395 bytes>
+ถสวัสดิการมีหน้าที่ตรวจเช็คสภาพรถร่วมกับเจ้าหน้าที่พัสดุ ทั้งก่อนนำรถไปใช้งานและก่อนส่งมอบคืนรถยนต์ทุกครั้ง <br>
+2722:         เสร็จสิ้นขั้นตอนการใช้สิทธิ์แล้ว กรุณาส่งคืนแบบฟอร์มตรวจสอบสภาพนี้แก่หน่วยงานพัสดุเพื่อเก็บรักษาเป็นหลักฐาน
+2723:       </div>
+2724:     </div>
+2725:     ` : ''}
+2726:   `;
+2727: }
+2728: 
+2729: // Set up UI Event Listeners
+2730: function setupEventListeners() {
+2731:   // Dynamic Trips update based on checkboxes
+2732:   const updateTripsCount = (e) => {
+2733:     const goCheckEl = document.getElementById('check-car-go');
+2734:     const backCheckEl = document.getElementById('check-car-back');
+2735:     if (!goCheckEl.checked && !backCheckEl.checked) {
+2736:       if (e) {
+2737:         e.target.checked = true;
+2738:         showToast("กรุณาเลือกรูปแบบการเดินทางอย่างน้อย 1 เส้นทาง (ไป หรือ กลับ)", "warning");
+2739:       }
+2740:     }
+2741:     let trips = 0;
+2742:     if (goCheckEl.checked) trips += 1;
+2743:     if (backCheckEl.checked) trips += 1;
+2744:     document.getElementById('input-trips').value = trips;
+2745:   };
+2746: 
+2747:   document.getElementById('check-car-go').addEventListener('change', updateTripsCount);
+2748:   document.getElementById('check-car-back').addEventListener('change', updateTripsCount);
+2749: 
+2750:   // Navigation sidebar clicks
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.
