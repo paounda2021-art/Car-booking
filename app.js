@@ -1336,8 +1336,153 @@ function renderTimelineScheduler() {
   container.innerHTML = html;
 }
 
+// Global view layout state for booking lists
+let bookingViewLayout = localStorage.getItem('bookingViewLayout') || 'card';
+
+function setBookingViewLayout(layout) {
+  bookingViewLayout = layout;
+  localStorage.setItem('bookingViewLayout', layout);
+  
+  // Sync toggle button styles
+  const cardBtn = document.getElementById('btn-view-card');
+  const tableBtn = document.getElementById('btn-view-table');
+  if (cardBtn && tableBtn) {
+    if (layout === 'card') {
+      cardBtn.classList.add('active');
+      cardBtn.style.background = 'var(--primary)';
+      cardBtn.style.color = 'white';
+      
+      tableBtn.classList.remove('active');
+      tableBtn.style.background = 'transparent';
+      tableBtn.style.color = 'var(--text-muted)';
+    } else {
+      tableBtn.classList.add('active');
+      tableBtn.style.background = 'var(--primary)';
+      tableBtn.style.color = 'white';
+      
+      cardBtn.classList.remove('active');
+      cardBtn.style.background = 'transparent';
+      cardBtn.style.color = 'var(--text-muted)';
+    }
+  }
+  
+  renderBookingsLists();
+}
+
+function helperCreateTableRow(b, isPendingForMe) {
+  let statusClass = 'warning';
+  let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
+  if (b.waitingForRequesterInput) {
+    statusClass = 'danger';
+    statusText = '⏳ รอระบุค่าพาหนะ';
+  } else if (b.status === 'approved') {
+    statusClass = 'success';
+    statusText = 'อนุมัติเสร็จสิ้น';
+  } else if (b.status === 'rejected') {
+    statusClass = 'danger';
+    statusText = 'ปฏิเสธคำขอ';
+  }
+
+  const startDateStr = new Date(b.startDate).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+  const endDateStr = new Date(b.endDate).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+  
+  let infoStr = '';
+  if (b.travelType === 'fmo_car') {
+    const carObj = cars.find(c => c.id === b.carId);
+    const prefix = b.controlUnit === 'รถสวัสดิการ' ? '🚗 [รถสวัสดิการ]' : '🚗 ใช้รถยนต์ อสป.';
+    infoStr = `${prefix}: <strong>${carObj ? carObj.name : 'ไม่ระบุ'}</strong> (ทะเบียน ${carObj ? carObj.plate : '-'})`;
+    if (b.driverName && b.driverName !== '-') {
+      const phone = getDriverPhoneByName(b.driverName);
+      const phoneStr = phone ? ` (โทร: ${phone})` : '';
+      infoStr += `<br>👤 พขร.: <strong>${b.driverName}</strong>${phoneStr}`;
+    }
+  } else {
+    infoStr = `🚐 ใช้รถรับจ้างสาธารณะ: ระยะทาง ${b.distance} กม. (ประมาณราคา ${b.price} บาท)`;
+  }
+
+  const directionStr = `<span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.2rem;">[ทิศทาง: ${b.goCheck ? 'ไป' : ''}${b.goCheck && b.backCheck ? '-' : ''}${b.backCheck ? 'กลับ' : ''}]</span>`;
+  const actionBtnText = isPendingForMe ? '✍️ พิจารณา' : '👁️ ดูรายละเอียด';
+  const actionBtnClass = isPendingForMe ? 'btn-warning' : 'btn-primary';
+  
+  const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
+  const printBtn = (b.status === 'approved' && isAdmin)
+    ? `<button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
+    : '';
+
+  let stepsDots = '';
+  const maxSteps = 4;
+  for (let i = 1; i <= maxSteps; i++) {
+    let dotClass = 'step-dot';
+    if (b.currentApprovalLevel > i) dotClass += ' completed';
+    else if (b.currentApprovalLevel === i && b.status === 'pending') dotClass += ' active';
+    else if (b.status === 'rejected' && b.currentApprovalLevel === i) dotClass += ' rejected';
+    stepsDots += `<span class="${dotClass}" title="สายอนุมัติที่ ${i}"></span>`;
+  }
+
+  let fillTaxiBtn = '';
+  if (b.waitingForRequesterInput && currentUser && b.requester === currentUser.name) {
+    fillTaxiBtn = `<button class="btn btn-danger btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); openFillTaxiModal('${b.id}')">✍️ กรอกค่าพาหนะ</button>`;
+  }
+
+  return `
+    <tr style="border-bottom: 1px solid var(--border-color); cursor: pointer; transition: var(--transition-smooth);" onclick="openApprovalModal('${b.id}')" class="booking-table-row">
+      <td style="padding: 0.75rem 1rem; font-weight: bold; color: var(--primary); white-space: nowrap;">${b.id}</td>
+      <td style="padding: 0.75rem 1rem;">
+        <div style="font-weight: 600;">${b.requester}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">${b.office || b.position || ''}</div>
+      </td>
+      <td style="padding: 0.75rem 1rem; max-width: 250px;">
+        <div style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${b.purpose}</div>
+      </td>
+      <td style="padding: 0.75rem 1rem; font-size: 0.85rem;">
+        <div>${infoStr}</div>
+        ${directionStr}
+      </td>
+      <td style="padding: 0.75rem 1rem; font-size: 0.8rem; white-space: nowrap;">
+        <div>⏰ ${startDateStr}</div>
+        <div>ถึง ${endDateStr}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">${b.trips} เที่ยว</div>
+      </td>
+      <td style="padding: 0.75rem 1rem; text-align: center; vertical-align: middle;">
+        <div style="margin-bottom: 0.35rem;"><span class="badge ${statusClass}">${statusText}</span></div>
+        <div class="approval-steps-indicator" style="justify-content: center; gap: 0.25rem;">${stepsDots}</div>
+      </td>
+      <td style="padding: 0.75rem 1rem; text-align: right;">
+        <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center;">
+          ${printBtn}
+          ${fillTaxiBtn}
+          <button class="btn ${actionBtnClass} btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">${actionBtnText}</button>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
+  // Sync toggle button styles on render
+  const cardBtn = document.getElementById('btn-view-card');
+  const tableBtn = document.getElementById('btn-view-table');
+  if (cardBtn && tableBtn) {
+    if (bookingViewLayout === 'card') {
+      cardBtn.classList.add('active');
+      cardBtn.style.background = 'var(--primary)';
+      cardBtn.style.color = 'white';
+      
+      tableBtn.classList.remove('active');
+      tableBtn.style.background = 'transparent';
+      tableBtn.style.color = 'var(--text-muted)';
+    } else {
+      tableBtn.classList.add('active');
+      tableBtn.style.background = 'var(--primary)';
+      tableBtn.style.color = 'white';
+      
+      cardBtn.classList.remove('active');
+      cardBtn.style.background = 'transparent';
+      cardBtn.style.color = 'var(--text-muted)';
+    }
+  }
+
   const pendingTabBtn = document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
   const myBkgTabBtn = document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
 
@@ -1415,7 +1560,6 @@ function renderBookingsLists() {
       : '';
 
     let stepsDots = '';
-    const isRequesterUser = currentUser && (currentUser.role === 'requester' || b.requester === currentUser.name);
     const maxSteps = 4;
     for (let i = 1; i <= maxSteps; i++) {
       let dotClass = 'step-dot';
@@ -1456,6 +1600,10 @@ function renderBookingsLists() {
     return card;
   };
 
+  const myBookingsList = [];
+  const pendingBookingsList = [];
+  const allBookingsList = [];
+
   bookings.forEach(b => {
     const isMyRequest = currentUser && b.requester === currentUser.name;
     
@@ -1479,44 +1627,89 @@ function renderBookingsLists() {
       }
     }
 
-    if (isMyRequest && myContainer) {
-      myContainer.appendChild(helperCreateCard(b, isPendingForMe));
+    if (isMyRequest) {
+      myBookingsList.push({ booking: b, isPendingForMe });
     }
-    if (isPendingForMe && pendingContainer) {
-      pendingContainer.appendChild(helperCreateCard(b, isPendingForMe));
+    if (isPendingForMe) {
+      pendingBookingsList.push({ booking: b, isPendingForMe });
     }
-    if (allContainer && (b.status === 'approved' || b.status === 'rejected')) {
-      allContainer.appendChild(helperCreateCard(b, isPendingForMe));
+    if (b.status === 'approved' || b.status === 'rejected') {
+      allBookingsList.push({ booking: b, isPendingForMe });
     }
   });
 
-  if (myContainer && myContainer.children.length === 0) {
-    myContainer.innerHTML = `
+  const renderToContainer = (container, listData, emptyHTML) => {
+    if (!container) return;
+    if (listData.length === 0) {
+      container.innerHTML = emptyHTML;
+      return;
+    }
+
+    if (bookingViewLayout === 'table') {
+      let html = `
+        <div class="table-responsive-container">
+          <table class="bookings-table">
+            <thead>
+              <tr style="background: rgba(99, 102, 241, 0.05); border-bottom: 1px solid var(--border-color);">
+                <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); white-space: nowrap; font-size: 0.8rem;">เลขที่คำขอ</th>
+                <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); white-space: nowrap; font-size: 0.8rem;">ผู้เสนอขอ / สังกัด</th>
+                <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); white-space: nowrap; font-size: 0.8rem;">วัตถุประสงค์</th>
+                <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); white-space: nowrap; font-size: 0.8rem;">ประเภทรถ / พขร.</th>
+                <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); white-space: nowrap; font-size: 0.8rem;">วัน-เวลาเดินทาง</th>
+                <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); white-space: nowrap; font-size: 0.8rem; text-align: center;">สถานะ / ขั้นตอน</th>
+                <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); white-space: nowrap; font-size: 0.8rem; text-align: right;">การจัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      listData.forEach(({ booking, isPendingForMe }) => {
+        html += helperCreateTableRow(booking, isPendingForMe);
+      });
+      html += `</tbody></table></div>`;
+      container.innerHTML = html;
+    } else {
+      container.innerHTML = '';
+      listData.forEach(({ booking, isPendingForMe }) => {
+        container.appendChild(helperCreateCard(booking, isPendingForMe));
+      });
+    }
+  };
+
+  renderToContainer(
+    myContainer,
+    myBookingsList,
+    `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📁</div>
         <div style="font-weight: 600; font-size: 1.05rem; color: var(--text-main);">ไม่มีรายการขออนุญาตใช้</div>
         <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 0.25rem;">รายการจองใช้พาหนะที่คุณเสนอขอจะแสดงขึ้นที่นี่</div>
       </div>
-    `;
-  }
-  if (pendingContainer && pendingContainer.children.length === 0) {
-    pendingContainer.innerHTML = `
+    `
+  );
+
+  renderToContainer(
+    pendingContainer,
+    pendingBookingsList,
+    `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📋</div>
         <div style="font-weight: 600; font-size: 1.05rem; color: var(--text-main);">ไม่มีรายการรออนุมัติ</div>
         <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 0.25rem;">รายการขอใช้รถที่รอการตรวจเห็นชอบและอนุมัติจากคุณจะแสดงขึ้นที่นี่</div>
       </div>
-    `;
-  }
-  if (allContainer && allContainer.children.length === 0) {
-    allContainer.innerHTML = `
+    `
+  );
+
+  renderToContainer(
+    allContainer,
+    allBookingsList,
+    `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📚</div>
         <div style="font-weight: 600; font-size: 1.05rem; color: var(--text-main);">ไม่มีประวัติการใช้รถ</div>
         <div style="font-size: 0.85rem; opacity: 0.7; margin-top: 0.25rem;">รายการจองที่ได้รับการอนุมัติเสร็จสิ้นหรือถูกปฏิเสธแล้วจะแสดงขึ้นที่นี่</div>
       </div>
-    `;
-  }
+    `
+  );
 
   updateStats();
 }
@@ -4752,6 +4945,7 @@ window.renderMonthCalendar = renderMonthCalendar;
 window.openFillTaxiModal = openFillTaxiModal;
 window.generateDriverReport = generateDriverReport;
 window.populateDriversDropdown = populateDriversDropdown;
+window.setBookingViewLayout = setBookingViewLayout;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (!localStorage.getItem('current_user')) {

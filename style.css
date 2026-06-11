@@ -2337,5 +2337,40 @@ input[readonly] {
   }
 }
 
+/* Responsive bookings table layout */
+.table-responsive-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  margin-top: 0.5rem;
+}
+
+.bookings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.bookings-table th, .bookings-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.bookings-table th {
+  background: rgba(99, 102, 241, 0.05);
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.booking-table-row:hover {
+  background: rgba(99, 102, 241, 0.04) !important;
+}
+
 
 
