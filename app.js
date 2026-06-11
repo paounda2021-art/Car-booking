@@ -25,6 +25,61 @@ let uploadedDriverLicenseBase64 = null;
 // Simulated Email Notification logs
 let emailLogs = JSON.parse(localStorage.getItem('email_logs_data') || '[]');
 
+// Helper to open base64 files (PDF/images) in new tab safely using Blob URLs
+function openBase64File(base64DataUrl, filenamePrefix = 'file') {
+  try {
+    const parts = base64DataUrl.split(';base64,');
+    if (parts.length < 2) return;
+    
+    const contentType = parts[0].split(':')[1];
+    const raw = window.atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+
+    for (let i = 0; i < rawLength; ++i) {
+      uInt8Array[i] = raw.charCodeAt(i);
+    }
+
+    const blob = new Blob([uInt8Array], { type: contentType });
+    const blobUrl = URL.createObjectURL(blob);
+    
+    const newTab = window.open(blobUrl, '_blank');
+    if (!newTab) {
+      const extension = contentType.split('/')[1] || 'pdf';
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `${filenamePrefix}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  } catch (error) {
+    console.error("Failed to open base64 file:", error);
+    showToast("เกิดข้อผิดพลาดในการเปิดไฟล์เอกสาร", "error");
+  }
+}
+
+// Helper to check if current user has already booked a Welfare Car in the fiscal year of the given date
+function checkWelfareBookingLimit(startDateStr) {
+  if (!startDateStr || !currentUser) return false;
+  
+  const getFiscalYear = (dateInput) => {
+    const d = new Date(dateInput);
+    const y = d.getFullYear();
+    const m = d.getMonth(); // 0 = Jan, 9 = Oct
+    return m >= 9 ? y + 1 : y;
+  };
+  
+  const targetFiscalYear = getFiscalYear(startDateStr);
+  return bookings.some(b => {
+    const emailMatches = (b.requesterEmail || '').toLowerCase() === (currentUser.email || '').toLowerCase();
+    const isWelfare = b.controlUnit === 'รถสวัสดิการ';
+    const isNotRejected = b.status !== 'rejected';
+    const sameFiscalYear = getFiscalYear(b.startDate) === targetFiscalYear;
+    return emailMatches && isWelfare && isNotRejected && sameFiscalYear;
+  });
+}
+
 // Helper to look up driver's phone number by driver name
 function getDriverPhoneByName(driverName) {
   if (!driverName || driverName === '-') return '';
@@ -1750,12 +1805,12 @@ function openApprovalModal(bookingId) {
   if (licenseRow && licenseEl) {
     if (booking.controlUnit === 'รถสวัสดิการ' && booking.driverLicenseFile) {
       if (booking.driverLicenseFile.startsWith('data:application/pdf')) {
-        licenseEl.innerHTML = `<a href="${booking.driverLicenseFile}" target="_blank" class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.25rem 0.5rem; font-size:0.8rem; border-radius:4px; font-weight:600; background:var(--primary); color:white; border:none; text-decoration:none;">📄 เปิดดูไฟล์ PDF ใบขับขี่</a>`;
+        licenseEl.innerHTML = `<button type="button" class="btn btn-secondary btn-sm btn-view-license-file" data-booking-id="${booking.id}" style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.25rem 0.5rem; font-size:0.8rem; border-radius:4px; font-weight:600; background:var(--primary); color:white; border:none; text-decoration:none; cursor:pointer;">📄 เปิดดูไฟล์ PDF ใบขับขี่</button>`;
       } else {
         licenseEl.innerHTML = `
-          <a href="${booking.driverLicenseFile}" target="_blank" title="คลิกเพื่อดูรูปใหญ่">
-            <img src="${booking.driverLicenseFile}" style="max-width: 120px; max-height: 80px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-color); object-fit: contain;">
-          </a>
+          <div class="btn-view-license-file" data-booking-id="${booking.id}" title="คลิกเพื่อดูรูปใหญ่" style="cursor: pointer; display: inline-block;">
+            <img src="${booking.driverLicenseFile}" style="max-width: 120px; max-height: 80px; border-radius: 4px; border: 1px solid var(--border-color); object-fit: contain;">
+          </div>
         `;
       }
       licenseRow.style.display = 'table-row';
@@ -2483,6 +2538,9 @@ function openReportView(bookingId) {
               <div style="margin-top: 2px;">
                 ผู้ขับรถ: <span class="dotted-val" style="min-width: 140px;">${b.driverName || '................................'}</span>
               </div>
+              <div style="margin-top: 2px;">
+                ความเห็น: <span class="dotted-val" style="min-width: 140px; text-align: left;">${l2Sig.comment || '-'}</span>
+              </div>
               <div style="display: flex; align-items: flex-end; gap: 0.25rem; margin-top: 4px;">
                 ลงชื่อ: 
                 <div style="border-bottom: 1px dotted #000; width: 120px; height: 25px; position: relative;">
@@ -3136,6 +3194,19 @@ function setupEventListeners() {
     }
   });
 
+  // View PDF/Image License File Event Delegation
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-view-license-file');
+    if (btn) {
+      e.preventDefault();
+      const bId = btn.getAttribute('data-booking-id');
+      const b = bookings.find(x => x.id === bId);
+      if (b && b.driverLicenseFile) {
+        openBase64File(b.driverLicenseFile, `ใบขับขี่_${b.requester}`);
+      }
+    }
+  });
+
 
   document.getElementById('btn-open-booking').addEventListener('click', () => {
     document.getElementById('modal-booking').classList.add('active');
@@ -3185,6 +3256,10 @@ function setupEventListeners() {
       document.getElementById('input-welfare-address-subdistrict').removeAttribute('required');
       document.getElementById('input-welfare-address-district').removeAttribute('required');
       document.getElementById('input-welfare-address-province').removeAttribute('required');
+    }
+    const vehicleRequestTip = document.getElementById('vehicle-request-tip');
+    if (vehicleRequestTip) {
+      vehicleRequestTip.innerHTML = '💡 ขอใช้รถยนต์ของ อสป. (การจัดจัดสรรรถยนต์และพนักงานขับรถจะดำเนินการมอบหมายโดยผู้จัดรถ (L2) ในขั้นตอนพิจารณาอนุมัติ)';
     }
     const radioFmo = document.querySelector('input[name="control-unit"][value="อสป."]');
     if (radioFmo) radioFmo.checked = true;
@@ -3295,16 +3370,13 @@ function setupEventListeners() {
         return;
       }
       
-      // Enforce 1 request per calendar year per user
-      const startYear = new Date(startDate).getFullYear();
-      const hasExistingBookingInYear = bookings.some(b => 
-        (b.requesterEmail || '').toLowerCase() === (currentUser.email || '').toLowerCase() &&
-        b.controlUnit === 'รถสวัสดิการ' &&
-        b.status !== 'rejected' &&
-        new Date(b.startDate).getFullYear() === startYear
-      );
-      if (hasExistingBookingInYear) {
-        showToast(`ขออภัย! ใน 1 ปี ท่านสามารถใช้สิทธิ์ขอรถสวัสดิการได้เพียง 1 ครั้งเท่านั้น (ท่านมีคำขอสิทธิ์ในระบบสำหรับปี พ.ศ. ${startYear + 543} แล้ว)`, "error");
+      // Enforce 1 request per fiscal year per user (Oct 1st - Sep 30th)
+      if (checkWelfareBookingLimit(startDate)) {
+        const d = new Date(startDate);
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        const fiscalYear = m >= 9 ? y + 1 : y;
+        showToast(`ขออภัย! ใน 1 ปีงบประมาณ ท่านสามารถใช้สิทธิ์ขอรถสวัสดิการได้เพียง 1 ครั้งเท่านั้น (ท่านมีคำขอสิทธิ์ในระบบสำหรับปีงบประมาณ พ.ศ. ${fiscalYear + 543} แล้ว)`, "error");
         return;
       }
     }
@@ -3631,7 +3703,29 @@ function setupEventListeners() {
       const addressDistrict = document.getElementById('input-welfare-address-district');
       const addressProvince = document.getElementById('input-welfare-address-province');
       
+      const vehicleRequestTip = document.getElementById('vehicle-request-tip');
       if (e.target.value === 'รถสวัสดิการ') {
+        if (vehicleRequestTip) {
+          vehicleRequestTip.innerHTML = '💡 ขอใช้รถยนต์สวัสดิการ (การจัดจัดสรรรถยนต์และพนักงานขับรถจะดำเนินการมอบหมายโดยผู้จัดรถ (L2) ในขั้นตอนพิจารณาอนุมัติ)';
+        }
+        // Check Welfare Car 1-per-fiscal-year limit immediately on selection
+        const startDate = document.getElementById('input-start-date').value;
+        if (checkWelfareBookingLimit(startDate)) {
+          const d = new Date(startDate);
+          const y = d.getFullYear();
+          const m = d.getMonth();
+          const fiscalYear = m >= 9 ? y + 1 : y;
+          showToast(`ขออภัย! ในปีงบประมาณ พ.ศ. ${fiscalYear + 543} ท่านได้ใช้สิทธิ์ขอรถสวัสดิการไปแล้ว (จำกัด 1 ครั้งต่อปีงบประมาณ)`, "error");
+          
+          // Switch back to "อสป."
+          const radioFmo = document.querySelector('input[name="control-unit"][value="อสป."]');
+          if (radioFmo) {
+            radioFmo.checked = true;
+            radioFmo.dispatchEvent(new Event('change'));
+          }
+          return;
+        }
+
         if (licenseSection) licenseSection.style.display = 'block';
         if (signatureGrid) signatureGrid.classList.add('split-mode');
         if (addressContainer) addressContainer.style.display = 'block';
@@ -3643,6 +3737,9 @@ function setupEventListeners() {
         if (addressDistrict) addressDistrict.setAttribute('required', 'required');
         if (addressProvince) addressProvince.setAttribute('required', 'required');
       } else {
+        if (vehicleRequestTip) {
+          vehicleRequestTip.innerHTML = '💡 ขอใช้รถยนต์ของ อสป. (การจัดจัดสรรรถยนต์และพนักงานขับรถจะดำเนินการมอบหมายโดยผู้จัดรถ (L2) ในขั้นตอนพิจารณาอนุมัติ)';
+        }
         if (licenseSection) licenseSection.style.display = 'none';
         if (signatureGrid) signatureGrid.classList.remove('split-mode');
         if (addressContainer) addressContainer.style.display = 'none';
@@ -3655,6 +3752,28 @@ function setupEventListeners() {
         if (addressProvince) addressProvince.removeAttribute('required');
       }
     });
+  });
+
+  // Handle start date change validation for Welfare Car limit
+  document.getElementById('input-start-date').addEventListener('change', (e) => {
+    const welfareRadio = document.querySelector('input[name="control-unit"][value="รถสวัสดิการ"]');
+    if (welfareRadio && welfareRadio.checked) {
+      const startDate = e.target.value;
+      if (checkWelfareBookingLimit(startDate)) {
+        const d = new Date(startDate);
+        const y = d.getFullYear();
+        const m = d.getMonth();
+        const fiscalYear = m >= 9 ? y + 1 : y;
+        showToast(`ขออภัย! ในปีงบประมาณ พ.ศ. ${fiscalYear + 543} ท่านได้ใช้สิทธิ์ขอรถสวัสดิการไปแล้ว (จำกัด 1 ครั้งต่อปีงบประมาณ)`, "error");
+        
+        // Switch back to "อสป."
+        const radioFmo = document.querySelector('input[name="control-unit"][value="อสป."]');
+        if (radioFmo) {
+          radioFmo.checked = true;
+          radioFmo.dispatchEvent(new Event('change'));
+        }
+      }
+    }
   });
 
   // Handle driver's license file upload, verification, and canvas compression

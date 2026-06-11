@@ -2326,13 +2326,14 @@ input[readonly] {
 
 @media (min-width: 576px) {
   .signature-license-grid.split-mode {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     position: relative;
+    gap: 2rem;
   }
   
   .signature-license-grid.split-mode #driver-license-section {
-    border-right: 2px solid #ef4444; /* Vertical red divider line */
-    padding-right: 1.5rem;
+    border-right: 2px dashed #4b5563; /* Vertical gray dashed divider line */
+    padding-right: 2rem;
   }
 }
 
