@@ -4211,7 +4211,7 @@ function getActiveEmailLogs() {
     if ((log.to || '').toLowerCase() !== uEmail) return false;
     
     // ดึงรหัสใบจองออกจากหัวข้อหรือเนื้อความเพื่อเช็คสถานะปัจจุบัน
-    const bookingIdMatch = (log.subject || '').match(/(?:BGK|BKG)-\d+(?:-\d+)?/) || (log.body || '').match(/(?:BGK|BKG)-\d+(?:-\d+)?/);
+    const bookingIdMatch = (log.subject || '').match(/(?:BGK|BKG)(?:-FMO)?-\d+(?:-\d+)?/) || (log.body || '').match(/(?:BGK|BKG)(?:-FMO)?-\d+(?:-\d+)?/);
     const bookingId = bookingIdMatch ? bookingIdMatch[0] : null;
     
     if (bookingId) {
@@ -4274,7 +4274,7 @@ function updateEmailInboxUI() {
     const timeStr = new Date(log.timestamp).toLocaleString('th-TH');
     
     // Extract booking ID using regex
-    const bookingIdMatch = (log.subject || '').match(/(?:BGK|BKG)-\d+(?:-\d+)?/) || (log.body || '').match(/(?:BGK|BKG)-\d+(?:-\d+)?/);
+    const bookingIdMatch = (log.subject || '').match(/(?:BGK|BKG)(?:-FMO)?-\d+(?:-\d+)?/) || (log.body || '').match(/(?:BGK|BKG)(?:-FMO)?-\d+(?:-\d+)?/);
     const bookingId = bookingIdMatch ? bookingIdMatch[0] : null;
     
     let modifiedBody = log.body || '';
