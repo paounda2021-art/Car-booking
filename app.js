@@ -349,7 +349,7 @@ async function initDatabase() {
   // Try to load bookings from Cloudflare KV database first
   let dbBookingsLoaded = false;
   try {
-    /*const dbResponse = await fetch('/api/get-bookings');//
+    const dbResponse = await fetch('/api/get-bookings');
     if (dbResponse.ok) {
       let dbBookings = await dbResponse.json();
       if (dbBookings && Array.isArray(dbBookings)) {
@@ -367,7 +367,7 @@ async function initDatabase() {
         localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
         dbBookingsLoaded = true;
       }
-    }*/
+    }
   } catch (error) {
     console.error("Failed to load bookings from Cloudflare KV database:", error);
   }
@@ -601,72 +601,10 @@ async function initDatabase() {
   }
 }
 
-// ================================================================
-// 1. ฟังก์ชันบันทึกข้อมูล (เซฟลงทั้ง Cloudflare และ สำรองไว้ในเครื่อง)
-// ================================================================
-/*async function saveBookings() {
-  // บันทึกสำรองลง LocalStorage ของเบราว์เซอร์
-  localStorage.setItem('bookings_data', JSON.stringify(bookings));
-  
-  try {
-    // พยายามส่งไปบันทึกที่ฐานข้อมูล Cloudflare (API)
-    await fetch('/api/save-bookings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(bookings)
-    });
-  } catch (error) {
-    console.error("Failed to save bookings to Cloudflare KV database:", error);
-  }
-}*/
-
-// ================================================================
-// 2. ฟังก์ชันโหลดข้อมูล (แก้ปัญหาล็อกเอาท์แล้วข้อมูลหายตอนเทสในเครื่อง)
-// ================================================================
-/*async function fetchBookings() {
-  // 🌟 Step 1: ดึงข้อมูลจากความจำเครื่องมาสแตนด์บายไว้ก่อนทันที (ไม่ต้องรอ API)
-  const savedData = localStorage.getItem('bookings_data');
-  if (savedData) {
-    bookings = JSON.parse(savedData);
-  } else {
-    bookings = [];
-  }
-  
-  // อัปเดตสถิติตั้งต้นรอไว้เลย
-  updateStats();
-  if (currentUser) {
-    renderDashboard();
-    renderBookingsLists();
-    renderMonthCalendar();
-  }
-
-  // 🌟 Step 2: ค่อยแอบวิ่งไปขอข้อมูลอัปเดตล่าสุดจาก API (ทำงานอยู่เบื้องหลัง)
-  try {
-    const response = await fetch('/api/get-bookings');
-    if (response.ok) {
-      bookings = await response.json();
-      localStorage.setItem('bookings_data', JSON.stringify(bookings)); // อัปเดตข้อมูลลงเครื่องซ้ำอีกรอบ
-      
-      // สั่งรีเรนเดอร์หน้าจออีกครั้งเมื่อได้ข้อมูลใหม่สดๆ จากเซิร์ฟเวอร์
-      updateStats();
-      if (currentUser) {
-        renderDashboard();
-        renderBookingsLists();
-        renderMonthCalendar();
-      }
-    }
-  } catch (error) {
-    // ถ้ารันในเครื่อง (Local) แล้ว fetch ไม่ผ่าน ก็จะปล่อยผ่านเงียบๆ 
-    // เพราะเรามีข้อมูลสแตนด์บายจาก Step 1 ช้อนไว้เรียบร้อยแล้ว ข้อมูลจะไม่หายแน่นอน
-    console.warn("รันระบบในเครื่อง (Local): ดึงข้อมูลจาก LocalStorage สำเร็จ");
-  }
-}*/
 // ==========================================
 // 1. ฟังก์ชันบันทึกข้อมูล (เซฟลงเครื่องเพียวๆ 100%)
 // ==========================================
-function saveBookings() {
+async function saveBookings() {
   // 🛡️ เกราะป้องกันขั้นสุดยอด: ห้ามเอา 0 รายการไปเซฟทับข้อมูลเดิมเด็ดขาด!
   if (bookings.length === 0) {
     console.warn("🛑 บล็อกการทำงาน: ป้องกันการเซฟ 0 รายการทับข้อมูลเดิม!");
@@ -676,6 +614,20 @@ function saveBookings() {
   // ถ้ามีข้อมูล (มากกว่า 0) ค่อยให้เซฟลงเครื่อง
   localStorage.setItem('bookings_data', JSON.stringify(bookings));
   console.log("💾 บันทึกข้อมูลสำเร็จ! จำนวนทั้งหมด:", bookings.length, "รายการ");
+
+  try {
+    // พยายามส่งไปบันทึกที่ฐานข้อมูล Cloudflare (API)
+    await fetch('/api/save-bookings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(bookings)
+    });
+    console.log("☁️ บันทึกข้อมูลลงฐานข้อมูลคลาวด์ (Cloudflare KV) สำเร็จ!");
+  } catch (error) {
+    console.error("Failed to save bookings to Cloudflare KV database:", error);
+  }
 }
 
 // ==========================================
