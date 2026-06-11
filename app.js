@@ -2229,7 +2229,7 @@ function handleApprovalAction(isApproved) {
           <p>เรียน ผู้จัดรถ / งานยานพาหนะ (L2),</p>
           <p>มีใบขออนุญาตใช้รถยนต์เลขที่ <strong>${booking.id}</strong> ผ่านความเห็นชอบพิจารณาจากระดับหัวหน้างาน (L1) แล้ว ขณะนี้รอการดำเนินการจากท่านในการจัดสรรยานพาหนะและคนขับรถ</p>
           <div style="text-align: center; margin: 25px 0;">
-            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
           </div>
         `;
         sendEmailNotification(toEmail, subject, body);
@@ -2249,7 +2249,7 @@ function handleApprovalAction(isApproved) {
             ${booking.travelType === 'fmo_car' ? `<tr><td style="padding: 6px 0; font-weight: bold;">พนักงานขับรถ:</td><td style="padding: 6px 0;">${driverNameWithPhone}</td></tr>` : `<tr><td style="padding: 6px 0; font-weight: bold;">ค่าพาหนะโดยประมาณ:</td><td style="padding: 6px 0;">${booking.price} บาท (ระยะทาง ${booking.distance} กม.)</td></tr>`}
           </table>
           <div style="text-align: center; margin: 25px 0;">
-            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
           </div>
         `;
         sendEmailNotification(toEmail, subject, body);
@@ -2269,7 +2269,7 @@ function handleApprovalAction(isApproved) {
             ${booking.travelType === 'fmo_car' ? `<tr><td style="padding: 6px 0; font-weight: bold;">พนักงานขับรถ:</td><td style="padding: 6px 0;">${driverNameWithPhone}</td></tr>` : `<tr><td style="padding: 6px 0; font-weight: bold;">วงเงินประมาณเบิกจ่าย:</td><td style="padding: 6px 0;">${booking.price} บาท</td></tr>`}
           </table>
           <div style="text-align: center; margin: 25px 0;">
-            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
           </div>
         `;
         sendEmailNotification(toEmail, subject, body);
@@ -3412,7 +3412,7 @@ function setupEventListeners() {
       </table>
       <p>ท่านสามารถคลิกเข้าสู่ระบบเพื่อพิจารณาลงความเห็นชอบหรือปฏิเสธคำขอได้ที่ลิงก์ด้านล่างนี้:</p>
       <div style="text-align: center; margin: 25px 0;">
-        <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+        <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
       </div>
     `;
     sendEmailNotification(newBooking.managerEmail, subject, body);
@@ -3895,7 +3895,7 @@ function setupFillTaxiHandler() {
           </table>
           <p>ท่านสามารถคลิกเข้าสู่ระบบเพื่อพิจารณาลงความเห็นชอบหรือปฏิเสธคำขอได้ที่ลิงก์ด้านล่างนี้:</p>
           <div style="text-align: center; margin: 25px 0;">
-            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
           </div>
         `;
         sendEmailNotification(toEmail, subject, body);
@@ -4120,7 +4120,7 @@ function autoGenerateMissingEmailLogs() {
               </table>
               <p>ท่านสามารถคลิกเข้าสู่ระบบเพื่อพิจารณาลงความเห็นชอบหรือปฏิเสธคำขอได้ที่ลิงก์ด้านล่างนี้:</p>
               <div style="text-align: center; margin: 25px 0;">
-                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
               </div>
             `;
           } else if (lvl === 2) {
@@ -4129,7 +4129,7 @@ function autoGenerateMissingEmailLogs() {
               <p>เรียน ผู้จัดรถ / งานยานพาหนะ (L2),</p>
               <p>มีใบขออนุญาตใช้รถยนต์เลขที่ <strong>${b.id}</strong> ผ่านความเห็นชอบพิจารณาจากระดับหัวหน้างาน (L1) แล้ว ขณะนี้รอการดำเนินการจากท่านในการจัดสรรยานพาหนะและคนขับรถ</p>
               <div style="text-align: center; margin: 25px 0;">
-                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
               </div>
             `;
           } else if (lvl === 3) {
@@ -4144,7 +4144,7 @@ function autoGenerateMissingEmailLogs() {
                 <tr><td style="padding: 6px 0; font-weight: bold;">ประเภทการเดินทาง:</td><td style="padding: 6px 0;">${b.travelType === 'fmo_car' ? 'รถตู้ อสป.' : 'รถรับจ้างสาธารณะ (TAXI)'}</td></tr>
               </table>
               <div style="text-align: center; margin: 25px 0;">
-                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
               </div>
             `;
           } else if (lvl === 4) {
@@ -4159,7 +4159,7 @@ function autoGenerateMissingEmailLogs() {
                 <tr><td style="padding: 6px 0; font-weight: bold;">ประเภทการเดินทาง:</td><td style="padding: 6px 0;">${b.travelType === 'fmo_car' ? 'รถตู้ อสป.' : 'รถรับจ้างสาธารณะ (TAXI)'}</td></tr>
               </table>
               <div style="text-align: center; margin: 25px 0;">
-                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อดำเนินการ</a>
+                <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
               </div>
             `;
           }
@@ -4279,9 +4279,14 @@ function updateEmailInboxUI() {
     
     let modifiedBody = log.body || '';
     if (bookingId) {
-      // Replace the blue button "เข้าสู่ระบบเพื่อดำเนินการ" with the orange "✍️ พิจารณาตรวจอนุมัติ" button
+      // Replace the blue button "เข้าสู่ระบบเพื่อดำเนินการ" with the orange "✍️ พิจารณาตรวจอนุมัติ" button (for backward compatibility)
       modifiedBody = modifiedBody.replace(
         /<a\s+href="https:\/\/car-booking\.fishmarket\.co\.th\/"\s+style="background-color:\s*#0284c7;[^>]*>เข้าสู่ระบบเพื่อดำเนินการ<\/a>/g,
+        `<button class="btn btn-warning" onclick="event.preventDefault(); openApprovalModal('${bookingId}'); document.getElementById('modal-email-inbox').classList.remove('active');" style="background-color: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: inline-block; font-family: Sarabun, sans-serif;">✍️ พิจารณาตรวจอนุมัติ</button>`
+      );
+      // Replace the orange link button "✍️ พิจารณาตรวจอนุมัติ" with a local button that opens the modal
+      modifiedBody = modifiedBody.replace(
+        /<a\s+href="https:\/\/car-booking\.fishmarket\.co\.th\/"\s+style="background-color:\s*#f59e0b;[^>]*>✍️\s*พิจารณาตรวจอนุมัติ<\/a>/g,
         `<button class="btn btn-warning" onclick="event.preventDefault(); openApprovalModal('${bookingId}'); document.getElementById('modal-email-inbox').classList.remove('active');" style="background-color: #f59e0b; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; display: inline-block; font-family: Sarabun, sans-serif;">✍️ พิจารณาตรวจอนุมัติ</button>`
       );
       // Replace the red button "กรอกรายละเอียดค่าพาหนะ" with a button that opens the taxi fill modal
