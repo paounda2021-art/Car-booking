@@ -4810,3 +4810,68 @@ function getMyPendingTasksList() {
     return false;
   });
 }
+
+// ==========================================
+// ส่งออกข้อมูลการจองทั้งหมดเป็นไฟล์ Excel (CSV)
+// ==========================================
+window.exportBookingsToCSV = function() {
+  if (bookings.length === 0) {
+    showToast("ไม่มีข้อมูลการจองสำหรับส่งออก", "warning");
+    return;
+  }
+  
+  const headers = [
+    "เลขที่คำขอ", "ผู้ขอจอง", "ตำแหน่ง", "หน่วยงาน/โครงการ", "วัตถุประสงค์", "สถานที่ปลายทาง", 
+    "ประเภทการเดินทาง", "วันเริ่มเดินทาง", "วันสิ้นสุดเดินทาง", "จำนวนเที่ยวรถ", "รถที่จัดสรร", 
+    "พนักงานขับรถ", "ระยะทางประมาณ (กม.)", "ค่าใช้จ่ายประมาณ (บาท)", "สถานะใบคำขอ"
+  ];
+  
+  const rows = bookings.map(b => {
+    let travelTypeStr = b.travelType === 'fmo_car' ? (b.controlUnit === 'รถสวัสดิการ' ? 'รถสวัสดิการ' : 'รถยนต์ อสป.') : 'รถรับจ้างสาธารณะ (TAXI)';
+    let carName = '';
+    if (b.travelType === 'fmo_car') {
+      const carObj = cars.find(c => c.id === b.carId);
+      carName = carObj ? `${carObj.name} (${carObj.plate})` : '';
+    }
+    
+    let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
+    if (b.waitingForRequesterInput) {
+      statusText = 'รอระบุค่าพาหนะ';
+    } else if (b.status === 'approved') {
+      statusText = 'อนุมัติเสร็จสิ้น';
+    } else if (b.status === 'rejected') {
+      statusText = 'ปฏิเสธคำขอ';
+    }
+    
+    return [
+      b.id,
+      b.requester,
+      b.position || '',
+      b.controlUnit || '',
+      b.purpose || '',
+      b.destination || '',
+      travelTypeStr,
+      new Date(b.startDate).toLocaleString('th-TH'),
+      new Date(b.endDate).toLocaleString('th-TH'),
+      b.trips || '',
+      carName,
+      b.driverName || '',
+      b.distance || '',
+      b.price || '',
+      statusText
+    ];
+  });
+  
+  let csvContent = "\uFEFF"; // UTF-8 BOM for Excel Thai character encoding
+  csvContent += [headers.join(','), ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\r\n');
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `รายงานการจองรถ_${new Date().toLocaleDateString('th-TH').replace(/\//g, '-')}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast("ส่งออกข้อมูลเป็นไฟล์ Excel (CSV) สำเร็จแล้ว!", "success");
+};
