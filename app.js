@@ -1460,28 +1460,18 @@ function helperCreateTableRow(b, isPendingForMe) {
 
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
-  // Sync toggle button styles on render
-  const cardBtn = document.getElementById('btn-view-card');
-  const tableBtn = document.getElementById('btn-view-table');
-  if (cardBtn && tableBtn) {
-    if (bookingViewLayout === 'card') {
-      cardBtn.classList.add('active');
-      cardBtn.style.background = 'var(--primary)';
-      cardBtn.style.color = 'white';
-      
-      tableBtn.classList.remove('active');
-      tableBtn.style.background = 'transparent';
-      tableBtn.style.color = 'var(--text-muted)';
+  // Show export button only for L2 (fleet_admin)
+  const exportBtn = document.getElementById('btn-export-csv');
+  if (exportBtn) {
+    if (currentUser && currentUser.role === 'fleet_admin') {
+      exportBtn.classList.remove('hidden');
     } else {
-      tableBtn.classList.add('active');
-      tableBtn.style.background = 'var(--primary)';
-      tableBtn.style.color = 'white';
-      
-      cardBtn.classList.remove('active');
-      cardBtn.style.background = 'transparent';
-      cardBtn.style.color = 'var(--text-muted)';
+      exportBtn.classList.add('hidden');
     }
   }
+
+  // Force card view layout
+  bookingViewLayout = 'card';
 
   const pendingTabBtn = document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
   const myBkgTabBtn = document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
