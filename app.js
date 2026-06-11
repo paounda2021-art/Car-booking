@@ -121,6 +121,54 @@ function compressImage(file, callback) {
   reader.readAsDataURL(file);
 }
 
+// Helper to dynamically resolve the manager email of a booking
+function resolveManagerEmail(booking) {
+  if (!booking) return 'ranida.c@fishmarket.co.th';
+  
+  // 1. If managerEmail is set and is NOT the fallback email 'ranida.c@fishmarket.co.th'
+  if (booking.managerEmail && booking.managerEmail.trim() !== '' && booking.managerEmail !== 'ranida.c@fishmarket.co.th') {
+    return booking.managerEmail;
+  }
+  
+  // 2. Look up the requester in the usersList loaded from users.json
+  if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
+    const requesterName = booking.requester.trim();
+    const userObj = usersList.find(u => 
+      u.name.trim() === requesterName || 
+      (booking.requesterEmail && u.email && u.email.toLowerCase() === booking.requesterEmail.toLowerCase())
+    );
+    if (userObj && userObj.manager_email && userObj.manager_email.trim() !== '') {
+      return userObj.manager_email;
+    }
+  }
+  
+  // 3. Fallback: if booking has managerEmail, use it even if it is the fallback email
+  if (booking.managerEmail && booking.managerEmail.trim() !== '') {
+    return booking.managerEmail;
+  }
+  
+  return 'ranida.c@fishmarket.co.th'; // Default fallback
+}
+
+// Helper to dynamically resolve the requester email of a booking
+function resolveRequesterEmail(booking) {
+  if (!booking) return 'ranida.c@fishmarket.co.th';
+  if (booking.requesterEmail && booking.requesterEmail.trim() !== '' && booking.requesterEmail !== 'ranida.c@fishmarket.co.th') {
+    return booking.requesterEmail;
+  }
+  if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
+    const requesterName = booking.requester.trim();
+    const userObj = usersList.find(u => u.name.trim() === requesterName);
+    if (userObj && userObj.email && userObj.email.trim() !== '') {
+      return userObj.email;
+    }
+  }
+  if (booking.requesterEmail && booking.requesterEmail.trim() !== '') {
+    return booking.requesterEmail;
+  }
+  return 'ranida.c@fishmarket.co.th';
+}
+
 // Asynchronous helper to send email notification via server-side API proxy
 async function sendEmailNotification(toEmail, subject, htmlBody) {
   if (!toEmail) {
@@ -1106,7 +1154,7 @@ function updateStats() {
         if (canApproveThisLevel && isSelectedLevel) {
           // เงื่อนไขคัดกรองพิเศษเพิ่มเติมสำหรับระดับ L1 (Supervisor)
           if (b.currentApprovalLevel === 1) {
-            const mEmail = (b.managerEmail || '').toLowerCase();
+            const mEmail = resolveManagerEmail(b).toLowerCase();
             const cEmail = (currentUser.email || '').toLowerCase();
             if (mEmail === cEmail || mEmail === '') {
               pendingCount++;
@@ -1606,7 +1654,7 @@ function renderBookingsLists() {
       if (canApproveThisLevel && isSelectedLevel) {
         if (b.currentApprovalLevel === 1) {
           // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
-          const mEmail = (b.managerEmail || '').toLowerCase();
+          const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
           if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
             isPendingForMe = true;
@@ -2032,7 +2080,7 @@ function openApprovalModal(bookingId) {
     if (canApproveThisLevel) {
       if (lvl === 1) {
         // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
-        const mEmail = (booking.managerEmail || '').toLowerCase();
+        const mEmail = resolveManagerEmail(booking).toLowerCase();
         const cEmail = (currentUser.email || '').toLowerCase();
         if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
           isMyTurn = true;
@@ -2277,7 +2325,7 @@ function handleApprovalAction(isApproved) {
         renderMonthCalendar();
 
         // Trigger email notification (L2 -> L0 TAXI Loop)
-        const reqEmail = booking.requesterEmail || 'ranida.c@fishmarket.co.th';
+        const reqEmail = resolveRequesterEmail(booking);
         const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
         const body = `
           <p>เรียน คุณ ${booking.requester},</p>
@@ -2366,7 +2414,7 @@ function handleApprovalAction(isApproved) {
 
   if (!isApproved) {
     // Rejection notification
-    const reqEmail = booking.requesterEmail || 'ranida.c@fishmarket.co.th';
+    const reqEmail = resolveRequesterEmail(booking);
     const subject = `[ระบบจองรถ อสป.] คำขอจองใช้รถเลขที่ ${booking.id} ได้รับการปฏิเสธอนุมัติ`;
     const body = `
       <p>เรียน คุณ ${booking.requester},</p>
@@ -2386,7 +2434,7 @@ function handleApprovalAction(isApproved) {
     // Approved at this level, check next action
     if (booking.status === 'approved') {
       // Notify requester that the booking is fully approved
-      const reqEmail = booking.requesterEmail || 'ranida.c@fishmarket.co.th';
+      const reqEmail = resolveRequesterEmail(booking);
       const subject = `[ระบบจองรถ อสป.] คำขอใช้รถเลขที่ ${booking.id} ได้รับอนุมัติเสร็จสิ้นเรียบร้อยแล้ว`;
       const body = `
         <p>เรียน คุณ ${booking.requester},</p>
@@ -3743,7 +3791,7 @@ function setupEventListeners() {
       renderMonthCalendar();
 
       // Trigger email notification (L2 -> L0 TAXI Loop)
-      const reqEmail = booking.requesterEmail || 'ranida.c@fishmarket.co.th';
+      const reqEmail = resolveRequesterEmail(booking);
       const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
       const body = `
         <p>เรียน คุณ ${booking.requester},</p>
@@ -3788,7 +3836,7 @@ function setupEventListeners() {
     renderMonthCalendar();
 
     // Trigger email notification to requester
-    const reqEmail = booking.requesterEmail || 'ranida.c@fishmarket.co.th';
+    const reqEmail = resolveRequesterEmail(booking);
     const subject = `[ระบบจองรถ อสป.] แจ้งเปลี่ยนประเภทพาหนะ / รถยนต์สำหรับคำขอ เลขที่ ${booking.id}`;
     let carDetails = '';
     if (booking.travelType === 'fmo_car') {
@@ -4064,7 +4112,7 @@ function setupFillTaxiHandler() {
         renderMonthCalendar();
 
         // Trigger email notification to L1 (manager)
-        const toEmail = booking.managerEmail || 'ranida.c@fishmarket.co.th';
+        const toEmail = resolveManagerEmail(booking);
         const subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ (จัดสรร TAXI) เลขที่ ${booking.id} รอการตรวจสอบเห็นชอบ`;
         const body = `
           <p>เรียน หัวหน้าแผนกผู้ควบคุม,</p>
@@ -4268,7 +4316,7 @@ function autoGenerateMissingEmailLogs() {
       
       if (currentUser.canApprove && currentUser.canApprove.includes(lvl)) {
         if (lvl === 1) {
-          const mEmail = (b.managerEmail || '').toLowerCase();
+          const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
           if (mEmail === cEmail || mEmail === '') {
             isForCurrentUser = true;
@@ -4418,7 +4466,7 @@ function getActiveEmailLogs() {
         // หากอยู่ในขั้นตอนรออนุมัติ แสดงเฉพาะเมื่อถึงคิวของบทบาทตัวเองในการอนุมัติ
         if (currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel)) {
           if (b.currentApprovalLevel === 1) {
-            const mEmail = (b.managerEmail || '').toLowerCase();
+            const mEmail = resolveManagerEmail(b).toLowerCase();
             return (mEmail === uEmail || mEmail === '');
           }
           return true;
@@ -4985,7 +5033,7 @@ function getMyPendingTasksList() {
       
       if (canApproveThisLevel && isSelectedLevel) {
         if (b.currentApprovalLevel === 1) {
-          const mEmail = (b.managerEmail || '').toLowerCase();
+          const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
           return (mEmail === cEmail || mEmail === '');
         }
