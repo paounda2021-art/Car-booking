@@ -1,0 +1,8 @@
+# Wrangler configuration for Car-booking project
+name = "car-booking"
+pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fmo-bookings"
+database_id = "c04f3121-ef33-4e5e-9891-c04f3121ef33"
