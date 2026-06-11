@@ -924,6 +924,7 @@ async function clearDatabase() {
     emailLogs = [];
     localStorage.removeItem('bookings_data');
     localStorage.removeItem('email_logs_data');
+    localStorage.removeItem('deleted_email_logs');
     
     // ล้างค่าสถานะการสลับบทบาทอนุมัติ (Dropdown) ที่ค้างอยู่
     sessionStorage.removeItem('activeApprovalLevel'); 
@@ -4074,6 +4075,7 @@ function autoGenerateMissingEmailLogs() {
   if (!currentUser) return;
   
   let logsUpdated = false;
+  const deletedLogs = JSON.parse(localStorage.getItem('deleted_email_logs') || '[]');
   
   bookings.forEach(b => {
     if ((b.status === 'pending' || b.status === 'pending_l1') && !b.waitingForRequesterInput) {
@@ -4102,7 +4104,9 @@ function autoGenerateMissingEmailLogs() {
           return toMatch && idMatch;
         });
         
-        if (!hasLog) {
+        const isDeleted = deletedLogs.some(del => del.bookingId === b.id && del.level === lvl && del.userEmail.toLowerCase() === targetEmail.toLowerCase());
+        
+        if (!hasLog && !isDeleted) {
           let subject = '';
           let body = '';
           
@@ -4319,6 +4323,25 @@ function updateEmailInboxUI() {
 }
 window.deleteEmailLog = function(index) {
   if (index >= 0 && index < emailLogs.length) {
+    const log = emailLogs[index];
+    
+    // Extract booking ID and target email
+    const bookingIdMatch = (log.subject || '').match(/(?:BGK|BKG)(?:-FMO)?-\d+(?:-\d+)?/) || (log.body || '').match(/(?:BGK|BKG)(?:-FMO)?-\d+(?:-\d+)?/);
+    const bookingId = bookingIdMatch ? bookingIdMatch[0] : null;
+    
+    if (bookingId) {
+      const b = bookings.find(x => x.id === bookingId);
+      const lvl = b ? b.currentApprovalLevel : 1;
+      
+      const deletedLogs = JSON.parse(localStorage.getItem('deleted_email_logs') || '[]');
+      deletedLogs.push({
+        bookingId: bookingId,
+        level: lvl,
+        userEmail: (log.to || '').toLowerCase()
+      });
+      localStorage.setItem('deleted_email_logs', JSON.stringify(deletedLogs));
+    }
+
     emailLogs.splice(index, 1);
     localStorage.setItem('email_logs_data', JSON.stringify(emailLogs));
     updateEmailInboxUI();
