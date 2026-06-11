@@ -16,7 +16,7 @@ export async function onRequestPost(context) {
     
     const provider = (env.EMAIL_PROVIDER || 'resend').toLowerCase();
     const apiKey = env.EMAIL_API_KEY;
-    const fromEmail = env.EMAIL_FROM || 'carbooking@fishmarket.co.th';
+    const fromEmail = env.EMAIL_FROM || 'procurement@fishmarket.co.th';
     const fromName = env.EMAIL_FROM_NAME || 'ระบบจองรถ อสป.';
     
     if (!apiKey) {
