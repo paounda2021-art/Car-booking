@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบขออนุมัติใช้รถยนต์และเบิกจ่าย - องค์การสะพานปลา</title>
-  <link rel="stylesheet" href="style.css?v=3.7">
+  <link rel="stylesheet" href="style.css?v=3.8">
 </head>
 <body>
   <!-- Background Blobs for Glassmorphism depth -->
@@ -201,7 +201,7 @@
             <button class="tab-btn active" data-tab="tab-my-bookings">รายการที่ฉันขอ (<span id="tab-my-bookings-count">0</span>)</button>
             <button class="tab-btn" data-tab="tab-pending-approvals">งานรออนุมัติจากคุณ (<span id="tab-pending-count">0</span>)</button>
             <button class="tab-btn" data-tab="tab-all-history">ประวัติทั้งหมด (<span id="tab-all-history-count">0</span>)</button>
-            <button class="btn btn-secondary btn-sm" id="btn-export-csv" onclick="exportBookingsToCSV()" style="margin-left: auto; height: 32px; padding: 0 0.75rem; display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; background: #10b981; color: white; border-color: #10b981; margin-bottom: 0.5rem; cursor: pointer; border-radius: 6px; font-weight: bold; border-style: solid; border-width: 1px;">
+            <button class="btn btn-secondary btn-sm" id="btn-export-csv" onclick="openExportModal()" style="margin-left: auto; height: 32px; padding: 0 0.75rem; display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; background: #10b981; color: white; border-color: #10b981; margin-bottom: 0.5rem; cursor: pointer; border-radius: 6px; font-weight: bold; border-style: solid; border-width: 1px;">
               📥 ส่งออก Excel (CSV)
             </button>
           </div>
@@ -716,6 +716,33 @@
         </div>
       </div>
 
-  <script src="app.js?v=3.7"></script>
+      <!-- MODAL 5: Export CSV Date Range (For L2) -->
+      <div id="modal-export-csv" class="modal-overlay">
+        <div class="modal-box" style="max-width: 450px;">
+          <div class="modal-header">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem;">📥 ส่งออกข้อมูลการจองรถยนต์</h3>
+            <button id="btn-close-export-csv" class="modal-close" onclick="document.getElementById('modal-export-csv').classList.remove('active')">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+              กรุณาเลือกช่วงเวลาของวันเริ่มเดินทางที่ต้องการส่งออก (หากไม่ระบุวันที่ จะส่งออกข้อมูลการจองทั้งหมดในระบบ)
+            </p>
+            <div class="form-group">
+              <label for="export-start-date">ตั้งแต่วันเริ่มเดินทาง</label>
+              <input type="date" id="export-start-date" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-family: inherit; margin-top: 0.25rem;">
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+              <label for="export-end-date">ถึงวันเริ่มเดินทาง</label>
+              <input type="date" id="export-end-date" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-family: inherit; margin-top: 0.25rem;">
+            </div>
+            <div class="modal-footer" style="margin-top: 1.5rem; padding: 0.5rem 0 0 0; display: flex; gap: 0.5rem; justify-content: flex-end;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-export-csv" onclick="document.getElementById('modal-export-csv').classList.remove('active')">ยกเลิก</button>
+              <button type="button" class="btn btn-primary" id="btn-submit-export-csv" onclick="triggerExportBookings()" style="background: #10b981; border-color: #10b981; color: white;">📥 ส่งออก Excel (CSV)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+  <script src="app.js?v=3.8"></script>
 </body>
 </html>

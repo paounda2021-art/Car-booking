@@ -4998,19 +4998,64 @@ function getMyPendingTasksList() {
 // ==========================================
 // ส่งออกข้อมูลการจองทั้งหมดเป็นไฟล์ Excel (CSV)
 // ==========================================
-window.exportBookingsToCSV = function() {
+// ==========================================
+// ส่งออกข้อมูลการจองตามช่วงเวลาที่กำหนดเป็นไฟล์ Excel (CSV)
+// ==========================================
+window.openExportModal = function() {
+  const modal = document.getElementById('modal-export-csv');
+  if (modal) {
+    document.getElementById('export-start-date').value = '';
+    document.getElementById('export-end-date').value = '';
+    modal.classList.add('active');
+  }
+};
+
+window.triggerExportBookings = function() {
   if (bookings.length === 0) {
     showToast("ไม่มีข้อมูลการจองสำหรับส่งออก", "warning");
     return;
   }
+
+  const startVal = document.getElementById('export-start-date').value;
+  const endVal = document.getElementById('export-end-date').value;
   
+  let filtered = bookings;
+  
+  if (startVal) {
+    const startLimit = new Date(startVal + 'T00:00:00').getTime();
+    filtered = filtered.filter(b => {
+      const bDate = new Date(b.startDate).getTime();
+      return bDate >= startLimit;
+    });
+  }
+  
+  if (endVal) {
+    const endLimit = new Date(endVal + 'T23:59:59').getTime();
+    filtered = filtered.filter(b => {
+      const bDate = new Date(b.startDate).getTime();
+      return bDate <= endLimit;
+    });
+  }
+  
+  if (filtered.length === 0) {
+    showToast("ไม่พบข้อมูลการจองในช่วงเวลาที่เลือก", "warning");
+    return;
+  }
+  
+  window.performExportToCSV(filtered, startVal, endVal);
+  
+  const modal = document.getElementById('modal-export-csv');
+  if (modal) modal.classList.remove('active');
+};
+
+window.performExportToCSV = function(list, startVal, endVal) {
   const headers = [
     "เลขที่คำขอ", "ผู้ขอจอง", "ตำแหน่ง", "หน่วยงาน/โครงการ", "วัตถุประสงค์", "สถานที่ปลายทาง", 
     "ประเภทการเดินทาง", "วันเริ่มเดินทาง", "วันสิ้นสุดเดินทาง", "จำนวนเที่ยวรถ", "รถที่จัดสรร", 
     "พนักงานขับรถ", "ระยะทางประมาณ (กม.)", "ค่าใช้จ่ายประมาณ (บาท)", "สถานะใบคำขอ"
   ];
   
-  const rows = bookings.map(b => {
+  const rows = list.map(b => {
     let travelTypeStr = b.travelType === 'fmo_car' ? (b.controlUnit === 'รถสวัสดิการ' ? 'รถสวัสดิการ' : 'รถยนต์ อสป.') : 'รถรับจ้างสาธารณะ (TAXI)';
     let carName = '';
     if (b.travelType === 'fmo_car') {
@@ -5046,14 +5091,27 @@ window.exportBookingsToCSV = function() {
     ];
   });
   
-  let csvContent = "\uFEFF"; // UTF-8 BOM for Excel Thai character encoding
+  let csvContent = "\uFEFF"; // UTF-8 BOM for Thai character encoding in Excel
   csvContent += [headers.join(','), ...rows.map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))].join('\r\n');
   
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.setAttribute("href", url);
-  link.setAttribute("download", `รายงานการจองรถ_${new Date().toLocaleDateString('th-TH').replace(/\//g, '-')}.csv`);
+  
+  let filename = "รายงานการจองรถ";
+  if (startVal && endVal) {
+    filename += `_ระหว่าง_${startVal}_ถึง_${endVal}`;
+  } else if (startVal) {
+    filename += `_ตั้งแต่_${startVal}`;
+  } else if (endVal) {
+    filename += `_จนถึง_${endVal}`;
+  } else {
+    filename += `_ทั้งหมด`;
+  }
+  filename += `_${new Date().toLocaleDateString('th-TH').replace(/\//g, '-')}.csv`;
+  
+  link.setAttribute("download", filename);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
