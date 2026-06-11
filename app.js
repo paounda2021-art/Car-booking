@@ -4238,6 +4238,8 @@ function getActiveEmailLogs() {
         }
         
         return false; // ผ่านคิวตัวเองไปแล้ว หรือยังไม่ถึงคิว
+      } else {
+        return false; // หากมีรหัสใบจองแต่ไม่พบใบจองในระบบแล้ว ให้ซ่อนการแจ้งเตือนนี้
       }
     }
     return true; // หากไม่มีรหัสใบจองคีย์ไว้ ให้แสดงตามปกติ
@@ -4289,11 +4291,14 @@ function updateEmailInboxUI() {
       );
     }
 
+    // Find the actual index of the log in the original emailLogs array
+    const realIndex = emailLogs.findIndex(x => x.timestamp === log.timestamp && x.to === log.to && x.subject === log.subject);
+
     return `
       <div class="email-log-item" style="border: 1px solid var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.02); padding: 1rem; position: relative; margin-bottom: 0.5rem;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem; border-bottom: 1px dashed var(--border-color); padding-bottom: 0.5rem;">
           <span style="font-size: 0.75rem; color: var(--text-muted);">${timeStr}</span>
-          <button class="btn btn-secondary btn-sm" onclick="deleteEmailLog(${index})" style="padding: 0.1rem 0.4rem; font-size:0.7rem; border-color:rgba(220,38,38,0.2); color:var(--danger);">ลบ</button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteEmailLog(${realIndex})" style="padding: 0.1rem 0.4rem; font-size:0.7rem; border-color:rgba(220,38,38,0.2); color:var(--danger);">ลบ</button>
         </div>
         <div style="margin-bottom: 0.5rem; font-size: 0.85rem;">
           <strong>ถึง:</strong> <span style="color: var(--primary); font-family: monospace;">${log.to}</span><br>
@@ -4308,9 +4313,11 @@ function updateEmailInboxUI() {
   }).join('');
 }
 window.deleteEmailLog = function(index) {
-  emailLogs.splice(index, 1);
-  localStorage.setItem('email_logs_data', JSON.stringify(emailLogs));
-  updateEmailInboxUI();
+  if (index >= 0 && index < emailLogs.length) {
+    emailLogs.splice(index, 1);
+    localStorage.setItem('email_logs_data', JSON.stringify(emailLogs));
+    updateEmailInboxUI();
+  }
 };
 
 window.toggleEmailBody = function(index) {
