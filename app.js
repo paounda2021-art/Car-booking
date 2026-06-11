@@ -3121,6 +3121,22 @@ function setupEventListeners() {
     document.getElementById('login-screen').classList.add('hidden');
   });
 
+  // Quick Login Buttons Event Delegation
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.quick-login-btn');
+    if (btn) {
+      e.preventDefault();
+      const username = btn.getAttribute('data-user');
+      const matched = usersList.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
+      if (matched) {
+        loginUser(matched);
+      } else {
+        showToast("ไม่พบข้อมูลผู้ใช้นี้ในระบบฐานข้อมูลองค์การสะพานปลา", "error");
+      }
+    }
+  });
+
+
   document.getElementById('btn-open-booking').addEventListener('click', () => {
     document.getElementById('modal-booking').classList.add('active');
     
