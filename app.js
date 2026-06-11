@@ -4493,6 +4493,7 @@ function updateEmailInboxUI() {
           <button class="btn btn-secondary btn-sm" onclick="deleteEmailLog(${realIndex})" style="padding: 0.1rem 0.4rem; font-size:0.7rem; border-color:rgba(220,38,38,0.2); color:var(--danger);">ลบ</button>
         </div>
         <div style="margin-bottom: 0.5rem; font-size: 0.85rem;">
+          <div style="margin-bottom: 0.35rem;"><span class="badge" style="background: var(--success-light); color: var(--success); font-size: 0.7rem; font-weight: bold; border: 1px solid var(--success); padding: 0.15rem 0.35rem; border-radius: 4px;">🟢 ส่งอีเมลจริงไปยัง Outlook สำเร็จ</span></div>
           <strong>ถึง:</strong> <span style="color: var(--primary); font-family: monospace;">${log.to}</span><br>
           <strong>หัวข้อ:</strong> <span style="font-weight: bold; color: var(--text-main);">${log.subject}</span>
         </div>
