@@ -963,6 +963,13 @@ if (logoutBtn) {
   };
 }
 
+const btnClearDb = document.getElementById('btn-clear-db');
+if (btnClearDb) {
+  btnClearDb.onclick = function() {
+    clearDatabase();
+  };
+}
+
 async function clearDatabase() {
   // 1. แจ้งเตือนยืนยันให้ชัดเจน
   if (confirm("⚠️ อันตราย: คุณกำลังจะล้าง 'ข้อมูลการจองทั้งหมด' และ 'ประวัติอีเมลจำลอง' ออกจากระบบ!\n\nการกระทำนี้จะส่งผลกับผู้ใช้งานทุกคน และไม่สามารถกู้คืนข้อมูลกลับมาได้\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?")) {
@@ -1021,10 +1028,12 @@ function checkLoginStatus() {
       const dbUser = usersList.find(u => u.username.toLowerCase() === parsed.username.toLowerCase());
       if (dbUser) {
         loginUser(dbUser);
+        showView('calendar');
         return;
       }
     }
     loginUser(parsed);
+    showView('calendar');
   } else {
     // Guest mode: land on calendar, hide dashboard and bookings, show login button
     currentUser = null;
