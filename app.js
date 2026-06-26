@@ -880,15 +880,7 @@ function loginUser(userObj) {
   document.getElementById('btn-top-login').classList.add('hidden');
   document.getElementById('header-user-profile').classList.remove('hidden');
   
-  // ควบคุมปุ่มล้างฐานข้อมูล (เฉพาะ L2 หรือ Admin)
-  const btnClearDb = document.getElementById('btn-clear-db');
-  if (btnClearDb) {
-    if (currentUser.role === 'fleet_admin') {
-      btnClearDb.classList.remove('hidden');
-    } else {
-      btnClearDb.classList.add('hidden');
-    }
-  }
+
 
   // 9. รันฟังก์ชันคำนวณสถิติและโหลดตารางหน้าจอต่างๆ
   populateCarsDropdown();
@@ -963,12 +955,7 @@ if (logoutBtn) {
   };
 }
 
-const btnClearDb = document.getElementById('btn-clear-db');
-if (btnClearDb) {
-  btnClearDb.onclick = function() {
-    clearDatabase();
-  };
-}
+
 
 async function clearDatabase() {
   // 1. แจ้งเตือนยืนยันให้ชัดเจน
@@ -1051,8 +1038,7 @@ function checkLoginStatus() {
     document.getElementById('btn-top-login').classList.remove('hidden');
     document.getElementById('header-user-profile').classList.add('hidden');
     document.getElementById('btn-open-booking').classList.add('hidden');
-    const btnClearDb = document.getElementById('btn-clear-db');
-    if (btnClearDb) btnClearDb.classList.add('hidden');
+
     
     // Populate dropdown and render views
     populateCarsDropdown();
