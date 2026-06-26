@@ -899,7 +899,15 @@ function loginUser(userObj) {
   document.getElementById('btn-top-login').classList.add('hidden');
   document.getElementById('header-user-profile').classList.remove('hidden');
   
-
+  // แสดงปุ่มปิดระบบชั่วคราวเฉพาะ ranida.c
+  const btnDeactivate = document.getElementById('btn-deactivate-system');
+  if (btnDeactivate) {
+    if (usernameLower === 'ranida.c') {
+      btnDeactivate.classList.remove('hidden');
+    } else {
+      btnDeactivate.classList.add('hidden');
+    }
+  }
 
   // 9. รันฟังก์ชันคำนวณสถิติและโหลดตารางหน้าจอต่างๆ
   populateCarsDropdown();
@@ -5231,6 +5239,45 @@ async function activateSystemGlobally() {
   }
 }
 
+// Function to deactivate system globally
+async function deactivateSystemGlobally() {
+  isSystemActive = false;
+  localStorage.setItem('system_active', 'false');
+  
+  const payload = [...bookings];
+  payload.push({
+    id: 'system_config',
+    requester: 'system',
+    startDate: '',
+    endDate: '',
+    status: '',
+    active: false
+  });
+
+  showToast("กำลังปิดใช้งานระบบในฐานข้อมูล...", "info");
+
+  try {
+    const response = await fetch('/api/save-bookings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (response.ok) {
+      showToast("ปิดใช้งานระบบชั่วคราวสำเร็จแล้ว!", "success");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } else {
+      showToast("เกิดข้อผิดพลาดในการบันทึกสถานะปิดระบบ", "error");
+    }
+  } catch (error) {
+    console.error("Error deactivating system:", error);
+    showToast("ไม่สามารถเชื่อมต่อฐานข้อมูลได้สำเร็จ", "error");
+  }
+}
+
 // Wire up activation event listeners
 document.addEventListener('DOMContentLoaded', () => {
   const btnActivate = document.getElementById('btn-activate-system');
@@ -5283,6 +5330,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Successful verification
       activateSystemGlobally();
+    });
+  }
+
+  // Hook up deactivation button for ranida.c
+  const btnDeactivate = document.getElementById('btn-deactivate-system');
+  if (btnDeactivate) {
+    btnDeactivate.addEventListener('click', (e) => {
+      e.preventDefault();
+      const confirmLock = confirm("⚠️ คุณต้องการปิดใช้งานระบบชั่วคราวใช่หรือไม่?\n\nเมื่อปิดใช้งานแล้ว ระบบจะกลับเข้าสู่โหมดปรับปรุงและแสดงข้อความแจ้งเตือนต่อผู้ใช้งานทั่วไปทันที");
+      if (confirmLock) {
+        deactivateSystemGlobally();
+      }
     });
   }
 });

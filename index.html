@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบขออนุมัติใช้รถยนต์และเบิกจ่าย - องค์การสะพานปลา</title>
-  <link rel="stylesheet" href="style.css?v=4.5">
+  <link rel="stylesheet" href="style.css?v=4.6">
 </head>
 <body>
   <!-- MAINTENANCE SCREEN (Overlay) -->
@@ -128,6 +128,9 @@
               <span class="user-role-badge" id="user-role-label">ตำแหน่ง</span>
             </div>
           </div>
+          <button class="btn btn-secondary btn-sm hidden" id="btn-deactivate-system" style="width: 100%; color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); font-weight: bold; margin-bottom: 0.25rem;">
+            🔒 ปิดใช้งานระบบชั่วคราว
+          </button>
           <button class="btn btn-secondary btn-sm" id="btn-logout" style="width: 100%; color: var(--danger); border-color: rgba(220, 38, 38, 0.2);">
             🚪 ออกจากระบบ
           </button>
@@ -766,6 +769,6 @@
         </div>
       </div>
 
-  <script src="app.js?v=4.5"></script>
+  <script src="app.js?v=4.6"></script>
 </body>
 </html>
