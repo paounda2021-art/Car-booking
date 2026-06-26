@@ -4,9 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบขออนุมัติใช้รถยนต์และเบิกจ่าย - องค์การสะพานปลา</title>
-  <link rel="stylesheet" href="style.css?v=4.1">
+  <link rel="stylesheet" href="style.css?v=4.5">
 </head>
 <body>
+  <!-- MAINTENANCE SCREEN (Overlay) -->
+  <div id="system-maintenance-overlay" class="maintenance-overlay">
+    <div class="maintenance-card">
+      <div class="maintenance-icon">🔒</div>
+      <h2>ระบบยังไม่เปิดใช้งาน</h2>
+      <p>ระบบจองใช้ยานพาหนะและเบิกจ่ายค่าพาหนะ องค์การสะพานปลา (FMO)<br>ขณะนี้ยังไม่เปิดให้บริการอย่างเป็นทางการ</p>
+      
+      <!-- Activation Form (hidden by default) -->
+      <div id="activation-login-box" class="hidden" style="width: 100%; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+        <input type="text" id="activation-username" class="form-control" placeholder="ชื่อผู้ใช้งาน (Username)" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white; padding: 0.6rem; border-radius: 8px;">
+        <input type="password" id="activation-password" class="form-control" placeholder="รหัสผ่าน (Password)" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white; padding: 0.6rem; border-radius: 8px;">
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-activation" style="flex: 1; padding: 0.6rem; border-radius: 8px; border-color: rgba(255,255,255,0.2); color: white; background: transparent;">ยกเลิก</button>
+          <button type="button" class="btn btn-primary" id="btn-submit-activation" style="flex: 1; padding: 0.6rem; border-radius: 8px; background: #10b981; border-color: #10b981; color: white;">ตกลง</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-activate-system" style="background: #f59e0b; border-color: #f59e0b; margin-top: 1rem; font-weight: bold; width: 100%; padding: 0.75rem;">
+        🔑 เปิดใช้งานระบบ
+      </button>
+    </div>
+  </div>
+
   <!-- Background Blobs for Glassmorphism depth -->
   <div class="bg-blob blob-1"></div>
   <div class="bg-blob blob-2"></div>
@@ -743,6 +766,6 @@
         </div>
       </div>
 
-  <script src="app.js?v=4.4"></script>
+  <script src="app.js?v=4.5"></script>
 </body>
 </html>

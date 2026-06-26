@@ -2372,5 +2372,76 @@ input[readonly] {
   background: rgba(99, 102, 241, 0.04) !important;
 }
 
+/* ========================================================
+   NEW: Maintenance Overlay Style
+   ======================================================== */
+.maintenance-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at top right, #1e1b4b, #0f172a 70%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000; /* Above everything */
+  transition: opacity 0.3s ease;
+}
+
+.maintenance-overlay.hidden {
+  display: none !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.maintenance-card {
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  width: 95%;
+  max-width: 480px;
+  padding: 3rem 2.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.25rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #f8fafc;
+}
+
+.maintenance-icon {
+  font-size: 4.5rem;
+  margin-bottom: 0.5rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.maintenance-card h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+  font-family: 'Sarabun', sans-serif;
+  line-height: 1.4;
+}
+
+.maintenance-card p {
+  font-size: 0.95rem;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin: 0;
+  font-family: 'Sarabun', sans-serif;
+}
+
+
 
 

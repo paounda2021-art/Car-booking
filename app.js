@@ -25,6 +25,8 @@ let uploadedDriverLicenseBase64 = null;
 // Simulated Email Notification logs
 let emailLogs = JSON.parse(localStorage.getItem('email_logs_data') || '[]');
 
+let isSystemActive = localStorage.getItem('system_active') === 'true';
+
 // Helper to open base64 files (PDF/images) in new tab safely using Blob URLs
 function openBase64File(base64DataUrl, filenamePrefix = 'file') {
   try {
@@ -401,6 +403,12 @@ async function initDatabase() {
     if (dbResponse.ok) {
       let dbBookings = await dbResponse.json();
       if (dbBookings && Array.isArray(dbBookings)) {
+        // Extract system config row
+        const systemConfig = dbBookings.find(b => b.id === 'system_config');
+        isSystemActive = systemConfig ? (systemConfig.active === true || systemConfig.active === 'true') : false;
+        localStorage.setItem('system_active', isSystemActive);
+        dbBookings = dbBookings.filter(b => b.id !== 'system_config');
+
         // Self-cleaning: if KV database contains test mock bookings (e.g. BKG-FMO-001), wipe the database automatically!
         const hasMockData = dbBookings.some(b => b.id && b.id.startsWith('BKG-FMO-00'));
         if (hasMockData) {
@@ -647,6 +655,7 @@ async function initDatabase() {
   } catch (e) {
     console.error("Error patching old email logs:", e);
   }
+  checkSystemActivation();
 }
 
 // ==========================================
@@ -664,13 +673,23 @@ async function saveBookings() {
   console.log("💾 บันทึกข้อมูลสำเร็จ! จำนวนทั้งหมด:", bookings.length, "รายการ");
 
   try {
+    const payload = [...bookings];
+    payload.push({
+      id: 'system_config',
+      requester: 'system',
+      startDate: '',
+      endDate: '',
+      status: '',
+      active: isSystemActive
+    });
+
     // พยายามส่งไปบันทึกที่ฐานข้อมูล Cloudflare (API)
     await fetch('/api/save-bookings', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(bookings)
+      body: JSON.stringify(payload)
     });
     console.log("☁️ บันทึกข้อมูลลงฐานข้อมูลคลาวด์ (Cloudflare KV) สำเร็จ!");
   } catch (error) {
@@ -5161,3 +5180,109 @@ window.performExportToCSV = function(list, startVal, endVal) {
   document.body.removeChild(link);
   showToast("ส่งออกข้อมูลเป็นไฟล์ Excel (CSV) สำเร็จแล้ว!", "success");
 };
+
+// Helper to check system activation state and show/hide the maintenance overlay
+function checkSystemActivation() {
+  const overlay = document.getElementById('system-maintenance-overlay');
+  if (!overlay) return;
+
+  if (isSystemActive) {
+    overlay.classList.add('hidden');
+  } else {
+    overlay.classList.remove('hidden');
+  }
+}
+
+// Function to activate system globally (bypasses saveBookings length guard)
+async function activateSystemGlobally() {
+  isSystemActive = true;
+  localStorage.setItem('system_active', 'true');
+  
+  const payload = [...bookings];
+  payload.push({
+    id: 'system_config',
+    requester: 'system',
+    startDate: '',
+    endDate: '',
+    status: '',
+    active: true
+  });
+
+  showToast("กำลังเปิดใช้งานระบบในฐานข้อมูล...", "info");
+
+  try {
+    const response = await fetch('/api/save-bookings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (response.ok) {
+      showToast("เปิดใช้งานระบบสำเร็จแล้ว! ยินดีต้อนรับ", "success");
+      const overlay = document.getElementById('system-maintenance-overlay');
+      if (overlay) overlay.classList.add('hidden');
+    } else {
+      showToast("เกิดข้อผิดพลาดในการบันทึกสถานะเปิดระบบ", "error");
+    }
+  } catch (error) {
+    console.error("Error activating system:", error);
+    showToast("ไม่สามารถเชื่อมต่อฐานข้อมูลได้สำเร็จ", "error");
+  }
+}
+
+// Wire up activation event listeners
+document.addEventListener('DOMContentLoaded', () => {
+  const btnActivate = document.getElementById('btn-activate-system');
+  const loginBox = document.getElementById('activation-login-box');
+  const btnCancel = document.getElementById('btn-cancel-activation');
+  const btnSubmit = document.getElementById('btn-submit-activation');
+
+  if (btnActivate && loginBox) {
+    btnActivate.addEventListener('click', (e) => {
+      e.preventDefault();
+      btnActivate.classList.add('hidden');
+      loginBox.classList.remove('hidden');
+      const userField = document.getElementById('activation-username');
+      if (userField) userField.focus();
+    });
+  }
+
+  if (btnCancel && btnActivate && loginBox) {
+    btnCancel.addEventListener('click', (e) => {
+      e.preventDefault();
+      loginBox.classList.add('hidden');
+      btnActivate.classList.remove('hidden');
+      const userField = document.getElementById('activation-username');
+      const passField = document.getElementById('activation-password');
+      if (userField) userField.value = '';
+      if (passField) passField.value = '';
+    });
+  }
+
+  if (btnSubmit) {
+    btnSubmit.addEventListener('click', (e) => {
+      e.preventDefault();
+      const user = document.getElementById('activation-username').value.trim();
+      const pass = document.getElementById('activation-password').value;
+
+      if (!user || !pass) {
+        showToast("กรุณากรอกข้อมูลชื่อผู้ใช้และรหัสผ่านให้ครบถ้วน", "warning");
+        return;
+      }
+
+      if (user.toLowerCase() !== 'ranida.c') {
+        showToast("ขออภัย! บัญชีนี้ไม่มีสิทธิ์ในการเปิดระบบ", "error");
+        return;
+      }
+
+      if (pass !== 'paounda289') {
+        showToast("รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง", "error");
+        return;
+      }
+
+      // Successful verification
+      activateSystemGlobally();
+    });
+  }
+});
