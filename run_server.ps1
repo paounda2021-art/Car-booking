@@ -29,8 +29,8 @@ Write-Host "  Root Directory: $rootDir"
 Write-Host "  To stop the server, press Ctrl+C in this console."
 Write-Host "=========================================================="
 
-# Launch the default browser to open the app
-Start-Process "http://localhost:$port/"
+# Launch the default browser to open the app (Commented out for background PM2 execution)
+# Start-Process "http://localhost:$port/"
 
 try {
     while ($listener.IsListening) {
@@ -39,6 +39,49 @@ try {
         $response = $context.Response
         $urlPath = $request.Url.LocalPath
         
+        # API: get-bookings
+        if ($urlPath -eq "/api/get-bookings" -and $request.HttpMethod -eq "GET") {
+            $bookingsFile = Join-Path $rootDir "bookings.json"
+            $bookingsData = "[]"
+            if (Test-Path $bookingsFile) {
+                $bookingsData = Get-Content $bookingsFile -Raw -Encoding UTF8
+            }
+            $response.StatusCode = 200
+            $response.ContentType = "application/json; charset=utf-8"
+            $resBytes = [System.Text.Encoding]::UTF8.GetBytes($bookingsData)
+            $response.ContentLength64 = $resBytes.Length
+            $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            $response.Close()
+            continue
+        }
+
+        # API: save-bookings
+        if ($urlPath -eq "/api/save-bookings" -and $request.HttpMethod -eq "POST") {
+            try {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $bodyText = $reader.ReadToEnd()
+                $reader.Close()
+
+                $bookingsFile = Join-Path $rootDir "bookings.json"
+                Set-Content -Path $bookingsFile -Value $bodyText -Encoding UTF8
+
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Bookings saved successfully"}')
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            } catch {
+                $response.StatusCode = 500
+                $response.ContentType = "application/json; charset=utf-8"
+                $errObj = @{ status = "error"; message = $_.ToString() } | ConvertTo-Json
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($errObj)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            }
+            $response.Close()
+            continue
+        }
+
         # API: send-email
         if ($urlPath -eq "/api/send-email" -and $request.HttpMethod -eq "POST") {
             try {
