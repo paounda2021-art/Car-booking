@@ -1561,16 +1561,18 @@ body {
 @media print {
   @page {
     size: A4;
-    margin: 15mm 20mm;
+    margin: 8mm 12mm !important;
   }
 
   body {
     background: white !important;
     color: black !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
   }
   
   .app-container {
-    display: block;
+    display: block !important;
   }
   
   .sidebar,
@@ -1582,9 +1584,9 @@ body {
   }
   
   .main-content {
-    padding: 0;
-    margin: 0;
-    max-width: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
   }
   
   .report-sheet {
@@ -1593,6 +1595,75 @@ body {
     padding: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;
+  }
+
+  /* Compact spacing for FMO Car / Taxi report form */
+  .fmo-header-block {
+    margin-bottom: 0.25rem !important;
+  }
+  .fmo-logo {
+    width: 55px !important;
+    height: 55px !important;
+  }
+  .fmo-divider-title {
+    margin: 0.4rem 0 !important;
+    padding: 0.15rem 0 !important;
+    font-size: 13.5px !important;
+  }
+  .fmo-subject-block {
+    font-size: 12px !important;
+  }
+  .fmo-line {
+    margin-bottom: 0.25rem !important;
+    line-height: 1.4 !important;
+  }
+  .dotted-val, .dotted-fill {
+    padding: 0 0.25rem !important;
+  }
+  .fmo-decision-grid {
+    margin-top: 0.4rem !important;
+  }
+  .fmo-column {
+    padding: 0.35rem !important;
+    font-size: 11.5px !important;
+  }
+  .fmo-column div, .fmo-column span {
+    line-height: 1.35 !important;
+  }
+  
+  /* Compact signatures layout in printable FMO report */
+  .fmo-column .dotted-val {
+    min-width: 100px !important;
+  }
+  .fmo-column div[style*="margin-top: 0.8rem"] {
+    margin-top: 0.4rem !important;
+  }
+  .fmo-column div[style*="margin-top:0.8rem"] {
+    margin-top: 0.4rem !important;
+  }
+  .fmo-column div[style*="border-top"] {
+    margin-top: 0.4rem !important;
+    padding-top: 0.25rem !important;
+  }
+  
+  /* Compact Welfare Car Request Form (Page 1) */
+  .welfare-car-report {
+    font-size: 12.5px !important;
+    line-height: 1.4 !important;
+    padding: 0 !important;
+  }
+  .welfare-car-report div[style*="margin-bottom"] {
+    margin-bottom: 0.4rem !important;
+  }
+  .welfare-car-report div[style*="line-height: 1.7"] {
+    line-height: 1.45 !important;
+    margin-bottom: 0.4rem !important;
+  }
+  .welfare-car-report div[style*="height: 35px"] {
+    height: 28px !important;
+  }
+  .welfare-car-report img[style*="max-height: 35px"] {
+    max-height: 28px !important;
   }
   
   .fmo-sig-img {
