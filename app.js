@@ -3605,7 +3605,6 @@ function setupEventListeners() {
     const endDate = document.getElementById('input-end-date').value;
     
     if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
-      alert("วันที่สิ้นสุดการจองต้องไม่น้อยกว่าวันที่เริ่มจอง");
       showToast("วันที่สิ้นสุดการจองต้องไม่น้อยกว่าวันที่เริ่มจอง", "warning");
       return;
     }
@@ -4073,7 +4072,6 @@ function setupEventListeners() {
     const startDate = document.getElementById('input-start-date').value;
     const endDate = e.target.value;
     if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
-      alert("วันที่สิ้นสุดการจองต้องไม่น้อยกว่าวันที่เริ่มจอง");
       showToast("วันที่สิ้นสุดการจองต้องไม่น้อยกว่าวันที่เริ่มจอง", "warning");
       e.target.value = ""; // clear invalid end date
     }
