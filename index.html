@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบขออนุมัติใช้รถยนต์และเบิกจ่าย - องค์การสะพานปลา</title>
+  <link rel="stylesheet" href="flatpickr.min.css?v=1.0">
+  <link rel="stylesheet" href="style.css?v=5.0">
+</head>
+<body>
+  <!-- MAINTENANCE SCREEN (Overlay) -->
+  <div id="system-maintenance-overlay" class="maintenance-overlay">
+    <script>
+      if (localStorage.getItem('system_active') === 'true') {
+        document.getElementById('system-maintenance-overlay').classList.add('hidden');
+      }
+    </script>
+    <div class="maintenance-card">
+      <div class="maintenance-icon">🔒</div>
+      <h2>ระบบยังไม่เปิดใช้งาน</h2>
+      <p>ระบบจองใช้ยานพาหนะและเบิกจ่ายค่าพาหนะ องค์การสะพานปลา (FMO)<br>ขณะนี้ยังไม่เปิดให้บริการอย่างเป็นทางการ</p>
+      
+      <!-- Activation Form (hidden by default) -->
+      <div id="activation-login-box" class="hidden" style="width: 100%; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+        <input type="text" id="activation-username" class="form-control" placeholder="ชื่อผู้ใช้งาน (Username)" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white; padding: 0.6rem; border-radius: 8px;">
+        <input type="password" id="activation-password" class="form-control" placeholder="รหัสผ่าน (Password)" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white; padding: 0.6rem; border-radius: 8px;">
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-activation" style="flex: 1; padding: 0.6rem; border-radius: 8px; border-color: rgba(255,255,255,0.2); color: white; background: transparent;">ยกเลิก</button>
+          <button type="button" class="btn btn-primary" id="btn-submit-activation" style="flex: 1; padding: 0.6rem; border-radius: 8px; background: #10b981; border-color: #10b981; color: white;">ตกลง</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="btn-activate-system" style="background: #f59e0b; border-color: #f59e0b; margin-top: 1rem; font-weight: bold; width: 100%; padding: 0.75rem;">
+        🔑 เปิดใช้งานระบบ
+      </button>
+    </div>
+  </div>
+
+  <!-- Background Blobs for Glassmorphism depth -->
+  <div class="bg-blob blob-1"></div>
+  <div class="bg-blob blob-2"></div>
+
+  <!-- LOGIN SCREEN (Overlay) -->
+  <div id="login-screen" class="login-overlay hidden">
+    <div class="login-card" style="box-shadow: var(--shadow-lg); position: relative;">
+      <button type="button" id="btn-close-login" style="position: absolute; top: 1rem; right: 1.25rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.75rem; cursor: pointer; line-height: 1; transition: var(--transition-smooth); z-index: 10;" onmouseover="this.style.color='var(--text-main)'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+      <div class="login-header">
+        <img src="logoFMO.png" alt="โลโก้ อสป." style="width: 90px; height: 90px; margin-bottom: 0.5rem; object-fit: contain;">
+        <h2>องค์การสะพานปลา</h2>
+        <p>ระบบขออนุมัติและจองใช้รถยนต์ภายในองค์กร</p>
+      </div>
+      <form id="form-login">
+        <div class="form-group">
+          <label for="login-username">ชื่อผู้ใช้งาน (Username)</label>
+          <input type="text" id="login-username" class="form-control" placeholder="ระบุชื่อผู้ใช้งาน เช่น siranya.w" required>
+        </div>
+        <div class="form-group">
+          <label for="login-password">รหัสผ่าน (รหัสพนักงาน)</label>
+          <input type="password" id="login-password" class="form-control" placeholder="ระบุรหัสพนักงาน 8 หลัก" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem; margin-bottom: 0.5rem;">🔓 เข้าสู่ระบบ</button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- APP CONTAINER (Always visible layout structure) -->
+  <div class="app-container" id="app-wrapper">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar no-print">
+      <div class="logo-section">
+        <img src="logoFMO.png" alt="โลโก้ อสป." style="width: 45px; height: 45px; object-fit: contain; background: white; padding: 2px; border-radius: 6px;">
+        <div class="logo-text">
+          <h1>องค์การสะพานปลา</h1>
+          <p>ระบบขออนุญาตใช้รถยนต์</p>
+        </div>
+      </div>
+      
+      <nav class="nav-menu">
+        <li class="nav-item">
+          <a href="#" class="nav-link" data-view="dashboard" id="nav-dashboard">
+            <span class="nav-icon">📊</span>
+            <span class="nav-text">แดชบอร์ดภาพรวม</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link" data-view="bookings" id="nav-bookings">
+            <span class="nav-icon">📋</span>
+            <span class="nav-text">รายการจอง & อนุมัติ</span>
+            <span id="pending-badge-count" class="menu-badge">0</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link active" data-view="calendar" id="nav-calendar">
+            <span class="nav-icon">📅</span>
+            <span class="nav-text">ปฏิทินจองใช้รถ</span>
+          </a>
+        </li>
+        <li class="nav-item hidden" id="nav-item-driver-report">
+          <a href="#" class="nav-link" data-view="driver-report" id="nav-driver-report">
+            <span class="nav-icon">📊</span>
+            <span class="nav-text">รายงานการใช้งาน พขร.</span>
+          </a>
+        </li>
+      </nav>
+
+    </aside>
+
+    <!-- Main Container -->
+    <main class="main-content">
+      
+      <!-- Top header bar -->
+  <header class="topbar no-print" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem;">
+      
+      <div class="page-title">
+        <h2 id="view-title">รายการจองรถยนต์</h2>
+        <p id="view-subtitle">จัดการ อนุมัติ และติดตามความคืบหน้าคำขอทั้งหมด</p>
+      </div>
+
+      <div class="header-actions" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; width: 320px; flex-shrink: 0;">
+        
+        <button class="btn btn-primary" id="btn-top-login">เข้าสู่ระบบ</button>
+
+        <div id="header-user-profile" class="header-user-profile" style="flex-direction: column; align-items: stretch; gap: 0.75rem; background: rgba(255,255,255,0.65); padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); margin: 0; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div id="email-inbox-trigger" style="position: relative; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.75); border-radius: 50%; width: 36px; height: 36px; border: 1px solid var(--border-color);">
+              <span>🔔</span>
+              <span id="email-inbox-badge" style="position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;">0</span>
+            </div>
+            <div class="avatar" id="user-avatar">?</div>
+            <div class="user-info">
+              <span class="user-name" id="user-display-name">ผู้ใช้</span>
+              <span class="user-role-badge" id="user-role-label">ตำแหน่ง</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm hidden" id="btn-deactivate-system" style="width: 100%; color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); font-weight: bold; margin-bottom: 0.25rem;">
+            🔒 ปิดใช้งานระบบชั่วคราว
+          </button>
+          <button class="btn btn-secondary btn-sm" id="btn-logout" style="width: 100%; color: var(--danger); border-color: rgba(220, 38, 38, 0.2);">
+            🚪 ออกจากระบบ
+          </button>
+        </div>
+
+        <div id="approval-level-container" class="hidden" style="display: none; width: 100%;">
+  <select id="approval-level-switcher" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--primary-color); background-color: #f8fafc; color: var(--primary-color); font-weight: bold;">
+    <option value="all">แสดงงานอนุมัติทั้งหมด</option>
+  </select>
+</div>
+
+<script>
+  if (!localStorage.getItem('current_user')) {
+    document.getElementById('approval-level-container').style.display = 'none';
+    document.getElementById('approval-level-container').classList.add('hidden');
+  }
+</script>
+
+        <button class="btn btn-primary hidden" id="btn-open-booking" style="width: 100%; justify-content: center;">
+          <span>+</span> เขียนใบขออนุญาตใช้รถ
+        </button>
+
+      </div>
+    </header>
+
+      <!-- VIEW 1: Dashboard -->
+      <section id="view-dashboard" class="view-section hidden">
+        
+        <!-- AUTHENTICATED DASHBOARD CONTENT -->
+        <div id="dashboard-main-widgets">
+          
+          <!-- Stats Row -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon primary">🚘</div>
+              <div class="stat-details">
+                <span class="stat-value" id="stat-total-cars">3 คัน</span>
+                <span class="stat-label">รถยนต์ของ อสป.</span>
+              </div>
+            </div>
+            <div class="stat-card success">
+              <div class="stat-icon success">🟢</div>
+              <div class="stat-details">
+                <span class="stat-value" id="stat-avail-cars">3 คัน</span>
+                <span class="stat-label">ว่างพร้อมปฏิบัติงาน</span>
+              </div>
+            </div>
+            <div class="stat-card warning">
+              <div class="stat-icon warning">⏳</div>
+              <div class="stat-details">
+                <span class="stat-value" id="stat-pending-approvals">0 รายการ</span>
+                <span class="stat-label">รอคุณตรวจสอบ</span>
+              </div>
+            </div>
+            <div class="stat-card danger">
+              <div class="stat-icon danger">📝</div>
+              <div class="stat-details">
+                <span class="stat-value" id="stat-total-bookings">0 รายการ</span>
+                <span class="stat-label">ใบขอใช้รถทั้งหมด</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fleet Grid -->
+          <div class="fleet-section" style="margin-top: 2rem;">
+            <div class="section-header">🚘 สถานะยานพาหนะของ อสป.</div>
+            <div class="car-grid" id="car-list-container">
+              <!-- Car cards injected here -->
+            </div>
+          </div>
+
+          <!-- Scheduler Visual Timeline -->
+          <div class="schedule-container" style="margin-top: 2rem;">
+            <div class="schedule-header">
+              <div class="section-header">📅 ตารางการใช้รถวันนี้</div>
+              <div class="timeline-legend">
+                <div class="legend-item"><span class="legend-dot available"></span> ว่าง</div>
+                <div class="legend-item"><span class="legend-dot pending"></span> รออนุมัติ</div>
+                <div class="legend-item"><span class="legend-dot approved"></span> อนุมัติแล้ว</div>
+              </div>
+            </div>
+            <div class="schedule-grid" id="timeline-scheduler-container">
+              <!-- Timeline details injected via JavaScript -->
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+       <!-- VIEW 2: Bookings List and Approvals -->
+      <section id="view-bookings" class="view-section hidden no-print">
+        <div class="tab-container">
+          <div class="tab-nav" style="display: flex; gap: 2rem; border-bottom: 1px solid var(--border-color); width: 100%; margin-bottom: 1.5rem; align-items: center; flex-wrap: wrap;">
+            <button class="tab-btn active" data-tab="tab-my-bookings">รายการที่ฉันขอ (<span id="tab-my-bookings-count">0</span>)</button>
+            <button class="tab-btn" data-tab="tab-pending-approvals">งานรออนุมัติจากคุณ (<span id="tab-pending-count">0</span>)</button>
+            <button class="tab-btn" data-tab="tab-all-history">ประวัติทั้งหมด (<span id="tab-all-history-count">0</span>)</button>
+            <button class="btn btn-secondary btn-sm" id="btn-export-csv" onclick="openExportModal()" style="margin-left: auto; height: 32px; padding: 0 0.75rem; display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; background: #10b981; color: white; border-color: #10b981; margin-bottom: 0.5rem; cursor: pointer; border-radius: 6px; font-weight: bold; border-style: solid; border-width: 1px;">
+              📥 ส่งออก Excel (CSV)
+            </button>
+          </div>
+
+          <!-- Tab 1: My Bookings -->
+          <div id="tab-my-bookings" class="tab-content active">
+            <div class="booking-list" id="my-bookings-container">
+              <!-- Injected dynamically -->
+            </div>
+          </div>
+
+          <!-- Tab 2: Pending Approvals (For managers/admin) -->
+          <div id="tab-pending-approvals" class="tab-content">
+            <div class="booking-list" id="pending-approvals-container">
+              <!-- Injected dynamically -->
+            </div>
+          </div>
+
+          <!-- Tab 3: All History -->
+          <div id="tab-all-history" class="tab-content">
+            <div class="booking-list" id="all-history-container">
+              <!-- Injected dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: Printable Report -->
+      <section id="view-report" class="view-section hidden">
+        <!-- Actions above the report sheet -->
+        <div class="report-actions-bar no-print">
+          <button class="btn btn-secondary" id="btn-report-back">← กลับ</button>
+          <div style="font-weight: 500; font-size: 0.9rem; color: var(--text-muted);">
+            ฟอร์มเสนออนุมัติ/เบิกจ่ายอย่างเป็นทางการขององค์การสะพานปลา
+          </div>
+          <button class="btn btn-primary" id="btn-report-print">🖨️ พิมพ์เอกสาร (Print / Save PDF)</button>
+        </div>
+
+        <!-- The printable paper container -->
+        <div class="report-sheet" id="report-sheet-content">
+          <!-- Injected dynamically -->
+        </div>
+      </section>
+
+      <!-- VIEW 5: Driver Report -->
+      <section id="view-driver-report" class="view-section hidden">
+        <!-- Actions above the report sheet -->
+        <div class="report-actions-bar no-print">
+          <button class="btn btn-secondary" id="btn-driver-report-back">← กลับ</button>
+          <div style="font-weight: 500; font-size: 0.9rem; color: var(--text-muted);">
+            รายงานการปฏิบัติงานใช้รถของพนักงานขับรถรายบุคคล
+          </div>
+          <button class="btn btn-primary" id="btn-driver-report-print">🖨️ พิมพ์รายงาน (Print / Save PDF)</button>
+        </div>
+
+        <!-- Filters Section - Visible only in app, not in print -->
+        <div class="driver-report-filters no-print card-glass" style="margin-bottom: 2rem; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(16px);">
+          <h3 style="margin-top: 0; margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+            <span>🔍</span> ค้นหาและออกรายงาน พขร.
+          </h3>
+          <div class="driver-report-filter-grid">
+            <div>
+              <label style="display: block; font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-muted); font-weight: 500;">เลือกพนักงานขับรถ</label>
+              <select id="driver-report-select" class="form-control" style="width: 100%;"></select>
+            </div>
+            <div>
+              <label style="display: block; font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-muted); font-weight: 500;">ช่วงเวลาของรายงาน</label>
+              <select id="driver-report-period" class="form-control" style="width: 100%;">
+                <option value="daily">รายวัน (Daily)</option>
+                <option value="weekly">รายสัปดาห์ (Weekly)</option>
+                <option value="monthly" selected>รายเดือน (Monthly)</option>
+              </select>
+            </div>
+            <div id="driver-report-date-container" class="hidden">
+              <label id="driver-report-date-label" style="display: block; font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-muted); font-weight: 500;">เลือกวัน</label>
+              <input type="date" id="driver-report-date" class="form-control" style="width: 100%;">
+            </div>
+            <div id="driver-report-month-container">
+              <label style="display: block; font-size: 0.8rem; margin-bottom: 0.5rem; color: var(--text-muted); font-weight: 500;">เลือกเดือน/ปี</label>
+              <div style="display: flex; gap: 0.5rem;">
+                <select id="driver-report-month" class="form-control" style="flex: 2;">
+                  <option value="0">มกราคม</option>
+                  <option value="1">กุมภาพันธ์</option>
+                  <option value="2">มีนาคม</option>
+                  <option value="3">เมษายน</option>
+                  <option value="4">พฤษภาคม</option>
+                  <option value="5">มิถุนายน</option>
+                  <option value="6">กรกฎาคม</option>
+                  <option value="7">สิงหาคม</option>
+                  <option value="8">กันยายน</option>
+                  <option value="9">ตุลาคม</option>
+                  <option value="10">พฤศจิกายน</option>
+                  <option value="11">ธันวาคม</option>
+                </select>
+                <select id="driver-report-year" class="form-control" style="flex: 1.2;">
+                  <option value="2026">2569</option>
+                  <option value="2027">2570</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <button class="btn btn-primary" id="btn-generate-driver-report" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: bold; height: 42px;">
+                <span>📊</span> ดึงข้อมูลรายงาน
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- The printable paper container -->
+        <div class="report-sheet" id="driver-report-sheet-content">
+          <div style="text-align: center; color: var(--text-muted); padding: 3rem 0; font-style: italic;">
+            กรุณาเลือกพนักงานขับรถและช่วงเวลา จากนั้นกดปุ่ม "ดึงข้อมูลรายงาน" เพื่อสร้างรายงานการวิ่งรถยนต์
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: Full Month Calendar -->
+      <section id="view-calendar" class="view-section no-print">
+        <div class="calendar-view-container">
+          <div class="calendar-top-controls">
+            <div class="calendar-month-nav">
+              <button class="btn btn-secondary" id="btn-cal-prev" style="padding:0.4rem 0.8rem;">← เดือนก่อนหน้า</button>
+              <h3 class="calendar-month-title" id="calendar-month-year-label">มิถุนายน 2569</h3>
+              <button class="btn btn-secondary" id="btn-cal-next" style="padding:0.4rem 0.8rem;">เดือนถัดไป →</button>
+            </div>
+            
+            <div style="display:flex; gap:1rem; align-items:center;">
+              <label for="filter-cal-car" style="font-size:0.875rem; font-weight:600; white-space:nowrap;">กรองตามรถยนต์:</label>
+              <select id="filter-cal-car" class="role-select" style="min-width:180px; padding:0.4rem; background: var(--bg-card);">
+                <option value="all">รถยนต์ทั้งหมด</option>
+                <option value="A">Toyota Commuter (ฮษ 7446)</option>
+                <option value="B">Toyota Commuter (1 นญ 1865 (เช่า))</option>
+                <option value="C">Toyota Commuter (1 นญ 2029 (เช่า))</option>
+                <option value="D">Toyota Commuter (ฮล 2521 (รถสวัสดิการ))</option>
+                <option value="public">รถรับจ้างสาธารณะ</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Month Calendar Grid -->
+          <div class="calendar-grid-wrapper">
+            <div class="calendar-days-header">
+              <div class="calendar-header-day sun">อาทิตย์</div>
+              <div class="calendar-header-day">จันทร์</div>
+              <div class="calendar-header-day">อังคาร</div>
+              <div class="calendar-header-day">พุธ</div>
+              <div class="calendar-header-day">พฤหัสบดี</div>
+              <div class="calendar-header-day">ศุกร์</div>
+              <div class="calendar-header-day sat">เสาร์</div>
+            </div>
+            <div class="calendar-grid-cells" id="calendar-cells-container">
+              <!-- Injected dynamically via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL 1: Create Booking Form -->
+  <div class="modal-overlay" id="modal-booking">
+    <div class="modal-box" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3>เขียนใบขออนุญาตใช้รถยนต์ อสป.</h3>
+        <button class="modal-close" id="btn-close-booking">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-create-booking">
+          
+          <h4 style="color: var(--primary); margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">ข้อมูลผู้ขอจอง</h4>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="input-requester">ชื่อผู้ขอจอง (ข้าพเจ้า)</label>
+              <input type="text" id="input-requester" class="form-control" placeholder="ชื่อ-นามสกุล" required>
+            </div>
+            <div class="form-group">
+              <label for="input-position">ตำแหน่ง</label>
+              <input type="text" id="input-position" class="form-control" placeholder="ตำแหน่ง" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="input-department">แผนก</label>
+              <input type="text" id="input-department" class="form-control" placeholder="แผนก" required>
+            </div>
+            <div class="form-group">
+              <label for="input-office">สำนักงาน</label>
+              <input type="text" id="input-office" class="form-control" placeholder="สำนักงาน" required>
+            </div>
+            <div class="form-group">
+              <label for="input-division">สังกัด/ฝ่าย</label>
+              <input type="text" id="input-division" class="form-control" placeholder="สังกัด/ฝ่าย" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>ขออนุญาตใช้รถยนต์ในความควบคุมของสำนักงานบริหารการพัสดุเพื่อติดต่องาน</label>
+            <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                <input type="radio" name="control-unit" value="อสป." checked style="accent-color: var(--primary);"> อสป.
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                <input type="radio" name="control-unit" value="สินเชื่อ" style="accent-color: var(--primary);"> สินเชื่อ
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                <input type="radio" name="control-unit" value="ส่งเสริมการประมง" style="accent-color: var(--primary);"> ส่งเสริมการประมง
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                <input type="radio" name="control-unit" value="รถสวัสดิการ" style="accent-color: var(--primary);"> รถสวัสดิการ
+              </label>
+            </div>
+          </div>
+
+          <!-- Welfare Car Address Info (Visible only for Welfare Car) -->
+          <div id="welfare-address-container" style="display: none; margin-top: 1rem; border: 1px dashed var(--border-color); padding: 1rem; border-radius: 8px; background: rgba(255,255,255,0.02);">
+            <h5 style="color: var(--primary); margin: 0 0 0.75rem 0; font-size: 0.95rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">ข้อมูลที่อยู่ผู้ขอใช้รถยนต์สวัสดิการ (ใช้สำหรับกรอกใบคำขอ)</h5>
+            <div class="form-row" style="margin-bottom: 0.75rem;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="input-welfare-address-no">อยู่บ้านเลขที่</label>
+                <input type="text" id="input-welfare-address-no" class="form-control" placeholder="เช่น 123/45">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="input-welfare-address-moo">หมู่ที่</label>
+                <input type="text" id="input-welfare-address-moo" class="form-control" placeholder="เช่น 5">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="input-welfare-address-road">ถนน</label>
+                <input type="text" id="input-welfare-address-road" class="form-control" placeholder="เช่น เจริญกรุง">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="input-welfare-address-subdistrict">ตำบล/แขวง</label>
+                <input type="text" id="input-welfare-address-subdistrict" class="form-control" placeholder="เช่น วัดพระยาไกร">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="input-welfare-address-district">อำเภอ/เขต</label>
+                <input type="text" id="input-welfare-address-district" class="form-control" placeholder="เช่น บางคอแหลม">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="input-welfare-address-province">จังหวัด</label>
+                <input type="text" id="input-welfare-address-province" class="form-control" placeholder="เช่น กรุงเทพมหานคร">
+              </div>
+            </div>
+          </div>
+
+          <h4 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">รายละเอียดการเดินทาง</h4>
+          <div class="form-group">
+            <label for="input-purpose">เรื่อง (วัตถุประสงค์)</label>
+            <input type="text" id="input-purpose" class="form-control" placeholder="ระบุเรื่องเพื่อติดต่องาน" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="input-destination">สถานที่ปลายทาง</label>
+              <input type="text" id="input-destination" class="form-control" placeholder="ระบุสถานที่ปลายทาง" required>
+            </div>
+            <div class="form-group">
+              <label for="input-ref">ที่ (อ้างอิงเอกสาร)</label>
+              <input type="text" id="input-ref" class="form-control" placeholder="เช่น อสป. 102/2569">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="input-passengers">โดยมีผู้โดยสารไปรถคือ (ระบุชื่อทั้งหมด คั่นด้วยเครื่องหมายจุลภาค ,)</label>
+            <input type="text" id="input-passengers" class="form-control" placeholder="ระบุชื่อพนักงานผู้เดินทางร่วม" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="input-start-date">ตั้งแต่วันที่</label>
+              <input type="text" id="input-start-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="input-end-date">จนถึงวันที่</label>
+              <input type="text" id="input-end-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="input-trips">จำนวนเที่ยว</label>
+              <input type="number" id="input-trips" class="form-control" value="2" min="1" readonly style="background-color: rgba(255, 255, 255, 0.05); opacity: 0.85; cursor: not-allowed;" required>
+            </div>
+          </div>
+
+          <h4 style="color: var(--primary); margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">ประเภทพาหนะที่เสนอขอ</h4>
+          <div class="form-group" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px;">
+            <div id="vehicle-request-tip" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; background: rgba(255,255,255,0.02); padding: 0.5rem; border-radius: 4px; border-left: 3px solid var(--primary);">
+              💡 ขอใช้รถยนต์ของ อสป. (การจัดจัดสรรรถยนต์และพนักงานขับรถจะดำเนินการมอบหมายโดยผู้จัดรถ (L2) ในขั้นตอนพิจารณาอนุมัติ)
+            </div>
+            <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.25rem; font-weight: normal; cursor: pointer; font-size: 0.85rem;">
+                <input type="checkbox" id="check-car-go" checked style="accent-color: var(--primary);"> (ไป)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.25rem; font-weight: normal; cursor: pointer; font-size: 0.85rem;">
+                <input type="checkbox" id="check-car-back" checked style="accent-color: var(--primary);"> (กลับ)
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 1.5rem;">
+            <div class="signature-license-grid" id="signature-license-grid">
+              
+              <!-- Left: Driver's License file upload section (Visible only for Welfare Car) -->
+              <div id="driver-license-section" style="display: none;">
+                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">แนบสำเนาใบขับขี่ (รูปภาพหรือ PDF) <span style="color: var(--danger);">*</span></label>
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; height: 180px; border: 2px dashed var(--border-color); border-radius: 8px; background: rgba(255,255,255,0.02); padding: 1rem; box-sizing: border-box;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('input-driver-license').click()" style="display: inline-flex; align-items: center; gap: 0.5rem;">
+                    📁 เลือกไฟล์ใบขับขี่
+                  </button>
+                  <input type="file" id="input-driver-license" accept="image/*,application/pdf" style="display: none;">
+                  <span id="driver-license-filename" style="font-size: 0.8rem; color: var(--text-muted); text-align: center; max-width: 100%; display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ยังไม่ได้เลือกไฟล์</span>
+                  <div id="driver-license-preview-container" style="display: none; margin-top: 0.25rem;">
+                    <img id="driver-license-preview" src="" style="max-width: 120px; max-height: 80px; border-radius: 6px; border: 1px solid var(--border-color); object-fit: contain;">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: Requester Signature section -->
+              <div id="signature-pad-section">
+                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">ลงลายมือชื่อผู้ขอใช้รถ</label>
+                <div class="signature-canvas-container" style="margin-bottom: 0;">
+                  <canvas id="canvas-requester-signature" class="signature-canvas"></canvas>
+                  <div class="signature-placeholder" id="requester-sig-placeholder">คลิกค้างแล้วลากเส้นเพื่อวาดลายมือชื่อสำหรับขออนุมัติ</div>
+                  <input type="file" id="upload-requester-sig" accept="image/*" style="display:none;">
+                  <button type="button" class="btn btn-secondary signature-upload-btn" onclick="document.getElementById('upload-requester-sig').click()">📁 อัปโหลดภาพ</button>
+                  <button type="button" class="btn btn-secondary signature-clear-btn" id="btn-clear-requester-sig">ล้างลายเซ็น</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-booking">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">ส่งเสนอใบขออนุญาต</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: View Details & Approval Panel -->
+  <div class="modal-overlay" id="modal-approval">
+    <div class="modal-box" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3>ข้อมูลและสายอนุมัติใบเสนอขอ</h3>
+        <button class="modal-close" id="btn-close-approval">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Summary of request -->
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+          <h4 id="detail-title" style="margin-bottom: 0.5rem; color: var(--primary);">คำขอใช้รถยนต์ องค์การสะพานปลา</h4>
+          <table style="width:100%; font-size:0.875rem; border-collapse:collapse;">
+            <tr>
+              <td style="padding:0.25rem 0; color:var(--text-muted); width:35%;">ผู้เสนอขอ:</td>
+              <td id="detail-requester" style="padding:0.25rem 0; font-weight:600;">-</td>
+            </tr>
+            <tr>
+              <td style="padding:0.25rem 0; color:var(--text-muted);">ตำแหน่ง/สังกัด:</td>
+              <td id="detail-office" style="padding:0.25rem 0;">-</td>
+            </tr>
+            <tr>
+              <td style="padding:0.25rem 0; color:var(--text-muted);">เรื่อง/วัตถุประสงค์:</td>
+              <td id="detail-purpose" style="padding:0.25rem 0;">-</td>
+            </tr>
+            <tr>
+              <td style="padding:0.25rem 0; color:var(--text-muted);">สถานที่ปลายทาง:</td>
+              <td id="detail-route" style="padding:0.25rem 0;">-</td>
+            </tr>
+            <tr>
+              <td style="padding:0.25rem 0; color:var(--text-muted);">ผู้ร่วมเดินทาง:</td>
+              <td id="detail-passengers" style="padding:0.25rem 0;">-</td>
+            </tr>
+            <tr>
+              <td style="padding:0.25rem 0; color:var(--text-muted);">ช่วงเวลาการเดินทาง:</td>
+              <td id="detail-time" style="padding:0.25rem 0; font-size:0.8rem;">-</td>
+            </tr>
+            <tr>
+              <td style="padding:0.25rem 0; color:var(--text-muted);">ประเภทการเดินทาง:</td>
+              <td id="detail-travel-type" style="padding:0.25rem 0; font-weight:600;">-</td>
+            </tr>
+            <tr>
+              <td style="padding:0.25rem 0; color:var(--text-muted);">รายละเอียดรถ/ค่าใช้จ่าย:</td>
+              <td id="detail-car" style="padding:0.25rem 0;">-</td>
+            </tr>
+            <tr id="detail-driver-row">
+              <td style="padding:0.25rem 0; color:var(--text-muted);">พนักงานขับรถ:</td>
+              <td id="detail-driver" style="padding:0.25rem 0; font-weight:600;">-</td>
+            </tr>
+            <tr id="detail-driver-license-row" style="display:none;">
+              <td style="padding:0.25rem 0; color:var(--text-muted);">สำเนาใบขับขี่:</td>
+              <td id="detail-driver-license" style="padding:0.25rem 0;">-</td>
+            </tr>
+            <tr id="detail-welfare-address-row" style="display:none;">
+              <td style="padding:0.25rem 0; color:var(--text-muted);">ที่อยู่ผู้ขอใช้รถ:</td>
+              <td id="detail-welfare-address" style="padding:0.25rem 0;">-</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Approval pipeline history visual -->
+        <div>
+          <h4 id="approval-pipeline-title" style="margin-bottom: 0.75rem; font-size: 1rem;">ลำดับการอนุมัติ (4 ขั้นตอนตามฟอร์ม อสป.)</h4>
+          <div class="approval-pipeline-detail" id="approval-pipeline-container">
+            <!-- Steps injected dynamically -->
+          </div>
+        </div>
+
+        <!-- Action Panel -->
+        <div id="approval-action-panel" class="hidden" style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+          <h4 style="margin-bottom: 0.5rem; color: var(--warning); font-size: 1rem;">✍️ พิจารณาคำขอ (ในบทบาทผู้ตรวจ/ผู้อนุมัติ)</h4>
+          
+          <div class="form-group" id="fleet-admin-assign-box" style="margin-bottom: 1.25rem; display:none; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 0.75rem; border-radius: 8px;">
+            <label style="color:var(--warning); font-weight:bold;">เฉพาะผู้จัดรถ (L2 ผู้จัดรถ): จัดรถยนต์และคนขับ</label>
+            
+            <div class="form-group" style="margin-top:0.5rem;" id="fleet-admin-car-select-group">
+              <label for="assign-car">เลือกรถยนต์ของ อสป. ที่ว่าง</label>
+              <select id="assign-car" class="form-control">
+                <option value="">-- กรุณาเลือกรถยนต์ --</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-top:0.5rem;" id="fleet-admin-driver-group">
+              <label for="assign-driver">ชื่อพนักงานขับรถปฏิบัติหน้าที่</label>
+              <input type="text" id="assign-driver" class="form-control" placeholder="ระบุชื่อพนักงานขับรถ" value="นายดีเลิศ สมใจ">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="approval-comment">ความคิดเห็น / คำสั่งเพิ่มเติม</label>
+            <input type="text" id="approval-comment" class="form-control" placeholder="ความคิดเห็น เช่น เห็นชอบ, อนุมัติ">
+          </div>
+
+          <div class="form-group">
+            <label>ลงลายมือชื่อผู้อนุมัติ (วาดลายเซ็น)</label>
+            <div class="signature-canvas-container">
+              <canvas id="canvas-approver-signature" class="signature-canvas"></canvas>
+              <div class="signature-placeholder" id="approver-sig-placeholder">กรุณาคลิกค้างแล้วลงลายมือชื่อดิจิทัล</div>
+              <input type="file" id="upload-approver-sig" accept="image/*" style="display:none;">
+              <button type="button" class="btn btn-secondary signature-upload-btn" onclick="document.getElementById('upload-approver-sig').click()">📁 อัปโหลดภาพ</button>
+              <button type="button" class="btn btn-secondary signature-clear-btn" id="btn-clear-approver-sig">ล้างลายเซ็น</button>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
+            <button class="btn btn-danger" id="btn-reject-request">ปฏิเสธคำขอ</button>
+            <button class="btn btn-success" id="btn-approve-request">อนุมัติคำขอ</button>
+          </div>
+        </div>
+
+        <!-- Special Edit Panel for L2 (Fleet Admin) when booking is approved or pending L3/L4 -->
+        <div id="fleet-admin-edit-panel" style="display:none; margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px;">
+          <h4 style="margin-bottom: 0.5rem; color: var(--warning); font-size: 1rem;">🔧 แก้ไขการจัดสรรยานพาหนะ (เฉพาะผู้จัดรถ L2)</h4>
+          
+          <div class="form-group" style="margin-top:0.5rem;">
+            <label for="edit-assign-car">เลือกรถยนต์ของ อสป. ที่ว่าง หรือเลือก TAXI</label>
+            <select id="edit-assign-car" class="form-control">
+              <!-- Injected dynamically -->
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-top:0.5rem;" id="fleet-admin-edit-driver-group">
+            <label for="edit-assign-driver">ชื่อพนักงานขับรถปฏิบัติหน้าที่</label>
+            <input type="text" id="edit-assign-driver" class="form-control" placeholder="ระบุชื่อพนักงานขับรถ">
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; margin-top:1.25rem;">
+            <button class="btn btn-warning btn-sm" id="btn-save-car-changes">💾 บันทึกการเปลี่ยนแปลงยานพาหนะ</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Fill Taxi Details (For Requester L0) -->
+  <div class="modal-overlay" id="modal-fill-taxi">
+    <div class="modal-box" style="max-width: 450px;">
+      <div class="modal-header">
+        <h3>กรอกข้อมูลระยะทางและค่าใช้จ่ายรถรับจ้าง</h3>
+        <button class="modal-close" id="btn-close-fill-taxi" type="button">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-fill-taxi">
+          <input type="hidden" id="fill-taxi-booking-id">
+          <div class="form-group">
+            <label for="fill-distance">ระยะทางรวมประมาณ (กิโลเมตร)</label>
+            <input type="number" id="fill-distance" class="form-control" placeholder="ระบุกิโลเมตร" required min="1">
+          </div>
+          <div class="form-group" style="margin-top: 1rem;">
+            <label for="fill-price">ราคาเบิกจ่ายประมาณ (บาท)</label>
+            <input type="number" id="fill-price" class="form-control" placeholder="ระบุจำนวนเงินประมาณ" required min="1">
+          </div>
+          <div class="modal-footer" style="margin-top: 1.5rem; padding: 0.5rem 0 0 0;">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-fill-taxi">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary">💾 บันทึกเสนอหัวหน้างาน</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+      <div id="modal-email-inbox" class="modal-overlay">
+        <div class="modal-box" style="max-width: 600px;">
+          <div class="modal-header">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem;">📧 กล่องข้อความแจ้งเตือนระบบ</h3>
+            <button id="btn-close-email-inbox" class="modal-close">&times;</button>
+          </div>
+          <div class="modal-body" id="email-logs-list" style="max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem;">
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL 5: Export CSV Date Range (For L2) -->
+      <div id="modal-export-csv" class="modal-overlay">
+        <div class="modal-box" style="max-width: 450px;">
+          <div class="modal-header">
+            <h3 style="display: flex; align-items: center; gap: 0.5rem;">📥 ส่งออกข้อมูลการจองรถยนต์</h3>
+            <button id="btn-close-export-csv" class="modal-close" onclick="document.getElementById('modal-export-csv').classList.remove('active')">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+              กรุณาเลือกช่วงเวลาของวันเริ่มเดินทางที่ต้องการส่งออก (หากไม่ระบุวันที่ จะส่งออกข้อมูลการจองทั้งหมดในระบบ)
+            </p>
+            <div class="form-group">
+              <label for="export-start-date">ตั้งแต่วันเริ่มเดินทาง</label>
+              <input type="date" id="export-start-date" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-family: inherit; margin-top: 0.25rem;">
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+              <label for="export-end-date">ถึงวันเริ่มเดินทาง</label>
+              <input type="date" id="export-end-date" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main); font-family: inherit; margin-top: 0.25rem;">
+            </div>
+            <div class="modal-footer" style="margin-top: 1.5rem; padding: 0.5rem 0 0 0; display: flex; gap: 0.5rem; justify-content: flex-end;">
+              <button type="button" class="btn btn-secondary" id="btn-cancel-export-csv" onclick="document.getElementById('modal-export-csv').classList.remove('active')">ยกเลิก</button>
+              <button type="button" class="btn btn-primary" id="btn-submit-export-csv" onclick="triggerExportBookings()" style="background: #10b981; border-color: #10b981; color: white;">📥 ส่งออก Excel (CSV)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+  <script src="flatpickr.min.js?v=1.0"></script>
+  <script src="flatpickr.th.js?v=1.0"></script>
+  <script src="app.js?v=5.0"></script>
+</body>
+</html>

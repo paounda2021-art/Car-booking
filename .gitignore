@@ -1,0 +1,26 @@
+# IDEs and local scratch
+.idea/
+.vscode/
+scratch/
+.wrangler/
+node_modules/
+
+# Credentials and private configs (CRITICAL SECURITY)
+.dev.vars
+smtp_config.json
+
+# Temporary logs, search results, and agent files
+*.log
+*.txt
+step_*.json
+recovery_content_*.txt
+apply_fixes.*
+search_*.ps1
+find_*.ps1
+check_chars.ps1
+extract_roles.ps1
+get_user.ps1
+test_email.ps1
+view_func*.ps1
+view_utf8.ps1
+diff.txt
