@@ -1258,7 +1258,19 @@ function updateStats() {
 
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
   if (tabAllHistoryBadge) {
-    const historyCount = bookings.filter(b => b.status === 'approved' || b.status === 'rejected').length;
+    const historyCount = bookings.filter(b => {
+      if (b.status !== 'approved' && b.status !== 'rejected') return false;
+      const isMyRequest = currentUser && (
+        (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
+        b.requester === currentUser.name
+      );
+      const canSeeAll = currentUser && (
+        currentUser.role === 'fleet_admin' || 
+        currentUser.role === 'director' || 
+        currentUser.role === 'executive'
+      );
+      return (canSeeAll || isMyRequest);
+    }).length;
     tabAllHistoryBadge.textContent = historyCount;
   }
 }
@@ -1732,7 +1744,18 @@ function renderBookingsLists() {
       pendingBookingsList.push({ booking: b, isPendingForMe });
     }
     if (b.status === 'approved' || b.status === 'rejected') {
-      allBookingsList.push({ booking: b, isPendingForMe });
+      const isMyRequest = currentUser && (
+        (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
+        b.requester === currentUser.name
+      );
+      const canSeeAll = currentUser && (
+        currentUser.role === 'fleet_admin' || 
+        currentUser.role === 'director' || 
+        currentUser.role === 'executive'
+      );
+      if (canSeeAll || isMyRequest) {
+        allBookingsList.push({ booking: b, isPendingForMe });
+      }
     }
   });
 
@@ -2527,7 +2550,7 @@ function handleApprovalAction(isApproved) {
         // Notify L2 (fleet admin - chalong.c)
         const adminEmails = usersList.filter(u => u.role === 'admin' || u.username.toLowerCase() === 'chalong.c').map(u => u.email).filter(Boolean);
         const uniqueEmails = [...new Set(adminEmails)];
-        const toEmail = uniqueEmails.length > 0 ? uniqueEmails.join(',') : 'ranida.c@fishmarket.co.th';
+        const toEmail = uniqueEmails.length > 0 ? uniqueEmails.join(',') : 'chalong.c@fishmarket.co.th';
         const subject = `[ระบบจองรถ อสป.] ใบจองเลขที่ ${booking.id} ได้รับการเห็นชอบจาก L1 แล้ว รอจัดรถยนต์`;
         const body = `
           <p>เรียน ผู้จัดรถ / งานยานพาหนะ (L2),</p>
@@ -2540,7 +2563,7 @@ function handleApprovalAction(isApproved) {
       } else if (nextLevel === 3) {
         // Notify L3 (director หส.พด. - saisunee.p)
         const directorUser = usersList.find(u => u.username.toLowerCase() === 'saisunee.p');
-        const toEmail = directorUser ? directorUser.email : 'ranida.c@fishmarket.co.th';
+        const toEmail = directorUser ? directorUser.email : 'chalong.c@fishmarket.co.th';
         const subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${booking.id} รอการตรวจสอบจาก หส.พด.`;
         const body = `
           <p>เรียน หัวหน้าแผนกพัสดุ / หส.พด. (L3),</p>
@@ -2560,7 +2583,7 @@ function handleApprovalAction(isApproved) {
       } else if (nextLevel === 4) {
         // Notify L4 (executive ผฝ.บง. - piyawan.k)
         const executiveUser = usersList.find(u => u.username.toLowerCase() === 'piyawan.k');
-        const toEmail = executiveUser ? executiveUser.email : 'ranida.c@fishmarket.co.th';
+        const toEmail = executiveUser ? executiveUser.email : 'chalong.c@fishmarket.co.th';
         const subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${booking.id} รอการอนุมัติเบิกจ่ายจาก ผฝ.บง.`;
         const body = `
           <p>เรียน ผู้อำนวยการฝ่ายการเงิน / ผฝ.บง. (L4),</p>
