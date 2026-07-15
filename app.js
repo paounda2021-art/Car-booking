@@ -2563,7 +2563,7 @@ function handleApprovalAction(isApproved) {
       } else if (nextLevel === 3) {
         // Notify L3 (director หส.พด. - saisunee.p)
         const directorUser = usersList.find(u => u.username.toLowerCase() === 'saisunee.p');
-        const toEmail = directorUser ? directorUser.email : 'chalong.c@fishmarket.co.th';
+        const toEmail = directorUser ? directorUser.email : 'saisunee.p@fishmarket.co.th';
         const subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${booking.id} รอการตรวจสอบจาก หส.พด.`;
         const body = `
           <p>เรียน หัวหน้าแผนกพัสดุ / หส.พด. (L3),</p>
@@ -2583,7 +2583,7 @@ function handleApprovalAction(isApproved) {
       } else if (nextLevel === 4) {
         // Notify L4 (executive ผฝ.บง. - piyawan.k)
         const executiveUser = usersList.find(u => u.username.toLowerCase() === 'piyawan.k');
-        const toEmail = executiveUser ? executiveUser.email : 'chalong.c@fishmarket.co.th';
+        const toEmail = executiveUser ? executiveUser.email : 'piyawan.k@fishmarket.co.th';
         const subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${booking.id} รอการอนุมัติเบิกจ่ายจาก ผฝ.บง.`;
         const body = `
           <p>เรียน ผู้อำนวยการฝ่ายการเงิน / ผฝ.บง. (L4),</p>
