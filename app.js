@@ -2547,10 +2547,8 @@ function handleApprovalAction(isApproved) {
     } else {
       const nextLevel = booking.currentApprovalLevel;
       if (nextLevel === 2) {
-        // Notify L2 (fleet admin - chalong.c)
-        const adminEmails = usersList.filter(u => u.role === 'admin' || u.username.toLowerCase() === 'chalong.c').map(u => u.email).filter(Boolean);
-        const uniqueEmails = [...new Set(adminEmails)];
-        const toEmail = uniqueEmails.length > 0 ? uniqueEmails.join(',') : 'chalong.c@fishmarket.co.th';
+        // Notify L2 (chalong.c, sakda.a)
+        const toEmail = 'chalong.c@fishmarket.co.th,sakda.a@fishmarket.co.th';
         const subject = `[ระบบจองรถ อสป.] ใบจองเลขที่ ${booking.id} ได้รับการเห็นชอบจาก L1 แล้ว รอจัดรถยนต์`;
         const body = `
           <p>เรียน ผู้จัดรถ / งานยานพาหนะ (L2),</p>
@@ -2561,9 +2559,8 @@ function handleApprovalAction(isApproved) {
         `;
         sendEmailNotification(toEmail, subject, body);
       } else if (nextLevel === 3) {
-        // Notify L3 (director หส.พด. - saisunee.p)
-        const directorUser = usersList.find(u => u.username.toLowerCase() === 'saisunee.p');
-        const toEmail = directorUser ? directorUser.email : 'saisunee.p@fishmarket.co.th';
+        // Notify L3 (saisunee.p, panadon.p)
+        const toEmail = 'saisunee.p@fishmarket.co.th,panadon.p@fishmarket.co.th';
         const subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${booking.id} รอการตรวจสอบจาก หส.พด.`;
         const body = `
           <p>เรียน หัวหน้าแผนกพัสดุ / หส.พด. (L3),</p>
@@ -2581,9 +2578,8 @@ function handleApprovalAction(isApproved) {
         `;
         sendEmailNotification(toEmail, subject, body);
       } else if (nextLevel === 4) {
-        // Notify L4 (executive ผฝ.บง. - piyawan.k)
-        const executiveUser = usersList.find(u => u.username.toLowerCase() === 'piyawan.k');
-        const toEmail = executiveUser ? executiveUser.email : 'piyawan.k@fishmarket.co.th';
+        // Notify L4 (piyawan.k, saisunee.p, sarena.m)
+        const toEmail = 'piyawan.k@fishmarket.co.th,saisunee.p@fishmarket.co.th,sarena.m@fishmarket.co.th';
         const subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ เลขที่ ${booking.id} รอการอนุมัติเบิกจ่ายจาก ผฝ.บง.`;
         const body = `
           <p>เรียน ผู้อำนวยการฝ่ายการเงิน / ผฝ.บง. (L4),</p>
