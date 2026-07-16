@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
@@ -111,6 +112,87 @@ const server = http.createServer((req, res) => {
 
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ status: 'success', message: 'Email queued' }));
+    });
+    return;
+  }
+
+  // API: notify-driver-group
+  if (urlPath === '/api/notify-driver-group' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const payload = JSON.parse(body);
+        
+        // Load LINE config
+        const lineConfigPath = path.join(ROOT_DIR, 'line_config.json');
+        fs.readFile(lineConfigPath, 'utf8', (err, configData) => {
+          let accessToken = '';
+          let groupId = '';
+          if (!err) {
+            try {
+              const cfg = JSON.parse(configData);
+              accessToken = cfg.channelAccessToken || '';
+              groupId = cfg.groupId || '';
+            } catch (e) {
+              console.error('Error parsing line_config.json:', e);
+            }
+          }
+
+          // Check for default placeholders or empty values
+          if (!accessToken || !groupId || accessToken.includes('YOUR_LINE_') || groupId.includes('YOUR_LINE_')) {
+            console.warn('LINE config not configured or using placeholders in line_config.json');
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ status: 'warning', message: 'LINE config not configured' }));
+            return;
+          }
+
+          const messageText = `📢 แจ้งงานคิว พขร. ใหม่ (อนุมัติเสร็จสิ้น)\n------------------------------\n🚗 คนขับ: ${payload.driverName || 'ไม่ระบุ'}\n🏢 ยานพาหนะ: ${payload.carInfo || 'ไม่ระบุ'}\n📍 ปลายทาง: ${payload.destination || 'ไม่ระบุ'}\n📅 วันเดินทาง: ${payload.date || ''} เวลา ${payload.time || ''} น.\n👤 ผู้ประสานงาน: ${payload.passenger || ''}\n------------------------------\nกรุณาเตรียมความพร้อมก่อนการเดินทาง`;
+
+          const postData = JSON.stringify({
+            to: groupId,
+            messages: [
+              {
+                type: 'text',
+                text: messageText
+              }
+            ]
+          });
+
+          const options = {
+            hostname: 'api.line.me',
+            port: 443,
+            path: '/v2/bot/message/push',
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Length': Buffer.byteLength(postData)
+            }
+          };
+
+          const lineReq = https.request(options, (lineRes) => {
+            let resBody = '';
+            lineRes.on('data', (d) => { resBody += d; });
+            lineRes.on('end', () => {
+              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+              res.end(JSON.stringify({ status: 'success', message: 'Notification sent successfully', response: resBody }));
+            });
+          });
+
+          lineReq.on('error', (e) => {
+            console.error('LINE notification request error:', e);
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ status: 'error', message: e.message }));
+          });
+
+          lineReq.write(postData);
+          lineReq.end();
+        });
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ status: 'error', message: 'Invalid JSON payload' }));
+      }
     });
     return;
   }

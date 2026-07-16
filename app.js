@@ -2662,6 +2662,11 @@ function handleApprovalAction(isApproved) {
         </table>
       `;
       sendEmailNotification(reqEmail, subject, body);
+
+      // Trigger LINE Notification to Driver Group (Option 1)
+      if (booking.travelType === 'fmo_car' && booking.driverName && booking.driverName !== '-') {
+        triggerLineNotification(booking, carPlate);
+      }
     } else {
       const nextLevel = booking.currentApprovalLevel;
       if (nextLevel === 2) {
@@ -5747,3 +5752,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// Helper function to send LINE Group notification when booking is approved
+function triggerLineNotification(booking, carPlate) {
+  const payload = {
+    bookingId: booking.id,
+    driverName: booking.driverName || 'ไม่ระบุ',
+    carInfo: booking.carId === 'taxi' ? 'รถรับจ้างสาธารณะ (TAXI)' : `รถยนต์ อสป. ทะเบียน ${carPlate || '-'}`,
+    destination: booking.destination || 'ไม่ระบุ',
+    date: booking.dateStart || '',
+    time: booking.timeStart || '',
+    passenger: booking.name || booking.requester || ''
+  };
+
+  fetch('/api/notify-driver-group', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8'
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === 'success') {
+      console.log('LINE Group notification sent successfully');
+      showToast('ส่งข้อความแจ้งเตือนงานไปยังไลน์กลุ่ม พขร. เรียบร้อยแล้ว', 'success');
+    } else if (data.status === 'warning') {
+      console.warn('LINE Config warning:', data.message);
+    }
+  })
+  .catch(err => {
+    console.error('Failed to send LINE notification:', err);
+  });
+}

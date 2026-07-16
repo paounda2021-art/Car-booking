@@ -23,6 +23,16 @@ if (Test-Path $deployDir) {
         Copy-Item -Path $bookingsFile -Destination (Join-Path $deployDir "bookings.json") -Force
     }
     Copy-Item -Path (Join-Path $rootDir "app.js"), (Join-Path $rootDir "index.html"), (Join-Path $rootDir "style.css"), (Join-Path $rootDir "server.js") -Destination $deployDir -Force
+    
+    # Safe copy of line_config.json (do not overwrite if exists)
+    $lineConfigLocal = Join-Path $rootDir "line_config.json"
+    $lineConfigDest = Join-Path $deployDir "line_config.json"
+    if (Test-Path $lineConfigLocal) {
+        if (-not (Test-Path $lineConfigDest)) {
+            Copy-Item -Path $lineConfigLocal -Destination $lineConfigDest -Force
+            Write-Host "Created default line_config.json in deploy folder."
+        }
+    }
     Write-Host "Copied updated files to deploy folder."
 }
 
