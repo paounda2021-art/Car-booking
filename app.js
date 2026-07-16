@@ -1590,10 +1590,15 @@ function helperCreateTableRow(b, isPendingForMe) {
 
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
-  // Show export button only for L2 (fleet_admin)
+  // Show export button for L2 (fleet_admin) and Ms. Saisunee
   const exportBtn = document.getElementById('btn-export-csv');
   if (exportBtn) {
-    if (currentUser && currentUser.role === 'fleet_admin') {
+    const hasExportPermission = currentUser && (
+      currentUser.role === 'fleet_admin' ||
+      (currentUser.email && currentUser.email.toLowerCase() === 'saisunee.p@fishmarket.co.th') ||
+      (currentUser.username && currentUser.username.toLowerCase() === 'saisunee.p')
+    );
+    if (hasExportPermission) {
       exportBtn.classList.remove('hidden');
     } else {
       exportBtn.classList.add('hidden');
