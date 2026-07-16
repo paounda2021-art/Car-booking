@@ -1518,14 +1518,13 @@ body {
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  cursor: pointer;
+  cursor: default;
   font-weight: 600;
   transition: var(--transition-smooth);
 }
 
 .calendar-event-badge:hover {
-  transform: scale(1.02);
-  filter: brightness(1.1);
+  filter: brightness(1.05);
 }
 
 .calendar-event-badge.pending {

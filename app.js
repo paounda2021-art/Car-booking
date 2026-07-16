@@ -1424,7 +1424,7 @@ function renderTimelineScheduler() {
         const eh = formatThaiTimeOnlyNoSuffix(b.endDate);
 
         bookingBarsHtml += `
-          <div class="${badgeClass}" onclick="openApprovalModal('${b.id}')" title="${b.purpose} (${sh} - ${eh}) ผู้จอง: ${b.requester}" style="position: absolute; left: ${leftPercent}%; width: ${widthPercent}%; top: 50%; transform: translateY(-50%); height: 38px; border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-sm); z-index: 2;">
+          <div class="${badgeClass}" title="${b.purpose} (${sh} - ${eh}) ผู้จอง: ${b.requester}" style="position: absolute; left: ${leftPercent}%; width: ${widthPercent}%; top: 50%; transform: translateY(-50%); height: 38px; border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: default; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-sm); z-index: 2;">
             <strong style="color: var(--text-main); text-overflow: ellipsis; overflow: hidden; display: block;">${b.purpose}</strong>
             <span style="color: var(--text-muted); font-size: 0.65rem;">${sh}-${eh} (${b.requester})</span>
           </div>
@@ -1952,10 +1952,6 @@ function renderMonthCalendar() {
           : `${startD} (${startT}) ถึง ${endD} (${endT})`;
 
         badge.title = `ผู้จอง: ${b.requester || '-'}\nเรื่อง: ${b.purpose || '-'}\nสถานที่: ${b.destination || '-'}\nเวลา: ${timeText}`;
-        badge.onclick = (e) => {
-          e.stopPropagation();
-          openApprovalModal(b.id);
-        };
         eventsContainer.appendChild(badge);
       });
 
