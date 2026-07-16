@@ -360,6 +360,74 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // API: test-line
+  if (urlPath === '/api/test-line') {
+    const lineConfigPath = path.join(ROOT_DIR, 'line_config.json');
+    fs.readFile(lineConfigPath, 'utf8', (err, configData) => {
+      let accessToken = '';
+      let groupId = '';
+      if (!err) {
+        try {
+          const cfg = JSON.parse(configData);
+          accessToken = cfg.channelAccessToken || '';
+          groupId = cfg.groupId || '';
+        } catch (e) {
+          console.error('Error parsing line_config.json:', e);
+        }
+      }
+
+      if (!accessToken || !groupId) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('LINE config is missing or invalid.');
+        return;
+      }
+
+      const postData = JSON.stringify({
+        to: groupId,
+        messages: [
+          {
+            type: "text",
+            text: "🔔 ทดสอบระบบแจ้งเตือนไลน์กลุ่ม พขร. (Test Notification)"
+          }
+        ]
+      });
+
+      const options = {
+        hostname: 'api.line.me',
+        port: 443,
+        path: '/v2/bot/message/push',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+
+      const lineReq = https.request(options, (lineRes) => {
+        let resBody = '';
+        lineRes.on('data', (d) => { resBody += d; });
+        lineRes.on('end', () => {
+          console.log('LINE Test Response Status:', lineRes.statusCode, 'Body:', resBody);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          let parsed = {};
+          try { parsed = JSON.parse(resBody); } catch(e) {}
+          res.end(JSON.stringify({ status: lineRes.statusCode, response: parsed }));
+        });
+      });
+
+      lineReq.on('error', (e) => {
+        console.error('LINE Test Request Error:', e);
+        res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Request error: ' + e.message);
+      });
+
+      lineReq.write(postData);
+      lineReq.end();
+    });
+    return;
+  }
+
   // Serve static files
   let safePath = urlPath === '/' ? '/index.html' : urlPath;
   const filePath = path.join(ROOT_DIR, safePath);
