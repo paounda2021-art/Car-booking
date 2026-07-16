@@ -147,14 +147,173 @@ const server = http.createServer((req, res) => {
             return;
           }
 
-          const messageText = `📢 แจ้งงานคิว พขร. ใหม่ (อนุมัติเสร็จสิ้น)\n------------------------------\n🚗 คนขับ: ${payload.driverName || 'ไม่ระบุ'}\n🏢 ยานพาหนะ: ${payload.carInfo || 'ไม่ระบุ'}\n📍 ปลายทาง: ${payload.destination || 'ไม่ระบุ'}\n📅 วันเดินทาง: ${payload.date || ''} เวลา ${payload.time || ''} น.\n👤 ผู้ประสานงาน: ${payload.passenger || ''}\n------------------------------\nกรุณาเตรียมความพร้อมก่อนการเดินทาง`;
-
           const postData = JSON.stringify({
             to: groupId,
             messages: [
               {
-                type: 'text',
-                text: messageText
+                type: "flex",
+                altText: `📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`,
+                contents: {
+                  type: "bubble",
+                  header: {
+                    type: "box",
+                    layout: "vertical",
+                    contents: [
+                      {
+                        type: "text",
+                        text: "📋 ใบสั่งงานพนักงานขับรถ",
+                        weight: "bold",
+                        size: "lg",
+                        color: "#1e3a8a"
+                      },
+                      {
+                        type: "text",
+                        text: "ระบบจองรถยนต์สะพานปลา (FMO)",
+                        size: "xs",
+                        color: "#64748b",
+                        margin: "xs"
+                      }
+                    ],
+                    backgroundColor: "#f8fafc",
+                    paddingAll: "15px"
+                  },
+                  body: {
+                    type: "box",
+                    layout: "vertical",
+                    contents: [
+                      {
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                          {
+                            type: "text",
+                            text: "👤 พขร. ปฏิบัติหน้าที่:",
+                            size: "sm",
+                            color: "#64748b",
+                            flex: 4
+                          },
+                          {
+                            type: "text",
+                            text: payload.driverName || 'ไม่ระบุ',
+                            size: "sm",
+                            color: "#1e293b",
+                            weight: "bold",
+                            flex: 6,
+                            wrap: true
+                          }
+                        ]
+                      },
+                      {
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                          {
+                            type: "text",
+                            text: "🚗 ยานพาหนะ:",
+                            size: "sm",
+                            color: "#64748b",
+                            flex: 4
+                          },
+                          {
+                            type: "text",
+                            text: payload.carInfo || 'ไม่ระบุ',
+                            size: "sm",
+                            color: "#1e293b",
+                            flex: 6,
+                            wrap: true
+                          }
+                        ],
+                        margin: "md"
+                      },
+                      {
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                          {
+                            type: "text",
+                            text: "📍 สถานที่ปลายทาง:",
+                            size: "sm",
+                            color: "#64748b",
+                            flex: 4
+                          },
+                          {
+                            type: "text",
+                            text: payload.destination || 'ไม่ระบุ',
+                            size: "sm",
+                            color: "#1e293b",
+                            flex: 6,
+                            wrap: true
+                          }
+                        ],
+                        margin: "md"
+                      },
+                      {
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                          {
+                            type: "text",
+                            text: "📅 วันเวลาเดินทาง:",
+                            size: "sm",
+                            color: "#64748b",
+                            flex: 4
+                          },
+                          {
+                            type: "text",
+                            text: `${payload.date || ''} เวลา ${payload.time || ''} น.`,
+                            size: "sm",
+                            color: "#1e293b",
+                            flex: 6,
+                            wrap: true
+                          }
+                        ],
+                        margin: "md"
+                      },
+                      {
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                          {
+                            type: "text",
+                            text: "👥 ผู้ขอใช้รถ:",
+                            size: "sm",
+                            color: "#64748b",
+                            flex: 4
+                          },
+                          {
+                            type: "text",
+                            text: payload.passenger || 'ไม่ระบุ',
+                            size: "sm",
+                            color: "#1e293b",
+                            flex: 6,
+                            wrap: true
+                          }
+                        ],
+                        margin: "md"
+                      }
+                    ],
+                    paddingAll: "15px"
+                  },
+                  footer: {
+                    type: "box",
+                    layout: "vertical",
+                    contents: [
+                      {
+                        type: "button",
+                        action: {
+                          type: "uri",
+                          label: "🌐 เข้าสู่ระบบเพื่อดูรายละเอียด",
+                          uri: "https://car-booking.fishmarket.co.th/"
+                        },
+                        style: "primary",
+                        color: "#1e3a8a",
+                        height: "sm"
+                      }
+                    ],
+                    paddingAll: "10px",
+                    backgroundColor: "#f8fafc"
+                  }
+                }
               }
             ]
           });
