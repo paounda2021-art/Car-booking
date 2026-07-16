@@ -26,9 +26,22 @@ if (Test-Path $deployDir) {
     Write-Host "Copied updated files to deploy folder."
 }
 
-# 3. Restart server
-Write-Host "Restarting server..."
-Stop-Process -Name node -Force -ErrorAction SilentlyContinue
+# 3. Restart server (Target ONLY the car-booking process)
+Write-Host "Restarting car-booking server..."
+$processes = Get-CimInstance Win32_Process -Filter "Name = 'node.exe'"
+$killed = $false
+foreach ($p in $processes) {
+    $cmdLine = $p.CommandLine
+    if ($cmdLine -and ($cmdLine -like "*car-booking*" -or $cmdLine -like "*$rootDir*")) {
+        Write-Host "Stopping car-booking process with ID $($p.ProcessId)..."
+        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+        $killed = $true
+    }
+}
+if (-not $killed) {
+    Write-Host "No active car-booking node processes found running."
+}
+
 cd $rootDir
 Start-Process node -ArgumentList "server.js" -WindowStyle Hidden
 
