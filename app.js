@@ -1069,7 +1069,7 @@ async function clearDatabase() {
 function checkLoginStatus() {
   const cached = localStorage.getItem('current_user');
   if (cached) {
-    if (cached.includes('à¸') || cached.includes('เจียมผักแว่น')) {
+    if (cached.includes('à¸') || cached.includes('ผักเจียมแว่น')) {
       localStorage.removeItem('current_user');
       currentUser = null;
       window.location.reload();
