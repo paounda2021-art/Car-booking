@@ -1177,6 +1177,16 @@ function showView(viewName) {
     title.textContent = 'รายงานการปฏิบัติงาน พขร.';
     subtitle.textContent = 'ตรวจสอบสถิติ สรุปผลงาน และสั่งพิมพ์รายงานการใช้รถของ พขร. รายวัน/สัปดาห์/เดือน';
   }
+
+  // 🚨 Re-render active views on navigation to ensure latest database state
+  if (viewName === 'dashboard') {
+    updateStats();
+    renderDashboard();
+  } else if (viewName === 'bookings') {
+    renderBookingsLists();
+  } else if (viewName === 'calendar') {
+    renderMonthCalendar();
+  }
 }
 
 // Update stats on Dashboard
@@ -1408,7 +1418,7 @@ function renderTimelineScheduler() {
 
         let badgeClass = 'timeline-badge';
         if (b.status === 'approved') badgeClass += ' approved';
-        else if (b.status === 'pending') badgeClass += ' pending';
+        else if (b.status === 'pending' || b.status.startsWith('pending')) badgeClass += ' pending';
 
         const sh = formatThaiTimeOnlyNoSuffix(b.startDate);
         const eh = formatThaiTimeOnlyNoSuffix(b.endDate);
@@ -1921,7 +1931,7 @@ function renderMonthCalendar() {
         const badge = document.createElement('div');
         let badgeClass = 'calendar-event-badge';
         if (b.status === 'approved') badgeClass += ' approved';
-        else if (b.status === 'pending') badgeClass += ' pending';
+        else if (b.status === 'pending' || b.status.startsWith('pending')) badgeClass += ' pending';
 
         badge.className = badgeClass;
         
@@ -4354,13 +4364,31 @@ function assignUserPermissions(userObj) {
   else if (username === 'jaruwan.s' || username === 'supachai.j' || username === 'patiyoot.k') {
     userObj.canApprove = [1];
   } 
+  // ผออ. / รผอ. / รองผู้อำนวยการ: เป็น L4 และ L1
+  else if (
+    positionText.includes('ผออ.') ||
+    positionText.includes('รผอ.') ||
+    positionText.includes('รองผู้อำนวยการ') ||
+    positionText.includes('ผู้อำนวยการองค์การ')
+  ) {
+    userObj.canApprove = [1, 4];
+  }
+  // ผู้อำนวยการฝ่าย / ผอ.ฝ่าย: เป็น L3 และ L1
+  else if (
+    positionText.includes('ผู้อำนวยการฝ่าย') ||
+    positionText.includes('ผอ.ฝ่าย')
+  ) {
+    userObj.canApprove = [1, 3];
+  }
   // 6. หัวหน้างาน L1 คนอื่นๆ ทั่วไป (เช่น ตรวจสอบจากตำแหน่ง หรือ role ใน Database)
   else if (
     userObj.role === 'supervisor' ||
     positionText.includes('หัวหน้าสำนักงาน') ||
     positionText.includes('หัวหน้าแผนก') ||
     positionText.includes('ร.หส.') ||
-    positionText.includes('ร.หผ.')
+    positionText.includes('ร.หผ.') ||
+    positionText.includes('หัวหน้าศูนย์') ||
+    positionText.includes('รักษาการ')
   ) {
     userObj.canApprove = [1];
   }
