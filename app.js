@@ -5760,8 +5760,7 @@ function triggerLineNotification(booking, carPlate) {
     driverName: booking.driverName || 'ไม่ระบุ',
     carInfo: booking.carId === 'taxi' ? 'รถรับจ้างสาธารณะ (TAXI)' : `รถยนต์ อสป. ทะเบียน ${carPlate || '-'}`,
     destination: booking.destination || 'ไม่ระบุ',
-    date: booking.startDate || '',
-    time: booking.startTime || '',
+    dateTime: formatThaiDateTime(booking.startDate),
     passenger: booking.name || booking.requester || '',
     passengers: booking.passengers || 'ไม่มี'
   };

@@ -248,7 +248,7 @@ const server = http.createServer((req, res) => {
                         ],
                         margin: "md"
                       },
-                      {
+                       {
                         type: "box",
                         layout: "horizontal",
                         contents: [
@@ -261,7 +261,7 @@ const server = http.createServer((req, res) => {
                           },
                           {
                             type: "text",
-                            text: `${payload.date || ''} เวลา ${payload.time || ''} น.`,
+                            text: payload.dateTime || 'ไม่ระบุ',
                             size: "sm",
                             color: "#1e293b",
                             flex: 6,
