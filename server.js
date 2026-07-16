@@ -314,26 +314,6 @@ const server = http.createServer((req, res) => {
                         margin: "md"
                       }
                     ],
-                    paddingAll: "15px"
-                  },
-                  footer: {
-                    type: "box",
-                    layout: "vertical",
-                    contents: [
-                      {
-                        type: "button",
-                        action: {
-                          type: "uri",
-                          label: "🌐 เข้าสู่ระบบเพื่อดูรายละเอียด",
-                          uri: "https://car-booking.fishmarket.co.th/"
-                        },
-                        style: "primary",
-                        color: "#1e3a8a",
-                        height: "sm"
-                      }
-                    ],
-                    paddingAll: "10px",
-                    backgroundColor: "#f8fafc"
                   }
                 }
               }
