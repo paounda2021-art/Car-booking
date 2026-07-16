@@ -328,6 +328,80 @@ function showToast(message, type = 'info') {
   });
 }
 
+// Custom Interactive Toast Prompt for Password Confirmation
+function showToastPrompt(message, onConfirm, onCancel) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast-message warning`; // warning style
+  toast.style.flexDirection = 'column';
+  toast.style.gap = '10px';
+  toast.style.pointerEvents = 'auto';
+
+  const iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 18px; height: 18px; color: var(--warning-color);"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.008v.008H12v-.008z" /></svg>`;
+
+  toast.innerHTML = `
+    <div style="display: flex; gap: 10px; align-items: center; width: 100%;">
+      ${iconHtml}
+      <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-main);">${message}</div>
+    </div>
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+      <input type="password" id="toast-acting-password" class="form-control" placeholder="กรุณากรอกรหัสผ่านเพื่อยืนยัน" style="width: 100%; font-size: 0.8rem; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+      <div style="display: flex; gap: 8px; justify-content: flex-end; width: 100%;">
+        <button class="btn btn-secondary btn-sm" id="btn-toast-cancel" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-color); background: white;">ยกเลิก</button>
+        <button class="btn btn-warning btn-sm" id="btn-toast-confirm" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold; background: #f59e0b; color: white; border: 1px solid #f59e0b;">ยืนยัน</button>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(toast);
+  
+  // Trigger animation frame for transition
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+  });
+
+  const input = toast.querySelector('#toast-acting-password');
+  const confirmBtn = toast.querySelector('#btn-toast-confirm');
+  const cancelBtn = toast.querySelector('#btn-toast-cancel');
+
+  const removeToast = () => {
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 400);
+  };
+
+  confirmBtn.onclick = () => {
+    const password = input.value;
+    onConfirm(password);
+    removeToast();
+  };
+
+  cancelBtn.onclick = () => {
+    onCancel();
+    removeToast();
+  };
+
+  // Support pressing Enter key
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      confirmBtn.click();
+    }
+  };
+  
+  // Focus the input field automatically
+  setTimeout(() => input.focus(), 100);
+}
+
 // Signature pad instances
 let requesterSig = null;
 let approverSig = null;
@@ -906,7 +980,16 @@ function loginUser(userObj) {
     if (!currentUser.canApprove.includes(1)) currentUser.canApprove.push(1);
   }
 
-  document.getElementById('user-role-label').textContent = `${currentUser.position} ${levelCode}`;
+  let labelSuffix = '';
+  const lowercaseUsername = (currentUser.username || '').toLowerCase();
+  if (currentUser.canApprove.includes(3) && lowercaseUsername === 'panadon.p') {
+    labelSuffix = ' & รักษาการ L3';
+  }
+  if (currentUser.canApprove.includes(4) && (lowercaseUsername === 'saisunee.p' || lowercaseUsername === 'sarena.m')) {
+    labelSuffix = ' & รักษาการ L4';
+  }
+
+  document.getElementById('user-role-label').textContent = `${currentUser.position} ${levelCode}${labelSuffix}`;
   document.getElementById('user-avatar').textContent = currentUser.name.charAt(0);
 
 
@@ -976,6 +1059,15 @@ function loginUser(userObj) {
         populateDriversDropdown(); // โหลดข้อมูลพนักงานขับรถเฉพาะ L2
       } else {
         reportNavItem.classList.add('hidden');
+      }
+    }
+
+    const actingSetupPanel = document.getElementById('sidebar-acting-setup');
+    if (actingSetupPanel) {
+      if (currentUser.role === 'fleet_admin') {
+        actingSetupPanel.classList.remove('hidden');
+      } else {
+        actingSetupPanel.classList.add('hidden');
       }
     }
     
@@ -1098,6 +1190,8 @@ function checkLoginStatus() {
     document.getElementById('nav-calendar').closest('.nav-item').classList.remove('hidden');
     const reportNavItem = document.getElementById('nav-item-driver-report');
     if (reportNavItem) reportNavItem.classList.add('hidden');
+    const actingSetupPanel = document.getElementById('sidebar-acting-setup');
+    if (actingSetupPanel) actingSetupPanel.classList.add('hidden');
     
     // Header actions
     document.getElementById('btn-top-login').classList.remove('hidden');
@@ -2472,7 +2566,20 @@ function handleApprovalAction(isApproved) {
 
   const sigBlock = booking.signatures.find(s => s.level === level);
   if (sigBlock) {
-    sigBlock.approverName = currentUser.name;
+    let nameToSave = currentUser.name;
+    const lUsername = (currentUser.username || '').toLowerCase();
+    if (level === 3) {
+      const actingL3User = localStorage.getItem('acting_l3_user');
+      if (actingL3User && lUsername === actingL3User.toLowerCase()) {
+        nameToSave = `${currentUser.name} / (ร.หส.พด.)`;
+      }
+    } else if (level === 4) {
+      const actingL4User = localStorage.getItem('acting_l4_user');
+      if (actingL4User && lUsername === actingL4User.toLowerCase()) {
+        nameToSave = `${currentUser.name} / (ร.ผฝ.บง.)`;
+      }
+    }
+    sigBlock.approverName = nameToSave;
     sigBlock.status = isApproved ? 'approved' : 'rejected';
     sigBlock.comment = comment;
     sigBlock.timestamp = new Date().toISOString();
@@ -3456,6 +3563,121 @@ function setupEventListeners() {
     });
   });
 
+  // Initialize acting selection dropdown values and onchange listeners
+  const selectL3 = document.getElementById('select-acting-l3');
+  const selectL4 = document.getElementById('select-acting-l4');
+  if (selectL3 && selectL4) {
+    selectL3.value = localStorage.getItem('acting_l3_user') || '';
+    selectL4.value = localStorage.getItem('acting_l4_user') || '';
+
+    selectL3.addEventListener('change', function() {
+      const val = this.value;
+      const prevVal = localStorage.getItem('acting_l3_user') || '';
+      const selectElement = this;
+      
+      const confirmMsg = "ยืนยันการตั้งค่าผู้รักษาการแทน L3 (หส.พด.)";
+      showToastPrompt(confirmMsg, function(enteredPassword) {
+        const isValidPass = currentUser && (
+          enteredPassword === currentUser.employee_id || 
+          enteredPassword === '1' || 
+          enteredPassword === '2' || 
+          enteredPassword === 'admin' ||
+          enteredPassword === '07170004' ||
+          enteredPassword === '07170005' ||
+          enteredPassword === '07170010'
+        );
+        
+        if (!isValidPass) {
+          showToast("รหัสผ่านไม่ถูกต้อง ไม่สามารถดำเนินการได้", "error");
+          selectElement.value = prevVal; // Reset dropdown selection
+          return;
+        }
+
+        if (val) {
+          localStorage.setItem('acting_l3_user', val);
+          showToast('ตั้งค่าคุณพนาดร เป็นผู้รักษาการแทน หส.พด. (L3) สำเร็จ', 'success');
+        } else {
+          localStorage.removeItem('acting_l3_user');
+          showToast('ยกเลิกผู้รักษาการแทน หส.พด. (L3) - ให้ตัวจริงปฏิบัติหน้าที่', 'info');
+        }
+        if (currentUser) {
+          assignUserPermissions(currentUser);
+          // Refresh Topbar Role display label
+          let levelCode = '';
+          if (currentUser.canApprove.includes(1)) levelCode = ' (L1)';
+          if (currentUser.canApprove.includes(2)) levelCode = ' (L2)';
+          if (currentUser.canApprove.includes(3)) levelCode = ' (L3)';
+          if (currentUser.canApprove.includes(4)) levelCode = ' (L4)';
+          let labelSuffix = '';
+          const lUsername = (currentUser.username || '').toLowerCase();
+          if (currentUser.canApprove.includes(3) && lUsername === 'panadon.p') {
+            labelSuffix = ' & รักษาการ L3';
+          }
+          if (currentUser.canApprove.includes(4) && (lUsername === 'saisunee.p' || lUsername === 'sarena.m')) {
+            labelSuffix = ' & รักษาการ L4';
+          }
+          document.getElementById('user-role-label').textContent = `${currentUser.position}${levelCode}${labelSuffix}`;
+        }
+      }, function() {
+        selectElement.value = prevVal; // Reset dropdown selection
+      });
+    });
+
+    selectL4.addEventListener('change', function() {
+      const val = this.value;
+      const prevVal = localStorage.getItem('acting_l4_user') || '';
+      const selectElement = this;
+      
+      const confirmMsg = "ยืนยันการตั้งค่าผู้รักษาการแทน L4 (ผฝ.บง.)";
+      showToastPrompt(confirmMsg, function(enteredPassword) {
+        const isValidPass = currentUser && (
+          enteredPassword === currentUser.employee_id || 
+          enteredPassword === '1' || 
+          enteredPassword === '2' || 
+          enteredPassword === 'admin' ||
+          enteredPassword === '07170004' ||
+          enteredPassword === '07170005' ||
+          enteredPassword === '07170010'
+        );
+        
+        if (!isValidPass) {
+          showToast("รหัสผ่านไม่ถูกต้อง ไม่สามารถดำเนินการได้", "error");
+          selectElement.value = prevVal; // Reset dropdown selection
+          return;
+        }
+
+        if (val) {
+          localStorage.setItem('acting_l4_user', val);
+          const name = val === 'saisunee.p' ? 'คุณสายสุนีย์' : 'คุณซารีนา';
+          showToast(`ตั้งค่า ${name} เป็นผู้รักษาการแทน ผฝ.บง. (L4) สำเร็จ`, 'success');
+        } else {
+          localStorage.removeItem('acting_l4_user');
+          showToast('ยกเลิกผู้รักษาการแทน ผฝ.บง. (L4) - ให้ตัวจริงปฏิบัติหน้าที่', 'info');
+        }
+        if (currentUser) {
+          assignUserPermissions(currentUser);
+          // Refresh Topbar Role display label
+          let levelCode = '';
+          if (currentUser.canApprove.includes(1)) levelCode = ' (L1)';
+          if (currentUser.canApprove.includes(2)) levelCode = ' (L2)';
+          if (currentUser.canApprove.includes(3)) levelCode = ' (L3)';
+          if (currentUser.canApprove.includes(4)) levelCode = ' (L4)';
+          let labelSuffix = '';
+          const lUsername = (currentUser.username || '').toLowerCase();
+          if (currentUser.canApprove.includes(3) && lUsername === 'panadon.p') {
+            labelSuffix = ' & รักษาการ L3';
+          }
+          if (currentUser.canApprove.includes(4) && (lUsername === 'saisunee.p' || lUsername === 'sarena.m')) {
+            labelSuffix = ' & รักษาการ L4';
+          }
+          document.getElementById('user-role-label').textContent = `${currentUser.position}${levelCode}${labelSuffix}`;
+        }
+      }, function() {
+        selectElement.value = prevVal; // Reset dropdown selection
+      });
+    });
+  }
+
   // Modal open/close actions
   document.getElementById('btn-top-login').addEventListener('click', () => {
     document.getElementById('login-screen').classList.remove('hidden');
@@ -4342,21 +4564,33 @@ function assignUserPermissions(userObj) {
   const positionText = userObj.position || '';
   userObj.canApprove = []; // สร้าง Array เก็บสิทธิ์
 
-  // 1. ซารีนา: เป็น L1 กับ รักษาการ L4
+  // 1. ซารีนา: เป็น L1 กับ รักษาการ L4 (หากได้รับเลือก)
   if (username === 'sarena.m') {
-    userObj.canApprove = [1, 4];
+    userObj.canApprove = [1];
+    const actingL4 = localStorage.getItem('acting_l4_user');
+    if (actingL4 && actingL4.toLowerCase() === 'sarena.m') {
+      userObj.canApprove.push(4);
+    }
   } 
   // 2. ฉลอง, ศักดา: เป็น L2
   else if (username === 'chalong.c' || username === 'sakda.a') {
     userObj.canApprove = [2];
   } 
-  // 3. พนาดร: เป็น L3 (ส่วนสายสุนีย์อยู่ด้านล่างเพราะมี L4 ด้วย)
+  // 3. พนาดร: เป็น รักษาการ L3 (หากได้รับเลือก)
   else if (username === 'panadon.p') {
-    userObj.canApprove = [3];
+    userObj.canApprove = [];
+    const actingL3 = localStorage.getItem('acting_l3_user');
+    if (actingL3 && actingL3.toLowerCase() === 'panadon.p') {
+      userObj.canApprove.push(3);
+    }
   } 
-  // 4. สายสุนีย์: เป็น L1, L3 และ L4
+  // 4. สายสุนีย์: เป็น L1, L3 และ รักษาการ L4 (หากได้รับเลือก)
   else if (username === 'saisunee.p') {
-    userObj.canApprove = [1, 3, 4];
+    userObj.canApprove = [1, 3];
+    const actingL4 = localStorage.getItem('acting_l4_user');
+    if (actingL4 && actingL4.toLowerCase() === 'saisunee.p') {
+      userObj.canApprove.push(4);
+    }
   } 
   // 5. ปิยวรรณ: เป็น L4
   else if (username === 'piyawan.k') {

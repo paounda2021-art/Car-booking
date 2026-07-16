@@ -105,6 +105,34 @@
         </li>
       </nav>
 
+      <!-- Dynamic Acting Setup Panel directly in the sidebar for L2 -->
+      <div class="sidebar-section hidden" id="sidebar-acting-setup" style="padding: 1rem 0.75rem; border-top: 1px solid var(--border-color); margin-top: 1.5rem;">
+        <div style="font-size: 0.8rem; font-weight: bold; color: var(--primary-color); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.35rem; text-transform: uppercase; letter-spacing: 0.05em;">
+          ⚙️ ตั้งค่ารักษาการแทน
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div class="form-group" style="margin: 0;">
+            <label for="select-acting-l3" style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">
+              รักษาการ L3 (หส.พด.)
+            </label>
+            <select id="select-acting-l3" class="form-control" style="width: 100%; font-size: 0.75rem; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+              <option value="">-- ตัวจริง (คุณสายสุนีย์) --</option>
+              <option value="panadon.p">คุณพนาดร</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="select-acting-l4" style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">
+              รักษาการ L4 (ผฝ.บง.)
+            </label>
+            <select id="select-acting-l4" class="form-control" style="width: 100%; font-size: 0.75rem; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+              <option value="">-- ตัวจริง (คุณปิยวรรณ) --</option>
+              <option value="saisunee.p">คุณสายสุนีย์</option>
+              <option value="sarena.m">คุณซารีนา</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
     </aside>
 
     <!-- Main Container -->
