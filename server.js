@@ -123,6 +123,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const payload = JSON.parse(body);
+        console.log("LINE: Received notify-driver-group request for booking:", payload.bookingId);
         
         // Load LINE config
         const lineConfigPath = path.join(ROOT_DIR, 'line_config.json');
@@ -336,6 +337,7 @@ const server = http.createServer((req, res) => {
             let resBody = '';
             lineRes.on('data', (d) => { resBody += d; });
             lineRes.on('end', () => {
+              console.log('LINE: Push Response Status:', lineRes.statusCode, 'Body:', resBody);
               res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
               res.end(JSON.stringify({ status: 'success', message: 'Notification sent successfully', response: resBody }));
             });
