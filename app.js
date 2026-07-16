@@ -3577,15 +3577,7 @@ function setupEventListeners() {
       
       const confirmMsg = "ยืนยันการตั้งค่าผู้รักษาการแทน L3 (หส.พด.)";
       showToastPrompt(confirmMsg, function(enteredPassword) {
-        const isValidPass = currentUser && (
-          enteredPassword === currentUser.employee_id || 
-          enteredPassword === '1' || 
-          enteredPassword === '2' || 
-          enteredPassword === 'admin' ||
-          enteredPassword === '07170004' ||
-          enteredPassword === '07170005' ||
-          enteredPassword === '07170010'
-        );
+        const isValidPass = currentUser && enteredPassword === currentUser.employee_id;
         
         if (!isValidPass) {
           showToast("รหัสผ่านไม่ถูกต้อง ไม่สามารถดำเนินการได้", "error");
@@ -3630,15 +3622,7 @@ function setupEventListeners() {
       
       const confirmMsg = "ยืนยันการตั้งค่าผู้รักษาการแทน L4 (ผฝ.บง.)";
       showToastPrompt(confirmMsg, function(enteredPassword) {
-        const isValidPass = currentUser && (
-          enteredPassword === currentUser.employee_id || 
-          enteredPassword === '1' || 
-          enteredPassword === '2' || 
-          enteredPassword === 'admin' ||
-          enteredPassword === '07170004' ||
-          enteredPassword === '07170005' ||
-          enteredPassword === '07170010'
-        );
+        const isValidPass = currentUser && enteredPassword === currentUser.employee_id;
         
         if (!isValidPass) {
           showToast("รหัสผ่านไม่ถูกต้อง ไม่สามารถดำเนินการได้", "error");
