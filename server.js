@@ -290,6 +290,28 @@ const server = http.createServer((req, res) => {
                           }
                         ],
                         margin: "md"
+                      },
+                      {
+                        type: "box",
+                        layout: "horizontal",
+                        contents: [
+                          {
+                            type: "text",
+                            text: "👨‍👩‍👦‍👦 ผู้ร่วมเดินทาง:",
+                            size: "sm",
+                            color: "#64748b",
+                            flex: 4
+                          },
+                          {
+                            type: "text",
+                            text: payload.passengers || 'ไม่มี',
+                            size: "sm",
+                            color: "#1e293b",
+                            flex: 6,
+                            wrap: true
+                          }
+                        ],
+                        margin: "md"
                       }
                     ],
                     paddingAll: "15px"

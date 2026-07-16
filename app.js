@@ -5762,7 +5762,8 @@ function triggerLineNotification(booking, carPlate) {
     destination: booking.destination || 'ไม่ระบุ',
     date: booking.dateStart || '',
     time: booking.timeStart || '',
-    passenger: booking.name || booking.requester || ''
+    passenger: booking.name || booking.requester || '',
+    passengers: booking.passengers || 'ไม่มี'
   };
 
   fetch('/api/notify-driver-group', {
