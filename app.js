@@ -1417,6 +1417,33 @@ function showView(viewName) {
   }
 }
 
+// Helper to check if a booking belongs to the current user (handles spelling and spacing robustly)
+function checkIsMyRequest(b, userObj) {
+  if (!userObj) return false;
+  const uEmail = (userObj.email || '').trim().toLowerCase();
+  const bEmail = (b.requesterEmail || '').trim().toLowerCase();
+  
+  const normalize = (n) => n ? n.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.ส\.|ว่าที่ร\.ต\.|ว่าที่ร้อยตรี|ดร\.)\s*/, '') : '';
+  const uNameNormalized = normalize(userObj.name);
+  const bNameNormalized = normalize(b.requester);
+  
+  return (bEmail && uEmail && bEmail === uEmail) || 
+         (bNameNormalized && uNameNormalized && bNameNormalized === uNameNormalized);
+}
+
+// Helper to check if a user is allowed to see all bookings in the system
+function checkCanSeeAll(userObj) {
+  if (!userObj) return false;
+  const usernameLower = (userObj.username || '').toLowerCase();
+  const isRanida = usernameLower === 'ranida.c';
+  const isNattanong = usernameLower === 'natanong.s';
+  return userObj.role === 'fleet_admin' || 
+         userObj.role === 'director' || 
+         userObj.role === 'executive' ||
+         isRanida ||
+         isNattanong;
+}
+
 // Update stats on Dashboard
 function updateStats() {
   autoGenerateMissingEmailLogs();
@@ -1498,15 +1525,8 @@ function updateStats() {
   if (tabAllHistoryBadge) {
     const historyCount = bookings.filter(b => {
       if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
-      const isMyRequest = currentUser && (
-        (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
-        b.requester === currentUser.name
-      );
-      const canSeeAll = currentUser && (
-        currentUser.role === 'fleet_admin' || 
-        currentUser.role === 'director' || 
-        currentUser.role === 'executive'
-      );
+      const isMyRequest = checkIsMyRequest(b, currentUser);
+      const canSeeAll = checkCanSeeAll(currentUser);
       return (canSeeAll || isMyRequest);
     }).length;
     tabAllHistoryBadge.textContent = historyCount;
@@ -1985,7 +2005,7 @@ function renderBookingsLists() {
   const allBookingsList = [];
 
   bookings.forEach(b => {
-    const isMyRequest = currentUser && b.requester === currentUser.name;
+    const isMyRequest = checkIsMyRequest(b, currentUser);
     
     let isPendingForMe = false;
     const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
@@ -2016,15 +2036,8 @@ function renderBookingsLists() {
       pendingBookingsList.push({ booking: b, isPendingForMe });
     }
     if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
-      const isMyRequest = currentUser && (
-        (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
-        b.requester === currentUser.name
-      );
-      const canSeeAll = currentUser && (
-        currentUser.role === 'fleet_admin' || 
-        currentUser.role === 'director' || 
-        currentUser.role === 'executive'
-      );
+      const isMyRequest = checkIsMyRequest(b, currentUser);
+      const canSeeAll = checkCanSeeAll(currentUser);
       if (canSeeAll || isMyRequest) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
