@@ -234,9 +234,10 @@ export async function onRequestPost(context) {
                 {
                   type: "button",
                   action: {
-                    type: "uri",
+                    type: "postback",
                     label: "✅ กดรับงาน",
-                    uri: `${baseOrigin}/index.html?action=accept-job&id=${payload.bookingId}`
+                    data: `action=accept-job&id=${payload.bookingId}`,
+                    displayText: "✅ กดรับงาน"
                   },
                   style: "primary",
                   color: "#10b981"

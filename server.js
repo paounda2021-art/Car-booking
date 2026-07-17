@@ -420,9 +420,10 @@ const server = http.createServer((req, res) => {
                       {
                         type: "button",
                         action: {
-                          type: "uri",
+                          type: "postback",
                           label: "✅ กดรับงาน",
-                          uri: `${baseOrigin}/index.html?action=accept-job&id=${payload.bookingId}`
+                          data: `action=accept-job&id=${payload.bookingId}`,
+                          displayText: "✅ กดรับงาน"
                         },
                         style: "primary",
                         color: "#10b981"
@@ -468,6 +469,263 @@ const server = http.createServer((req, res) => {
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ status: 'error', message: 'Invalid JSON payload' }));
+      }
+    });
+    return;
+  }
+
+  // API: line-webhook
+  if (req.method === 'POST' && urlPath === '/api/line-webhook') {
+    let chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const body = Buffer.concat(chunks).toString('utf8');
+        const payload = JSON.parse(body);
+        
+        console.log("LINE Webhook received payload:", JSON.stringify(payload));
+        
+        if (payload.events && payload.events.length > 0) {
+          const lineConfigPath = path.join(ROOT_DIR, 'line_config.json');
+          fs.readFile(lineConfigPath, 'utf8', (err, configData) => {
+            let accessToken = '';
+            if (!err) {
+              try {
+                const cfg = JSON.parse(configData);
+                accessToken = cfg.channelAccessToken || '';
+              } catch (e) {
+                console.error('Error parsing line_config.json:', e);
+              }
+            }
+            
+            const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
+            fs.readFile(bookingsFile, 'utf8', async (bErr, bData) => {
+              if (bErr) {
+                console.error("Error reading bookings.json:", bErr);
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'error', message: 'Read error' }));
+                return;
+              }
+              
+              let bookings = [];
+              try {
+                bookings = JSON.parse(bData);
+              } catch (e) {
+                console.error("Error parsing bookings.json:", e);
+              }
+              
+              let updatedAny = false;
+              
+              for (const event of payload.events) {
+                if (event.type === 'postback') {
+                  const postbackData = event.postback.data;
+                  const params = new URLSearchParams(postbackData);
+                  const action = params.get('action');
+                  const bookingId = params.get('id');
+                  
+                  console.log(`LINE Webhook: Postback received - action: ${action}, bookingId: ${bookingId}`);
+                  
+                  if (bookingId) {
+                    const booking = bookings.find(b => b.id === bookingId);
+                    if (booking) {
+                      let updated = false;
+                      if (action === 'accept-job' && !booking.driverAccepted) {
+                        booking.driverAccepted = true;
+                        updated = true;
+                      } else if (action === 'return-early' && !booking.returnedEarly) {
+                        booking.returnedEarly = true;
+                        booking.endDate = new Date().toISOString();
+                        updated = true;
+                      }
+                      
+                      if (updated) {
+                        updatedAny = true;
+                        
+                        if (accessToken) {
+                          const defaultCars = [
+                            { "id": "A", "name": "Toyota Commuter", "type": "รถตู้", "plate": "ฮษ 7446", "status": "available", "icon": "🚐", "driverName": "นายชลาดล  ทองคำ", "phone": "08-0992-3735" },
+                            { "id": "B", "name": "Toyota Commuter", "type": "รถตู้", "plate": "1 นญ 1865 (เช่า)", "status": "available", "icon": "🚐", "driverName": "นายสันติ สุธรรม", "phone": "09-1021-4916" },
+                            { "id": "C", "name": "Toyota Commuter", "type": "รถตู้", "plate": "1 นญ 2029 (เช่า)", "status": "available", "icon": "🚐", "driverName": "นายคมกฤษ คุ้มชัย", "phone": "09-4849-1122" },
+                            { "id": "D", "name": "Toyota Commuter", "type": "รถตู้", "plate": "ฮล 2521 (รถสวัสดิการ)", "status": "available", "icon": "🚐", "driverName": "", "phone": "" }
+                          ];
+                          
+                          const getCarPlateById = (carId) => {
+                            const car = defaultCars.find(c => c.id === carId);
+                            return car ? car.plate : '-';
+                          };
+                          
+                          const formatThaiDateTime = (isoString) => {
+                            if (!isoString) return '-';
+                            const date = new Date(isoString);
+                            const years = date.getFullYear() + 543;
+                            const shortYear = String(years).slice(-2);
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const hours = String(date.getHours()).padStart(2, '0');
+                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                            return `${day}/${month}/${shortYear} ${hours}.${minutes} น.`;
+                          };
+
+                          const isFinished = action === 'return-early';
+                          const headerTitle = isFinished ? "🏁 เสร็จสิ้นใบสั่งงาน (พขร. คืนรถแล้ว)" : "🟢 พขร. รับงานแล้ว";
+                          const headerColor = isFinished ? "#64748b" : "#10b981";
+                          const headerBg = isFinished ? "#f1f5f9" : "#f0fdf4";
+                          const altText = isFinished ? `🏁 เสร็จสิ้นคิวงาน พขร. - ${booking.id}` : `🟢 พขร. รับงานแล้ว - ${booking.id}`;
+                          
+                          const carPlate = getCarPlateById(booking.carId);
+                          const carInfo = booking.carId === 'taxi' ? 'รถรับจ้างสาธารณะ (TAXI)' : `รถยนต์ อสป. ทะเบียน ${carPlate}`;
+                          const dateTime = formatThaiDateTime(booking.startDate);
+                          
+                          const bodyContents = [
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                { type: "text", text: "👤 พขร. ปฏิบัติหน้าที่:", size: "sm", color: "#64748b", flex: 4 },
+                                { type: "text", text: booking.driverName || 'ไม่ระบุ', size: "sm", color: "#1e293b", weight: "bold", flex: 6, wrap: true }
+                              ]
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                { type: "text", text: "🚗 ยานพาหนะ:", size: "sm", color: "#64748b", flex: 4 },
+                                { type: "text", text: carInfo, size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                              ],
+                              margin: "md"
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                { type: "text", text: "📍 สถานที่ปลายทาง:", size: "sm", color: "#64748b", flex: 4 },
+                                { type: "text", text: booking.destination || 'ไม่ระบุ', size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                              ],
+                              margin: "md"
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                { type: "text", text: "📅 วันเวลาเดินทาง:", size: "sm", color: "#64748b", flex: 4 },
+                                { type: "text", text: dateTime, size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                              ],
+                              margin: "md"
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                { type: "text", text: "👤 ผู้ขอใช้รถ:", size: "sm", color: "#64748b", flex: 4 },
+                                { type: "text", text: booking.requester || '', size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                              ],
+                              margin: "md"
+                            },
+                            {
+                              type: "box",
+                              layout: "horizontal",
+                              contents: [
+                                { type: "text", text: "👨‍👩‍👦‍👦 ผู้ร่วมเดินทาง:", size: "sm", color: "#64748b", flex: 4 },
+                                { type: "text", text: booking.passengers || 'ไม่มี', size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                              ],
+                              margin: "md"
+                            }
+                          ];
+
+                          const flexContents = {
+                            type: "bubble",
+                            header: {
+                              type: "box",
+                              layout: "vertical",
+                              contents: [
+                                { type: "text", text: headerTitle, weight: "bold", size: "lg", color: headerColor },
+                                { type: "text", text: "ระบบจองรถยนต์สะพานปลา (FMO)", size: "xs", color: "#64748b", margin: "xs" }
+                              ],
+                              backgroundColor: headerBg,
+                              paddingAll: "15px"
+                            },
+                            body: {
+                              type: "box",
+                              layout: "vertical",
+                              contents: bodyContents
+                            }
+                          };
+
+                          if (!isFinished) {
+                            flexContents.footer = {
+                              type: "box",
+                              layout: "vertical",
+                              contents: [
+                                {
+                                  type: "button",
+                                  action: {
+                                    type: "postback",
+                                    label: "🔴 จบงาน (คืนรถ)",
+                                    data: `action=return-early&id=${booking.id}`,
+                                    displayText: "🔴 จบงาน"
+                                  },
+                                  style: "secondary",
+                                  color: "#ef4444"
+                                }
+                              ]
+                            };
+                          }
+
+                          const postData = JSON.stringify({
+                            replyToken: event.replyToken,
+                            messages: [{
+                              type: "flex",
+                              altText: altText,
+                              contents: flexContents
+                            }]
+                          });
+                          
+                          const reqOptions = {
+                            hostname: 'api.line.me',
+                            port: 443,
+                            path: '/v2/bot/message/reply',
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': 'Bearer ' + accessToken,
+                              'Content-Length': Buffer.byteLength(postData)
+                            }
+                          };
+                          
+                          const lReq = https.request(reqOptions, (lRes) => {
+                            let rBody = '';
+                            lRes.on('data', d => rBody += d);
+                            lRes.on('end', () => console.log('LINE Webhook: Reply sent. Status:', lRes.statusCode, 'Body:', rBody));
+                          });
+                          lReq.on('error', e => console.error('LINE Reply API error:', e));
+                          lReq.write(postData);
+                          lReq.end();
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              
+              if (updatedAny) {
+                fs.writeFile(bookingsFile, JSON.stringify(bookings, null, 2), 'utf8', (wErr) => {
+                  if (wErr) console.error("Error writing bookings.json:", wErr);
+                  else console.log("LINE Webhook: Database updated successfully");
+                });
+              }
+              
+              res.writeHead(200, { 'Content-Type': 'text/plain' });
+              res.end('OK');
+            });
+          });
+        } else {
+          res.writeHead(200, { 'Content-Type': 'text/plain' });
+          res.end('OK');
+        }
+      } catch (e) {
+        console.error("LINE Webhook parse error:", e);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'error', message: e.message }));
       }
     });
     return;
