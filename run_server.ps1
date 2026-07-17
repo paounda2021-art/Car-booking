@@ -82,6 +82,60 @@ try {
             continue
         }
 
+        # API: save-cars
+        if ($urlPath -eq "/api/save-cars" -and $request.HttpMethod -eq "POST") {
+            try {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $bodyText = $reader.ReadToEnd()
+                $reader.Close()
+
+                $carsFile = Join-Path $rootDir "cars.json"
+                Set-Content -Path $carsFile -Value $bodyText -Encoding UTF8
+
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Cars saved successfully"}')
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            } catch {
+                $response.StatusCode = 500
+                $response.ContentType = "application/json; charset=utf-8"
+                $errObj = @{ status = "error"; message = $_.ToString() } | ConvertTo-Json
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($errObj)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            }
+            $response.Close()
+            continue
+        }
+
+        # API: save-users
+        if ($urlPath -eq "/api/save-users" -and $request.HttpMethod -eq "POST") {
+            try {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $bodyText = $reader.ReadToEnd()
+                $reader.Close()
+
+                $usersFile = Join-Path $rootDir "users.json"
+                Set-Content -Path $usersFile -Value $bodyText -Encoding UTF8
+
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Users saved successfully"}')
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            } catch {
+                $response.StatusCode = 500
+                $response.ContentType = "application/json; charset=utf-8"
+                $errObj = @{ status = "error"; message = $_.ToString() } | ConvertTo-Json
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($errObj)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            }
+            $response.Close()
+            continue
+        }
+
         # API: send-email
         if ($urlPath -eq "/api/send-email" -and $request.HttpMethod -eq "POST") {
             try {
