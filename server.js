@@ -175,6 +175,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const body = Buffer.concat(chunks).toString('utf8');
+        const payload = JSON.parse(body);
         console.log("LINE: Received notify-driver-group request for booking:", payload.bookingId);
         const simulatedUrl = `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`;
         console.log("LINE: Simulated job acceptance link:", simulatedUrl);
