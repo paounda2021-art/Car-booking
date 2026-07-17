@@ -1,0 +1,6 @@
+[
+  { "id": "A", "name": "Toyota Commuter", "type": "รถตู้", "plate": "ฮษ 7446", "status": "available", "icon": "🚐", "driverName": "นายชลาดล  ทองคำ", "phone": "08-0992-3735" },
+  { "id": "B", "name": "Toyota Commuter", "type": "รถตู้", "plate": "1 นญ 1865 (เช่า)", "status": "available", "icon": "🚐", "driverName": "นายสันติ สุธรรม", "phone": "09-1021-4916" },
+  { "id": "C", "name": "Toyota Commuter", "type": "รถตู้", "plate": "1 นญ 2029 (เช่า)", "status": "available", "icon": "🚐", "driverName": "นายคมกฤษ คุ้มชัย", "phone": "09-4849-1122" },
+  { "id": "D", "name": "Toyota Commuter", "type": "รถตู้", "plate": "ฮล 2521 (รถสวัสดิการ)", "status": "available", "icon": "🚐", "driverName": "", "phone": "" }
+]

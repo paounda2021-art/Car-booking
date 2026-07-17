@@ -103,6 +103,12 @@
             <span class="nav-text">รายงานการใช้งาน พขร.</span>
           </a>
         </li>
+        <li class="nav-item hidden" id="nav-item-admin-settings">
+          <a href="#" class="nav-link" data-view="admin-settings" id="nav-admin-settings">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-text">ตั้งค่าระบบ & รถยนต์</span>
+          </a>
+        </li>
       </nav>
 
       <!-- Dynamic Acting Setup Panel directly in the sidebar for L2 -->
@@ -419,6 +425,39 @@
             <div class="calendar-grid-cells" id="calendar-cells-container">
               <!-- Injected dynamically via JS -->
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: Admin Settings (Manage Cars & Drivers) -->
+      <section id="view-admin-settings" class="view-section hidden no-print">
+        <div class="card" style="padding: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem;">
+            <div>
+              <h3 style="margin: 0; color: var(--text-main); font-weight: bold;">⚙️ ระบบจัดการข้อมูลยานพาหนะ</h3>
+              <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">จัดการรถยนต์ พนักงานขับรถ และสถานะซ่อมบำรุง</p>
+            </div>
+            <button class="btn btn-primary" id="btn-add-car-settings" style="display: flex; align-items: center; gap: 0.35rem; font-weight: bold;">
+              ➕ เพิ่มรถยนต์ใหม่
+            </button>
+          </div>
+
+          <div class="table-responsive-container">
+            <table class="bookings-table">
+              <thead>
+                <tr style="background: rgba(99, 102, 241, 0.05); border-bottom: 1px solid var(--border-color);">
+                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; width: 60px;">ID</th>
+                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">รุ่นรถ / ประเภท</th>
+                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">หมายเลขทะเบียน</th>
+                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">พนักงานขับรถ / เบอร์โทร</th>
+                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; text-align: center; width: 150px;">สถานะการใช้งาน</th>
+                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; text-align: right; width: 160px;">การจัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="admin-cars-list-container">
+                <!-- Injected dynamically via JS -->
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -821,8 +860,68 @@
         </div>
       </div>
 
+  <!-- MODAL 6: Add/Edit Car and Driver Form -->
+  <div class="modal-overlay" id="modal-car-editor">
+    <div class="modal-box" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 id="modal-car-editor-title">เพิ่มรถยนต์คันใหม่</h3>
+        <button class="modal-close" id="btn-close-car-editor">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-car-editor">
+          <input type="hidden" id="input-car-edit-mode" value="add">
+          <input type="hidden" id="input-car-edit-id" value="">
+          
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="input-car-name">รุ่นรถยนต์ / ยี่ห้อ</label>
+            <input type="text" id="input-car-name" class="form-control" placeholder="เช่น Toyota Commuter, Toyota Camry" required>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label for="input-car-type">ประเภทรถยนต์</label>
+              <select id="input-car-type" class="form-control" required>
+                <option value="รถตู้">🚐 รถตู้</option>
+                <option value="รถเก๋ง">🚗 รถเก๋ง</option>
+                <option value="รถกระบะ">🛻 รถกระบะ</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="input-car-plate">หมายเลขทะเบียนรถ</label>
+              <input type="text" id="input-car-plate" class="form-control" placeholder="เช่น ฮษ 7446" required>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label for="input-car-driver">พนักงานขับรถ (พขร.)</label>
+              <input type="text" id="input-car-driver" class="form-control" placeholder="ระบุชื่อ-นามสกุล">
+            </div>
+            <div class="form-group">
+              <label for="input-car-phone">เบอร์โทรศัพท์ พขร.</label>
+              <input type="text" id="input-car-phone" class="form-control" placeholder="เช่น 08-0992-3735">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label for="input-car-status">สถานะรถยนต์</label>
+            <select id="input-car-status" class="form-control" required>
+              <option value="available">🟢 ใช้งานปกติ (Available)</option>
+              <option value="maintenance">🔴 ปิดซ่อมบำรุง / ไม่พร้อมใช้งาน (Out of Service)</option>
+            </select>
+          </div>
+
+          <div class="modal-footer" style="padding: 0; display: flex; gap: 0.5rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-car-editor">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary" id="btn-submit-car-editor">💾 บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=6.6"></script>
+  <script src="app.js?v=7.0"></script>
 </body>
 </html>

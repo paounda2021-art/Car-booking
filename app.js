@@ -474,29 +474,48 @@ function getSignatureImg(level, signatureVal, approverName) {
 
 // Load initial database records from local storage and users.json
 async function initDatabase() {
-  // Load cars data
-  const existingCars = localStorage.getItem('cars_data');
-  if (existingCars) {
-    try {
-      const parsed = JSON.parse(existingCars);
-      if (parsed.length < 4 || !parsed[0].hasOwnProperty('driverName') || existingCars.includes('Camry') || existingCars.includes('กข 1234')) {
+  // Try to load cars from backend first
+  let dbCarsLoaded = false;
+  try {
+    const carsResponse = await fetch('/api/get-cars');
+    if (carsResponse.ok) {
+      const dbCars = await carsResponse.json();
+      if (dbCars && dbCars.length > 0) {
+        cars = dbCars;
+        localStorage.setItem('cars_data', JSON.stringify(cars));
+        dbCarsLoaded = true;
+        console.log("🚗 Cars database successfully loaded from server! Count:", cars.length);
+      }
+    }
+  } catch(err) {
+    console.warn("⚠️ Failed to load cars from server, falling back to local cache:", err);
+  }
+
+  if (!dbCarsLoaded) {
+    // Load cars data
+    const existingCars = localStorage.getItem('cars_data');
+    if (existingCars) {
+      try {
+        const parsed = JSON.parse(existingCars);
+        if (parsed.length < 4 || !parsed[0].hasOwnProperty('driverName') || existingCars.includes('Camry') || existingCars.includes('กข 1234')) {
+          localStorage.removeItem('cars_data');
+        }
+      } catch(e) {
         localStorage.removeItem('cars_data');
       }
-    } catch(e) {
-      localStorage.removeItem('cars_data');
     }
-  }
-  // Load default cars data if empty or contains Mojibake
-  let carsData = localStorage.getItem('cars_data');
-  if (carsData) {
-    if (carsData.includes('เธ') || carsData.includes('เฏร') || carsData.includes('เน€') || carsData.includes('à¸')) {
-      localStorage.removeItem('cars_data');
+    // Load default cars data if empty or contains Mojibake
+    let carsData = localStorage.getItem('cars_data');
+    if (carsData) {
+      if (carsData.includes('เธ') || carsData.includes('เฏร') || carsData.includes('เน€') || carsData.includes('à¸')) {
+        localStorage.removeItem('cars_data');
+      }
     }
+    if (!localStorage.getItem('cars_data')) {
+      localStorage.setItem('cars_data', JSON.stringify(DEFAULT_CARS));
+    }
+    cars = JSON.parse(localStorage.getItem('cars_data'));
   }
-  if (!localStorage.getItem('cars_data')) {
-    localStorage.setItem('cars_data', JSON.stringify(DEFAULT_CARS));
-  }
-  cars = JSON.parse(localStorage.getItem('cars_data'));
 
   // Load users from users.json
   try {
@@ -807,6 +826,23 @@ async function saveBookings() {
   }
 }
 
+// Function to save cars to localStorage and server API
+async function saveCars() {
+  localStorage.setItem('cars_data', JSON.stringify(cars));
+  try {
+    await fetch('/api/save-cars', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(cars)
+    });
+    console.log("☁️ Cars database successfully saved to server!");
+  } catch (error) {
+    console.error("Failed to save cars to server API:", error);
+  }
+}
+
 // ==========================================
 // 2. ฟังก์ชันโหลดข้อมูล (ดึงจากเครื่องเพียวๆ 100%)
 // ==========================================
@@ -1030,6 +1066,18 @@ function loginUser(userObj) {
     }
   }
 
+  // แสดงเมนูตั้งค่าระบบเฉพาะ L2 หรือ คุณรณิดา
+  const navItemAdminSettings = document.getElementById('nav-item-admin-settings');
+  if (navItemAdminSettings) {
+    const isFleetAdmin = currentUser.canApprove && currentUser.canApprove.includes(2);
+    const isRanida = usernameLower === 'ranida.c';
+    if (isFleetAdmin || isRanida) {
+      navItemAdminSettings.classList.remove('hidden');
+    } else {
+      navItemAdminSettings.classList.add('hidden');
+    }
+  }
+
   // 9. รันฟังก์ชันคำนวณสถิติและโหลดตารางหน้าจอต่างๆ
   populateCarsDropdown();
   updateStats();
@@ -1228,7 +1276,7 @@ function populateCarsDropdown() {
 }
 
 // Navigation / View management
-const views = ['dashboard', 'bookings', 'calendar', 'report', 'driver-report'];
+const views = ['dashboard', 'bookings', 'calendar', 'report', 'driver-report', 'admin-settings'];
 function showView(viewName) {
   // Protect dashboard view from unauthorized roles and guests
   if (!currentUser && viewName === 'dashboard') {
@@ -1246,7 +1294,7 @@ function showView(viewName) {
   });
 
   // Nav menu class toggling
-  const navItems = ['dashboard', 'bookings', 'calendar', 'driver-report'];
+  const navItems = ['dashboard', 'bookings', 'calendar', 'driver-report', 'admin-settings'];
   navItems.forEach(n => {
     const link = document.getElementById(`nav-${n}`);
     if (link) {
@@ -1254,6 +1302,10 @@ function showView(viewName) {
       else link.classList.remove('active');
     }
   });
+
+  if (viewName === 'admin-settings') {
+    renderAdminSettings();
+  }
 
   // Update top bar text based on active view
   const title = document.getElementById('view-title');
@@ -1270,6 +1322,9 @@ function showView(viewName) {
   } else if (viewName === 'driver-report') {
     title.textContent = 'รายงานการปฏิบัติงาน พขร.';
     subtitle.textContent = 'ตรวจสอบสถิติ สรุปผลงาน และสั่งพิมพ์รายงานการใช้รถของ พขร. รายวัน/สัปดาห์/เดือน';
+  } else if (viewName === 'admin-settings') {
+    title.textContent = 'ตั้งค่าระบบ & รถยนต์';
+    subtitle.textContent = 'จัดการรายชื่อรถยนต์ ทะเบียนรถ พนักงานขับรถ และการปิดซ่อมบำรุงยานพาหนะ';
   }
 
   // 🚨 Re-render active views on navigation to ensure latest database state
@@ -5981,3 +6036,163 @@ function triggerLineCancellation(booking, reason) {
     console.error('Failed to send LINE cancellation:', err);
   });
 }
+
+// Render Admin settings car management table
+function renderAdminSettings() {
+  const container = document.getElementById('admin-cars-list-container');
+  if (!container) return;
+
+  if (cars.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+          ไม่พบข้อมูลรถยนต์ในระบบ
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  container.innerHTML = cars.map(c => {
+    const statusText = c.status === 'available' 
+      ? '<span class="badge success">🟢 ใช้งานปกติ</span>' 
+      : '<span class="badge danger">🔴 ปิดซ่อมบำรุง</span>';
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border-color);">
+        <td style="padding: 0.85rem 1rem; font-weight: bold; color: var(--text-main); font-family: monospace;">${c.id}</td>
+        <td style="padding: 0.85rem 1rem; color: var(--text-main); font-weight: 500;">${c.icon || '🚗'} ${c.name}</td>
+        <td style="padding: 0.85rem 1rem; color: var(--text-main); font-weight: bold;">${c.plate}</td>
+        <td style="padding: 0.85rem 1rem; color: var(--text-main); font-size: 0.85rem;">
+          <strong>${c.driverName || 'ไม่ระบุ พขร.'}</strong>
+          ${c.phone ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">📞 ${c.phone}</span>` : ''}
+        </td>
+        <td style="padding: 0.85rem 1rem; text-align: center;">${statusText}</td>
+        <td style="padding: 0.85rem 1rem; text-align: right;">
+          <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
+            <button class="btn btn-secondary btn-sm" onclick="openEditCar('${c.id}')" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">✏️ แก้ไข</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCar('${c.id}')" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-color: rgba(220,38,38,0.2); color: var(--danger);">❌ ลบ</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Open Car Editor Modal in Add mode
+document.getElementById('btn-add-car-settings')?.addEventListener('click', () => {
+  document.getElementById('modal-car-editor-title').textContent = 'เพิ่มรถยนต์คันใหม่';
+  document.getElementById('input-car-edit-mode').value = 'add';
+  document.getElementById('input-car-edit-id').value = '';
+  document.getElementById('form-car-editor').reset();
+  document.getElementById('modal-car-editor').classList.add('active');
+});
+
+// Close Car Editor Modal
+const closeCarEditorModal = () => {
+  document.getElementById('modal-car-editor').classList.remove('active');
+};
+document.getElementById('btn-close-car-editor')?.addEventListener('click', closeCarEditorModal);
+document.getElementById('btn-cancel-car-editor')?.addEventListener('click', closeCarEditorModal);
+
+// Global wrapper functions for onclick in HTML template
+window.openEditCar = function(carId) {
+  const car = cars.find(c => c.id === carId);
+  if (!car) return;
+
+  document.getElementById('modal-car-editor-title').textContent = `แก้ไขข้อมูลยานพาหนะ (ID: ${car.id})`;
+  document.getElementById('input-car-edit-mode').value = 'edit';
+  document.getElementById('input-car-edit-id').value = car.id;
+  
+  document.getElementById('input-car-name').value = car.name || '';
+  document.getElementById('input-car-type').value = car.type || 'รถตู้';
+  document.getElementById('input-car-plate').value = car.plate || '';
+  document.getElementById('input-car-driver').value = car.driverName || '';
+  document.getElementById('input-car-phone').value = car.phone || '';
+  document.getElementById('input-car-status').value = car.status || 'available';
+
+  document.getElementById('modal-car-editor').classList.add('active');
+};
+
+window.deleteCar = function(carId) {
+  const index = cars.findIndex(c => c.id === carId);
+  if (index === -1) return;
+
+  const ok = confirm(`⚠️ คุณแน่ใจที่จะลบข้อมูลรถทะเบียน "${cars[index].plate}" ใช่หรือไม่?\n\n(การลบรถยนต์จะไม่มีผลกระทบต่อรายการจองเก่าที่เลือกคันนี้ไว้แล้ว)`);
+  if (!ok) return;
+
+  cars.splice(index, 1);
+  saveCars();
+  showToast("ลบข้อมูลรถยนต์เรียบร้อยแล้ว", "success");
+  renderAdminSettings();
+  populateCarsDropdown();
+  updateStats();
+  renderDashboard();
+};
+
+// Form Car Editor Submission
+document.getElementById('form-car-editor')?.addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const mode = document.getElementById('input-car-edit-mode').value;
+  const editId = document.getElementById('input-car-edit-id').value;
+  
+  const name = document.getElementById('input-car-name').value.trim();
+  const type = document.getElementById('input-car-type').value;
+  const plate = document.getElementById('input-car-plate').value.trim();
+  const driverName = document.getElementById('input-car-driver').value.trim();
+  const phone = document.getElementById('input-car-phone').value.trim();
+  const status = document.getElementById('input-car-status').value;
+
+  // Map icon based on type
+  let icon = '🚗';
+  if (type === 'รถตู้') icon = '🚐';
+  else if (type === 'รถกระบะ') icon = '🛻';
+
+  if (mode === 'add') {
+    // Generate new unique ID (A, B, C... Z, then AA, BB...)
+    let nextIdCode = 65; // 'A'
+    let generatedId = String.fromCharCode(nextIdCode);
+    while (cars.some(c => c.id === generatedId)) {
+      nextIdCode++;
+      if (nextIdCode > 90) {
+        generatedId = 'CAR_' + (cars.length + 1);
+        break;
+      }
+      generatedId = String.fromCharCode(nextIdCode);
+    }
+
+    const newCar = {
+      id: generatedId,
+      name,
+      type,
+      plate,
+      status,
+      icon,
+      driverName,
+      phone
+    };
+
+    cars.push(newCar);
+    showToast(`เพิ่มรถยนต์ทะเบียน "${plate}" สำเร็จ`, "success");
+  } else {
+    const car = cars.find(c => c.id === editId);
+    if (car) {
+      car.name = name;
+      car.type = type;
+      car.plate = plate;
+      car.status = status;
+      car.icon = icon;
+      car.driverName = driverName;
+      car.phone = phone;
+      showToast(`แก้ไขข้อมูลรถยนต์ทะเบียน "${plate}" สำเร็จ`, "success");
+    }
+  }
+
+  saveCars();
+  closeCarEditorModal();
+  renderAdminSettings();
+  populateCarsDropdown();
+  updateStats();
+  renderDashboard();
+});

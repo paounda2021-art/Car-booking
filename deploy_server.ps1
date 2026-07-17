@@ -10,10 +10,20 @@ $bookingsFile = Join-Path $rootDir "bookings.json"
 try {
     $data = Invoke-RestMethod -Uri "https://car-booking-5l7.pages.dev/api/get-bookings" -ErrorAction Stop
     $data | ConvertTo-Json -Depth 10 | Out-File -FilePath $bookingsFile -Encoding utf8
-    Write-Host "Database successfully synced from Cloudflare."
+    Write-Host "Bookings database successfully synced from Cloudflare."
 } catch {
-    Write-Warning "Cannot resolve or connect to Cloudflare: $_"
+    Write-Warning "Cannot resolve or connect to Cloudflare for bookings: $_"
     Write-Warning "Safe Mode: Keeping the existing bookings.json database file intact."
+}
+
+$carsFile = Join-Path $rootDir "cars.json"
+try {
+    $data = Invoke-RestMethod -Uri "https://car-booking-5l7.pages.dev/api/get-cars" -ErrorAction Stop
+    $data | ConvertTo-Json -Depth 10 | Out-File -FilePath $carsFile -Encoding utf8
+    Write-Host "Cars database successfully synced from Cloudflare."
+} catch {
+    Write-Warning "Cannot resolve or connect to Cloudflare for cars: $_"
+    Write-Warning "Safe Mode: Keeping the existing cars.json database file intact."
 }
 
 # 2. Copy to deploy directory if it exists
@@ -21,6 +31,9 @@ $deployDir = "D:\deploy_latest"
 if (Test-Path $deployDir) {
     if (Test-Path $bookingsFile) {
         Copy-Item -Path $bookingsFile -Destination (Join-Path $deployDir "bookings.json") -Force
+    }
+    if (Test-Path $carsFile) {
+        Copy-Item -Path $carsFile -Destination (Join-Path $deployDir "cars.json") -Force
     }
     Copy-Item -Path (Join-Path $rootDir "app.js"), (Join-Path $rootDir "index.html"), (Join-Path $rootDir "style.css"), (Join-Path $rootDir "server.js"), (Join-Path $rootDir "line_config.json") -Destination $deployDir -Force
     Write-Host "Copied updated files to deploy folder."
