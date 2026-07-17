@@ -1434,14 +1434,9 @@ function checkIsMyRequest(b, userObj) {
 // Helper to check if a user is allowed to see all bookings in the system
 function checkCanSeeAll(userObj) {
   if (!userObj) return false;
-  const usernameLower = (userObj.username || '').toLowerCase();
-  const isRanida = usernameLower === 'ranida.c';
-  const isNattanong = usernameLower === 'natanong.s';
   return userObj.role === 'fleet_admin' || 
          userObj.role === 'director' || 
-         userObj.role === 'executive' ||
-         isRanida ||
-         isNattanong;
+         userObj.role === 'executive';
 }
 
 // Helper to check if a supervisor is the manager or approver for a subordinate's booking
