@@ -835,7 +835,7 @@ function hasBookingConflict(carId, startDateStr, endDateStr, excludeId = null) {
   const end = new Date(endDateStr);
   
   return bookings.some(b => {
-    if (b.id === excludeId || b.status === 'rejected' || b.travelType !== 'fmo_car' || b.carId !== carId) return false;
+    if (b.id === excludeId || b.status === 'rejected' || b.status === 'cancelled' || b.travelType !== 'fmo_car' || b.carId !== carId) return false;
     const bStart = new Date(b.startDate);
     const bEnd = new Date(b.endDate);
     return (start < bEnd && end > bStart);
@@ -2008,7 +2008,7 @@ function renderMonthCalendar() {
     // Render event badges inside date cell
     const dateStr = cell.date.toDateString();
     const cellBkg = bookings.filter(b => {
-      if (b.status === 'rejected') return false;
+      if (b.status === 'rejected' || b.status === 'cancelled') return false;
       
       // Calendar filter implementation
       if (calFilterCar !== 'all') {
@@ -2155,6 +2155,8 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
 function openApprovalModal(bookingId) {
   const booking = bookings.find(b => b.id === bookingId);
   if (!booking) return;
+
+  activeBookingIdForApproval = booking.id;
 
   const modal = document.getElementById('modal-approval');
   if (!modal) return;
