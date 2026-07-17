@@ -2667,7 +2667,47 @@ span.flatpickr-weekday {
   background: #f3f4f6 !important;
 }
 
+@media (max-width: 768px) {
+  /* Admin Settings Responsive Layout */
+  .settings-tab-content > div:first-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
+  }
+  
+  .settings-tab-content > div:first-child > div {
+    text-align: center !important;
+  }
 
+  .settings-tab-content button.btn-primary {
+    width: 100% !important;
+    justify-content: center !important;
+  }
 
+  /* Filters & Controls */
+  #tab-users > div[style*="display: flex"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
 
+  #input-search-users {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
 
+  #select-users-limit {
+    width: 100% !important;
+  }
+  
+  /* Tabs bar scrolling on mobile if tab buttons overflow */
+  .settings-tabs-bar {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    padding-bottom: 0.25rem !important;
+    display: flex !important;
+  }
+  
+  .settings-tabs-bar .tab-btn {
+    flex-shrink: 0 !important;
+  }
+}
