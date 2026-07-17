@@ -1598,7 +1598,8 @@ function helperCreateTableRow(b, isPendingForMe) {
   let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
   if (b.status === 'cancelled') {
     statusClass = 'danger';
-    statusText = '🚫 ยกเลิกใบเสนอขอ';
+    const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
+    statusText = `🚫 ยกเลิกโดย: ${byL}`;
   } else if (b.status === 'cancellation_requested') {
     statusClass = 'warning';
     statusText = '⏳ ร้องขอยกเลิก';
@@ -1749,7 +1750,8 @@ function renderBookingsLists() {
     let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
     if (b.status === 'cancelled') {
       statusClass = 'danger';
-      statusText = '🚫 ยกเลิกใบเสนอขอ';
+      const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
+      statusText = `🚫 ยกเลิกโดย: ${byL}`;
     } else if (b.status === 'cancellation_requested') {
       statusClass = 'warning';
       statusText = '⏳ ร้องขอยกเลิก';
@@ -4101,6 +4103,7 @@ function setupEventListeners() {
 
       booking.status = 'cancelled';
       booking.cancelReason = 'ผู้ใช้ถอนคำขอ';
+      booking.cancelledBy = isFleetAdmin ? 'L2' : 'L0';
       saveBookings();
       showToast("ถอนคำขอและยกเลิกใบจองเรียบร้อยแล้ว", "success");
       document.getElementById('modal-approval').classList.remove('active');
@@ -4133,6 +4136,7 @@ function setupEventListeners() {
 
         booking.status = 'cancelled';
         booking.cancelReason = reason || 'ผู้จัดรถยกเลิกงาน';
+        booking.cancelledBy = 'L2';
         saveBookings();
         showToast("ยกเลิกใบขอจองรถยนต์เรียบร้อยแล้ว", "success");
         document.getElementById('modal-approval').classList.remove('active');
@@ -4150,6 +4154,7 @@ function setupEventListeners() {
         if (!ok) return;
 
         booking.status = 'cancelled';
+        booking.cancelledBy = 'L2';
         saveBookings();
         showToast("อนุมัติยกเลิกใบขอจองเรียบร้อยแล้ว", "success");
         document.getElementById('modal-approval').classList.remove('active');
@@ -5687,7 +5692,8 @@ window.performExportToCSV = function(list, startVal, endVal) {
     
     let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
     if (b.status === 'cancelled') {
-      statusText = 'ยกเลิกใบเสนอขอ';
+      const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
+      statusText = `ยกเลิกโดย: ${byL}`;
     } else if (b.status === 'cancellation_requested') {
       statusText = 'ร้องขอยกเลิก';
     } else if (b.waitingForRequesterInput) {
