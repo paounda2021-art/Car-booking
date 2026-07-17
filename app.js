@@ -6233,23 +6233,92 @@ async function saveUsers() {
   }
 }
 
+// State variables for user pagination and search
+let usersSearchQuery = '';
+let usersDisplayLimit = '20';
+let usersCurrentPage = 1;
+
 // Render Admin settings users table
 function renderAdminUsers() {
   const container = document.getElementById('admin-users-list-container');
   if (!container) return;
 
-  if (usersList.length === 0) {
+  const query = usersSearchQuery.toLowerCase().trim();
+  const filtered = usersList.filter(u => {
+    return (u.employee_id || '').toLowerCase().includes(query) ||
+           (u.name || '').toLowerCase().includes(query) ||
+           (u.username || '').toLowerCase().includes(query) ||
+           (u.position || '').toLowerCase().includes(query) ||
+           (u.department1 || '').toLowerCase().includes(query) ||
+           (u.department2 || '').toLowerCase().includes(query);
+  });
+
+  if (filtered.length === 0) {
     container.innerHTML = `
       <tr>
         <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-          ไม่พบข้อมูลผู้ใช้งานในระบบ
+          ไม่พบข้อมูลผู้ใช้งานที่ค้นหา
         </td>
       </tr>
     `;
+    const paginationContainer = document.getElementById('admin-users-pagination');
+    if (paginationContainer) paginationContainer.style.display = 'none';
     return;
   }
 
-  container.innerHTML = usersList.map(u => {
+  // Handle Pagination
+  const totalItems = filtered.length;
+  let displayed = [...filtered];
+  
+  const paginationContainer = document.getElementById('admin-users-pagination');
+  const paginationInfo = document.getElementById('admin-users-pagination-info');
+  
+  if (usersDisplayLimit === 'all') {
+    if (paginationContainer) paginationContainer.style.display = 'none';
+  } else {
+    if (paginationContainer) paginationContainer.style.display = 'flex';
+    const limit = parseInt(usersDisplayLimit) || 20;
+    const totalPages = Math.ceil(totalItems / limit) || 1;
+    
+    if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
+    if (usersCurrentPage < 1) usersCurrentPage = 1;
+    
+    const startIndex = (usersCurrentPage - 1) * limit;
+    const endIndex = Math.min(startIndex + limit, totalItems);
+    displayed = filtered.slice(startIndex, endIndex);
+    
+    if (paginationInfo) {
+      paginationInfo.textContent = `แสดง ${startIndex + 1} ถึง ${endIndex} จากทั้งหมด ${totalItems} คน`;
+    }
+    
+    const btnPrev = document.getElementById('btn-users-prev');
+    const btnNext = document.getElementById('btn-users-next');
+    
+    if (btnPrev) btnPrev.disabled = usersCurrentPage === 1;
+    if (btnNext) btnNext.disabled = usersCurrentPage === totalPages;
+  }
+
+  container.innerHTML = displayed.map(u => {
+    // Generate role text showing assigned approval levels
+    let approvalsHtml = '';
+    if (u.customApprovalLevels && u.customApprovalLevels.length > 0) {
+      const badges = u.customApprovalLevels.map(lvl => {
+        let badgeColor = '#6366f1';
+        if (lvl === 1) badgeColor = '#10b981';
+        if (lvl === 2) badgeColor = '#3b82f6';
+        if (lvl === 3) badgeColor = '#f59e0b';
+        if (lvl === 4) badgeColor = '#ef4444';
+        return `<span style="display:inline-block; font-size: 0.7rem; color: #fff; background: ${badgeColor}; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: bold; margin-right: 0.15rem;">L${lvl}</span>`;
+      }).join('');
+      approvalsHtml = `<div style="margin-top: 0.25rem;">${badges}</div>`;
+    } else {
+      // Default roles text
+      const defaultRole = u.role === 'supervisor' 
+        ? '<span style="font-size: 0.75rem; color: #d97706;">L1 (ตามตำแหน่ง)</span>'
+        : '<span style="font-size: 0.75rem; color: #6b7280;">L0 (ทั่วไป)</span>';
+      approvalsHtml = `<div style="margin-top: 0.25rem;">${defaultRole}</div>`;
+    }
+
     const roleText = u.role === 'supervisor' 
       ? '<span class="badge warning" style="color: #d97706; background: rgba(217,119,6,0.1);">✍️ Supervisor</span>' 
       : '<span class="badge info" style="color: #2563eb; background: rgba(37,99,235,0.1);">👤 User (L0)</span>';
@@ -6267,8 +6336,9 @@ function renderAdminUsers() {
           <span style="font-size: 0.75rem; color: var(--text-muted);">${u.department1 || '-'} / ${u.department2 || '-'}</span>
         </td>
         <td style="padding: 0.85rem 1rem;">
-          ${roleText}<br>
-          <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">หัวหน้า: ${u.manager_email || '-'}</span>
+          ${roleText}
+          ${approvalsHtml}
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace; display: block; margin-top: 0.25rem;">หัวหน้า: ${u.manager_email || '-'}</span>
         </td>
         <td style="padding: 0.85rem 1rem; text-align: right;">
           <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
@@ -6280,6 +6350,44 @@ function renderAdminUsers() {
     `;
   }).join('');
 }
+
+// Bind search and limit events
+document.getElementById('input-search-users')?.addEventListener('input', function() {
+  usersSearchQuery = this.value;
+  usersCurrentPage = 1;
+  renderAdminUsers();
+});
+
+document.getElementById('select-users-limit')?.addEventListener('change', function() {
+  usersDisplayLimit = this.value;
+  usersCurrentPage = 1;
+  renderAdminUsers();
+});
+
+document.getElementById('btn-users-prev')?.addEventListener('click', function() {
+  if (usersCurrentPage > 1) {
+    usersCurrentPage--;
+    renderAdminUsers();
+  }
+});
+
+document.getElementById('btn-users-next')?.addEventListener('click', function() {
+  const query = usersSearchQuery.toLowerCase().trim();
+  const filtered = usersList.filter(u => {
+    return (u.employee_id || '').toLowerCase().includes(query) ||
+           (u.name || '').toLowerCase().includes(query) ||
+           (u.username || '').toLowerCase().includes(query) ||
+           (u.position || '').toLowerCase().includes(query) ||
+           (u.department1 || '').toLowerCase().includes(query) ||
+           (u.department2 || '').toLowerCase().includes(query);
+  });
+  const limit = parseInt(usersDisplayLimit) || 20;
+  const totalPages = Math.ceil(filtered.length / limit) || 1;
+  if (usersCurrentPage < totalPages) {
+    usersCurrentPage++;
+    renderAdminUsers();
+  }
+});
 
 // Settings tab switching logic
 document.querySelectorAll('.settings-tabs-bar .tab-btn').forEach(btn => {
@@ -6309,6 +6417,13 @@ document.getElementById('btn-add-user-settings')?.addEventListener('click', () =
   
   // Make inputs editable
   document.getElementById('input-user-username').readOnly = false;
+
+  // Reset checkboxes
+  document.getElementById('check-user-l1').checked = false;
+  document.getElementById('check-user-l2').checked = false;
+  document.getElementById('check-user-l3').checked = false;
+  document.getElementById('check-user-l4').checked = false;
+
   document.getElementById('modal-user-editor').classList.add('active');
 });
 
@@ -6340,6 +6455,19 @@ window.openEditUser = function(usernameVal) {
   document.getElementById('input-user-dept2').value = userObj.department2 || '';
   document.getElementById('input-user-role').value = userObj.role || 'user';
   document.getElementById('input-user-manager').value = userObj.manager_email || '';
+
+  // Load custom approval levels into checkboxes
+  document.getElementById('check-user-l1').checked = false;
+  document.getElementById('check-user-l2').checked = false;
+  document.getElementById('check-user-l3').checked = false;
+  document.getElementById('check-user-l4').checked = false;
+  
+  if (userObj.customApprovalLevels && Array.isArray(userObj.customApprovalLevels)) {
+    userObj.customApprovalLevels.forEach(lvl => {
+      const chk = document.getElementById(`check-user-l${lvl}`);
+      if (chk) chk.checked = true;
+    });
+  }
 
   document.getElementById('modal-user-editor').classList.add('active');
 };
@@ -6381,6 +6509,13 @@ document.getElementById('form-user-editor')?.addEventListener('submit', function
   const role = document.getElementById('input-user-role').value;
   const manager_email = document.getElementById('input-user-manager').value.trim();
 
+  // Collect checked custom approval levels
+  const customApprovalLevels = [];
+  if (document.getElementById('check-user-l1').checked) customApprovalLevels.push(1);
+  if (document.getElementById('check-user-l2').checked) customApprovalLevels.push(2);
+  if (document.getElementById('check-user-l3').checked) customApprovalLevels.push(3);
+  if (document.getElementById('check-user-l4').checked) customApprovalLevels.push(4);
+
   if (mode === 'add') {
     if (usersList.some(u => u.username.toLowerCase() === username.toLowerCase())) {
       showToast(`มีชื่อผู้ใช้งาน "${username}" อยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น`, "error");
@@ -6400,6 +6535,10 @@ document.getElementById('form-user-editor')?.addEventListener('submit', function
       sign: ""
     };
 
+    if (customApprovalLevels.length > 0) {
+      newUser.customApprovalLevels = customApprovalLevels;
+    }
+
     usersList.push(newUser);
     showToast(`เพิ่มพนักงาน "${name}" สำเร็จ`, "success");
   } else {
@@ -6413,6 +6552,12 @@ document.getElementById('form-user-editor')?.addEventListener('submit', function
       userObj.department2 = department2;
       userObj.role = role;
       userObj.manager_email = manager_email;
+      
+      if (customApprovalLevels.length > 0) {
+        userObj.customApprovalLevels = customApprovalLevels;
+      } else {
+        delete userObj.customApprovalLevels;
+      }
       showToast(`แก้ไขข้อมูลพนักงาน "${name}" สำเร็จ`, "success");
     }
   }

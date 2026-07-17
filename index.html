@@ -486,6 +486,16 @@
               </button>
             </div>
 
+            <!-- Filters & Controls for Users -->
+            <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap;">
+              <input type="text" id="input-search-users" class="form-control" placeholder="🔍 ค้นหารหัสพนักงาน, ชื่อ, หรือฝ่ายงาน..." style="max-width: 320px; font-size: 0.85rem; padding: 0.45rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+              
+              <select id="select-users-limit" class="form-control" style="width: 160px; font-size: 0.85rem; padding: 0.45rem 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+                <option value="20">แสดง 20 รายการ</option>
+                <option value="all">แสดงทั้งหมด (All)</option>
+              </select>
+            </div>
+
             <div class="table-responsive-container">
               <table class="bookings-table">
                 <thead>
@@ -502,6 +512,15 @@
                   <!-- Injected dynamically via JS -->
                 </tbody>
               </table>
+            </div>
+
+            <!-- Pagination for Users -->
+            <div id="admin-users-pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
+              <span id="admin-users-pagination-info" style="font-size: 0.85rem; color: var(--text-muted);">แสดง 1 ถึง 20 จากทั้งหมด 0 คน</span>
+              <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary btn-sm" id="btn-users-prev" style="padding: 0.35rem 0.75rem; font-weight: bold;">← ย้อนกลับ</button>
+                <button class="btn btn-secondary btn-sm" id="btn-users-next" style="padding: 0.35rem 0.75rem; font-weight: bold;">ถัดไป →</button>
+              </div>
             </div>
           </div>
 
@@ -1027,6 +1046,25 @@
               <label for="input-user-manager">อีเมลหัวหน้าผู้อนุมัติ (L1)</label>
               <input type="email" id="input-user-manager" class="form-control" placeholder="เช่น supervisor@fishmarket.co.th">
             </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.5rem; border: 1px dashed var(--border-color); padding: 0.75rem; border-radius: 8px; background: rgba(99, 102, 241, 0.02);">
+            <label style="font-weight: bold; color: var(--primary-color); display: block; margin-bottom: 0.5rem;">⚙️ สิทธิ์และระดับการอนุมัติ (Approval Permissions)</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.85rem;">
+              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+                <input type="checkbox" id="check-user-l1" value="1"> L1 - หัวหน้างาน (Supervisor)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+                <input type="checkbox" id="check-user-l2" value="2"> L2 - งานยานพาหนะ (Fleet Admin)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+                <input type="checkbox" id="check-user-l3" value="3"> L3 - หน.พัสดุ (Director)
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+                <input type="checkbox" id="check-user-l4" value="4"> L4 - ผู้บริหาร (Executive)
+              </label>
+            </div>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.75rem; color: var(--text-muted); font-style: italic;">* หากเลือกสิทธิ์ด้านบน จะเป็นการข้ามเงื่อนไขตำแหน่งเดิมในระบบเพื่อใช้สิทธิ์ชุดนี้โดยตรง</p>
           </div>
 
           <div class="modal-footer" style="padding: 0; display: flex; gap: 0.5rem; justify-content: flex-end;">
