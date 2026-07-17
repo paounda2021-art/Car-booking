@@ -44,9 +44,10 @@ const server = http.createServer((req, res) => {
 
   // API: save-bookings
   if (urlPath === '/api/save-bookings' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
+    let chunks = [];
+    req.on('data', chunk => { chunks.push(chunk); });
     req.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8');
       const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
       fs.writeFile(bookingsFile, body, 'utf8', err => {
         if (err) {
@@ -63,9 +64,10 @@ const server = http.createServer((req, res) => {
 
   // API: send-email
   if (urlPath === '/api/send-email' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
+    let chunks = [];
+    req.on('data', chunk => { chunks.push(chunk); });
     req.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8');
       // Escape single quotes for PowerShell
       const escapedBody = body.replace(/'/g, "''");
       const escapedRootDir = ROOT_DIR.replace(/\\/g, '\\\\');
@@ -118,10 +120,11 @@ const server = http.createServer((req, res) => {
 
   // API: notify-driver-group
   if (urlPath === '/api/notify-driver-group' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
+    let chunks = [];
+    req.on('data', chunk => { chunks.push(chunk); });
     req.on('end', () => {
       try {
+        const body = Buffer.concat(chunks).toString('utf8');
         const payload = JSON.parse(body);
         console.log("LINE: Received notify-driver-group request for booking:", payload.bookingId);
         
