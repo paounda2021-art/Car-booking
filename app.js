@@ -1503,7 +1503,6 @@ function updateStats() {
         b.requester === currentUser.name
       );
       const canSeeAll = currentUser && (
-        currentUser.role === 'supervisor' ||
         currentUser.role === 'fleet_admin' || 
         currentUser.role === 'director' || 
         currentUser.role === 'executive'
