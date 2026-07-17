@@ -1021,12 +1021,12 @@ function loginUser(userObj) {
   document.getElementById('header-user-profile').classList.remove('hidden');
   
   // แสดงปุ่มปิดระบบชั่วคราวเฉพาะ ranida.c
-  const btnDeactivate = document.getElementById('btn-deactivate-system');
-  if (btnDeactivate) {
+  const sidebarDeactivateContainer = document.getElementById('sidebar-deactivate-container');
+  if (sidebarDeactivateContainer) {
     if (usernameLower === 'ranida.c') {
-      btnDeactivate.classList.remove('hidden');
+      sidebarDeactivateContainer.classList.remove('hidden');
     } else {
-      btnDeactivate.classList.add('hidden');
+      sidebarDeactivateContainer.classList.add('hidden');
     }
   }
 

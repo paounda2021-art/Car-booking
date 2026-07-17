@@ -133,6 +133,13 @@
         </div>
       </div>
 
+      <!-- Sidebar Footer containing deactivation button for Ranida -->
+      <div class="sidebar-footer hidden" id="sidebar-deactivate-container" style="padding: 1rem 0.75rem; width: 100%; border-top: 1px solid var(--border-color); margin-top: auto;">
+        <button class="btn btn-secondary btn-sm" id="btn-deactivate-system" style="width: 100%; color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); font-weight: bold; font-size: 0.8rem; padding: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+          🔒 ปิดใช้งานระบบชั่วคราว
+        </button>
+      </div>
+
     </aside>
 
     <!-- Main Container -->
@@ -162,9 +169,6 @@
               <span class="user-role-badge" id="user-role-label">ตำแหน่ง</span>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm hidden" id="btn-deactivate-system" style="width: 100%; color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); font-weight: bold; margin-bottom: 0.25rem;">
-            🔒 ปิดใช้งานระบบชั่วคราว
-          </button>
           <button class="btn btn-secondary btn-sm" id="btn-logout" style="width: 100%; color: var(--danger); border-color: rgba(220, 38, 38, 0.2);">
             🚪 ออกจากระบบ
           </button>
@@ -819,6 +823,6 @@
 
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=6.5"></script>
+  <script src="app.js?v=6.6"></script>
 </body>
 </html>
