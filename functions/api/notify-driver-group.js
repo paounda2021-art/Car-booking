@@ -20,6 +20,8 @@ export async function onRequestPost(context) {
       });
     }
 
+    const baseOrigin = (payload.origin && payload.origin.startsWith('https://')) ? payload.origin : 'https://car-booking.fishmarket.co.th';
+
     const isCancel = payload.type === 'cancel';
     const headerTitle = isCancel ? "⚠️ แจ้งยกเลิกใบสั่งงาน พขร." : "📋 ใบสั่งงานพนักงานขับรถ";
     const headerColor = isCancel ? "#dc2626" : "#1e3a8a";
@@ -234,7 +236,7 @@ export async function onRequestPost(context) {
                   action: {
                     type: "uri",
                     label: "✅ กดรับงาน",
-                    uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`
+                    uri: `${baseOrigin}/index.html?action=accept-job&id=${payload.bookingId}`
                   },
                   style: "primary",
                   color: "#10b981"

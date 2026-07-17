@@ -180,6 +180,8 @@ const server = http.createServer((req, res) => {
         const simulatedUrl = `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`;
         console.log("LINE: Simulated job acceptance link:", simulatedUrl);
         
+        const baseOrigin = (payload.origin && payload.origin.startsWith('https://')) ? payload.origin : 'https://car-booking.fishmarket.co.th';
+        
         // Load LINE config
         const lineConfigPath = path.join(ROOT_DIR, 'line_config.json');
         fs.readFile(lineConfigPath, 'utf8', (err, configData) => {
@@ -420,7 +422,7 @@ const server = http.createServer((req, res) => {
                         action: {
                           type: "uri",
                           label: "✅ กดรับงาน",
-                          uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`
+                          uri: `${baseOrigin}/index.html?action=accept-job&id=${payload.bookingId}`
                         },
                         style: "primary",
                         color: "#10b981"
