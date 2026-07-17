@@ -2662,7 +2662,7 @@ function openApprovalModal(bookingId) {
     const isRequester = currentUser && (booking.requester === currentUser.name || booking.username === currentUser.username);
     const isDriver = currentUser && booking.driverName && currentUser.name && booking.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
     
-    if (isActive && (isL2 || isRequester || isDriver)) {
+    if ((isActive && (isRequester || isDriver)) || (booking.status === 'approved' && isL2)) {
       returnEarlyPanel.style.display = 'block';
       const btnReturnEarly = document.getElementById('btn-modal-return-early');
       if (btnReturnEarly) {
