@@ -2614,8 +2614,18 @@ function openApprovalModal(bookingId) {
   const driverAcceptPanel = document.getElementById('driver-accept-action-panel');
   if (driverAcceptPanel) {
     const isDriver = currentUser && booking.driverName && currentUser.name && booking.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
-    if (booking.status === 'approved' && isDriver && !booking.driverAccepted) {
+    const isL2OrAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || currentUser.role === 'supervisor');
+    
+    if (booking.status === 'approved' && (isDriver || isL2OrAdmin) && !booking.driverAccepted) {
       driverAcceptPanel.style.display = 'block';
+      const descEl = driverAcceptPanel.querySelector('p');
+      if (descEl) {
+        if (isDriver) {
+          descEl.textContent = 'ท่านได้รับการจัดสรรให้ปฏิบัติหน้าที่เป็นพนักงานขับรถสำหรับใบจองคิวงานนี้ กรุณากดปุ่มยืนยันเพื่อรับงานและบันทึกข้อมูลเข้าระบบ';
+        } else {
+          descEl.textContent = '💡 (สำหรับแอดมิน/ผู้จัดรถ): ท่านสามารถกดปุ่มสีเขียวด้านล่างนี้เพื่อ "จำลองการกดยืนยันรับงานแทน พขร." ในระบบจำลองได้ทันที';
+        }
+      }
       const btnAccept = document.getElementById('btn-modal-accept-job');
       if (btnAccept) {
         btnAccept.onclick = () => {
