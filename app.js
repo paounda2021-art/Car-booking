@@ -1304,6 +1304,26 @@ function showView(viewName) {
   });
 
   if (viewName === 'admin-settings') {
+    // Control tabs visibility based on user
+    const btnTabUsers = document.getElementById('btn-tab-users-settings');
+    const isRanida = currentUser && (currentUser.username || '').toLowerCase() === 'ranida.c';
+    if (btnTabUsers) {
+      if (isRanida) {
+        btnTabUsers.style.display = 'block';
+      } else {
+        btnTabUsers.style.display = 'none';
+        
+        // Force default tab to tab-cars for L2 (non-Ranida)
+        document.querySelectorAll('.settings-tabs-bar .tab-btn').forEach(b => {
+          if (b.getAttribute('data-settings-tab') === 'tab-cars') b.classList.add('active');
+          else b.classList.remove('active');
+        });
+        document.querySelectorAll('.settings-tab-content').forEach(c => {
+          if (c.id === 'tab-cars') c.classList.remove('hidden');
+          else c.classList.add('hidden');
+        });
+      }
+    }
     renderAdminSettings();
   }
 
@@ -6195,4 +6215,209 @@ document.getElementById('form-car-editor')?.addEventListener('submit', function(
   populateCarsDropdown();
   updateStats();
   renderDashboard();
+});
+
+// Function to save users back to backend API
+async function saveUsers() {
+  try {
+    await fetch('/api/save-users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8'
+      },
+      body: JSON.stringify(usersList)
+    });
+    console.log("☁️ Users list successfully saved to server!");
+  } catch (error) {
+    console.error("Failed to save users list to server:", error);
+  }
+}
+
+// Render Admin settings users table
+function renderAdminUsers() {
+  const container = document.getElementById('admin-users-list-container');
+  if (!container) return;
+
+  if (usersList.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+          ไม่พบข้อมูลผู้ใช้งานในระบบ
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  container.innerHTML = usersList.map(u => {
+    const roleText = u.role === 'supervisor' 
+      ? '<span class="badge warning" style="color: #d97706; background: rgba(217,119,6,0.1);">✍️ Supervisor</span>' 
+      : '<span class="badge info" style="color: #2563eb; background: rgba(37,99,235,0.1);">👤 User (L0)</span>';
+
+    return `
+      <tr style="border-bottom: 1px solid var(--border-color); font-size: 0.85rem;">
+        <td style="padding: 0.85rem 1rem; font-family: monospace; font-weight: bold; color: var(--text-main);">${u.employee_id || '-'}</td>
+        <td style="padding: 0.85rem 1rem; font-weight: 500; color: var(--text-main);">${u.name}</td>
+        <td style="padding: 0.85rem 1rem; color: var(--text-main);">
+          <strong>${u.username}</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">${u.email || '-'}</span>
+        </td>
+        <td style="padding: 0.85rem 1rem; color: var(--text-main);">
+          <strong>${u.position || '-'}</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">${u.department1 || '-'} / ${u.department2 || '-'}</span>
+        </td>
+        <td style="padding: 0.85rem 1rem;">
+          ${roleText}<br>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace;">หัวหน้า: ${u.manager_email || '-'}</span>
+        </td>
+        <td style="padding: 0.85rem 1rem; text-align: right;">
+          <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
+            <button class="btn btn-secondary btn-sm" onclick="openEditUser('${u.username}')" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">✏️ แก้ไข</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.username}')" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-color: rgba(220,38,38,0.2); color: var(--danger);">❌ ลบ</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Settings tab switching logic
+document.querySelectorAll('.settings-tabs-bar .tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.settings-tabs-bar .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-content').forEach(c => c.classList.add('hidden'));
+
+    this.classList.add('active');
+    const targetTab = this.getAttribute('data-settings-tab');
+    const tabEl = document.getElementById(targetTab);
+    if (tabEl) tabEl.classList.remove('hidden');
+
+    if (targetTab === 'tab-users') {
+      renderAdminUsers();
+    } else {
+      renderAdminSettings();
+    }
+  });
+});
+
+// Open User Editor in Add Mode
+document.getElementById('btn-add-user-settings')?.addEventListener('click', () => {
+  document.getElementById('modal-user-editor-title').textContent = 'เพิ่มบัญชีผู้ใช้งานใหม่';
+  document.getElementById('input-user-edit-mode').value = 'add';
+  document.getElementById('input-user-edit-username-orig').value = '';
+  document.getElementById('form-user-editor').reset();
+  
+  // Make inputs editable
+  document.getElementById('input-user-username').readOnly = false;
+  document.getElementById('modal-user-editor').classList.add('active');
+});
+
+// Close User Editor Modal
+const closeUserEditorModal = () => {
+  document.getElementById('modal-user-editor').classList.remove('active');
+};
+document.getElementById('btn-close-user-editor')?.addEventListener('click', closeUserEditorModal);
+document.getElementById('btn-cancel-user-editor')?.addEventListener('click', closeUserEditorModal);
+
+// Edit User Action
+window.openEditUser = function(usernameVal) {
+  const userObj = usersList.find(u => u.username === usernameVal);
+  if (!userObj) return;
+
+  document.getElementById('modal-user-editor-title').textContent = `แก้ไขข้อมูลพนักงาน (Username: ${userObj.username})`;
+  document.getElementById('input-user-edit-mode').value = 'edit';
+  document.getElementById('input-user-edit-username-orig').value = userObj.username;
+
+  document.getElementById('input-user-empid').value = userObj.employee_id || '';
+  document.getElementById('input-user-username').value = userObj.username || '';
+  document.getElementById('input-user-username').readOnly = true; // Cannot edit username to prevent mapping breaks
+  
+  document.getElementById('input-user-name').value = userObj.name || '';
+  document.getElementById('input-user-email').value = userObj.email || '';
+  document.getElementById('input-user-position').value = userObj.position || '';
+  
+  document.getElementById('input-user-dept1').value = userObj.department1 || '';
+  document.getElementById('input-user-dept2').value = userObj.department2 || '';
+  document.getElementById('input-user-role').value = userObj.role || 'user';
+  document.getElementById('input-user-manager').value = userObj.manager_email || '';
+
+  document.getElementById('modal-user-editor').classList.add('active');
+};
+
+// Delete User Action
+window.deleteUser = function(usernameVal) {
+  const index = usersList.findIndex(u => u.username === usernameVal);
+  if (index === -1) return;
+
+  const userObj = usersList[index];
+  if ((userObj.username || '').toLowerCase() === 'ranida.c') {
+    showToast("ขออภัย ระบบไม่อนุญาตให้ลบบัญชีของคุณ รณิดา ได้ครับ", "error");
+    return;
+  }
+
+  const ok = confirm(`⚠️ คุณแน่ใจที่จะลบผู้ใช้งาน "${userObj.name}"ออกจากระบบใช่หรือไม่?\n\n(การดำเนินการนี้จะมีผลต่อการยืนยันตัวตนเข้าระบบของพนักงานคนนี้ทันที)`);
+  if (!ok) return;
+
+  usersList.splice(index, 1);
+  saveUsers();
+  showToast("ลบข้อมูลผู้ใช้งานเรียบร้อยแล้ว", "success");
+  renderAdminUsers();
+};
+
+// Form User Editor Submission
+document.getElementById('form-user-editor')?.addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  const mode = document.getElementById('input-user-edit-mode').value;
+  const origUsername = document.getElementById('input-user-edit-username-orig').value;
+
+  const employee_id = document.getElementById('input-user-empid').value.trim();
+  const username = document.getElementById('input-user-username').value.trim();
+  const name = document.getElementById('input-user-name').value.trim();
+  const email = document.getElementById('input-user-email').value.trim();
+  const position = document.getElementById('input-user-position').value.trim();
+  const department1 = document.getElementById('input-user-dept1').value.trim();
+  const department2 = document.getElementById('input-user-dept2').value.trim();
+  const role = document.getElementById('input-user-role').value;
+  const manager_email = document.getElementById('input-user-manager').value.trim();
+
+  if (mode === 'add') {
+    if (usersList.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+      showToast(`มีชื่อผู้ใช้งาน "${username}" อยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น`, "error");
+      return;
+    }
+
+    const newUser = {
+      employee_id,
+      username,
+      email,
+      name,
+      position,
+      department1,
+      department2,
+      role,
+      manager_email,
+      sign: ""
+    };
+
+    usersList.push(newUser);
+    showToast(`เพิ่มพนักงาน "${name}" สำเร็จ`, "success");
+  } else {
+    const userObj = usersList.find(u => u.username === origUsername);
+    if (userObj) {
+      userObj.employee_id = employee_id;
+      userObj.name = name;
+      userObj.email = email;
+      userObj.position = position;
+      userObj.department1 = department1;
+      userObj.department2 = department2;
+      userObj.role = role;
+      userObj.manager_email = manager_email;
+      showToast(`แก้ไขข้อมูลพนักงาน "${name}" สำเร็จ`, "success");
+    }
+  }
+
+  saveUsers();
+  closeUserEditorModal();
+  renderAdminUsers();
 });

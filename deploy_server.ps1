@@ -35,7 +35,7 @@ if (Test-Path $deployDir) {
     if (Test-Path $carsFile) {
         Copy-Item -Path $carsFile -Destination (Join-Path $deployDir "cars.json") -Force
     }
-    Copy-Item -Path (Join-Path $rootDir "app.js"), (Join-Path $rootDir "index.html"), (Join-Path $rootDir "style.css"), (Join-Path $rootDir "server.js"), (Join-Path $rootDir "line_config.json") -Destination $deployDir -Force
+    Copy-Item -Path (Join-Path $rootDir "app.js"), (Join-Path $rootDir "index.html"), (Join-Path $rootDir "style.css"), (Join-Path $rootDir "server.js"), (Join-Path $rootDir "line_config.json"), (Join-Path $rootDir "users.json") -Destination $deployDir -Force
     Write-Host "Copied updated files to deploy folder."
 }
 

@@ -92,6 +92,26 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // API: save-users
+  if (urlPath === '/api/save-users' && req.method === 'POST') {
+    let chunks = [];
+    req.on('data', chunk => { chunks.push(chunk); });
+    req.on('end', () => {
+      const body = Buffer.concat(chunks).toString('utf8');
+      const usersFile = path.join(ROOT_DIR, 'users.json');
+      fs.writeFile(usersFile, body, 'utf8', err => {
+        if (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ status: 'error', message: err.message }));
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ status: 'success', message: 'Users saved successfully' }));
+        }
+      });
+    });
+    return;
+  }
+
   // API: send-email
   if (urlPath === '/api/send-email' && req.method === 'POST') {
     let chunks = [];

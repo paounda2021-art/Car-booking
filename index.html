@@ -432,33 +432,79 @@
       <!-- VIEW 5: Admin Settings (Manage Cars & Drivers) -->
       <section id="view-admin-settings" class="view-section hidden no-print">
         <div class="card" style="padding: 1.5rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem;">
-            <div>
-              <h3 style="margin: 0; color: var(--text-main); font-weight: bold;">⚙️ ระบบจัดการข้อมูลยานพาหนะ</h3>
-              <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">จัดการรถยนต์ พนักงานขับรถ และสถานะซ่อมบำรุง</p>
-            </div>
-            <button class="btn btn-primary" id="btn-add-car-settings" style="display: flex; align-items: center; gap: 0.35rem; font-weight: bold;">
-              ➕ เพิ่มรถยนต์ใหม่
-            </button>
+          <div style="border-bottom: 2px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+            <h3 style="margin: 0; color: var(--text-main); font-weight: bold;">⚙️ ระบบตั้งค่าและการจัดการข้อมูลระบบ</h3>
+            <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">จัดการรายชื่อยานพาหนะ พนักงานขับรถ และบัญชีสิทธิ์พนักงานองค์การสะพานปลา</p>
           </div>
 
-          <div class="table-responsive-container">
-            <table class="bookings-table">
-              <thead>
-                <tr style="background: rgba(99, 102, 241, 0.05); border-bottom: 1px solid var(--border-color);">
-                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; width: 60px;">ID</th>
-                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">รุ่นรถ / ประเภท</th>
-                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">หมายเลขทะเบียน</th>
-                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">พนักงานขับรถ / เบอร์โทร</th>
-                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; text-align: center; width: 150px;">สถานะการใช้งาน</th>
-                  <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; text-align: right; width: 160px;">การจัดการ</th>
-                </tr>
-              </thead>
-              <tbody id="admin-cars-list-container">
-                <!-- Injected dynamically via JS -->
-              </tbody>
-            </table>
+          <!-- Settings Tab Headers -->
+          <div class="settings-tabs-bar" style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+            <button class="tab-btn active" data-settings-tab="tab-cars" style="padding: 0.5rem 1rem; font-weight: 600; border-radius: 6px; border: none; background: transparent; cursor: pointer; transition: all 0.2s;">🚗 จัดการยานพาหนะ</button>
+            <button class="tab-btn" id="btn-tab-users-settings" data-settings-tab="tab-users" style="padding: 0.5rem 1rem; font-weight: 600; border-radius: 6px; border: none; background: transparent; cursor: pointer; transition: all 0.2s;">👥 จัดการผู้ใช้งาน</button>
           </div>
+
+          <!-- Tab 1: Vehicles Management -->
+          <div id="tab-cars" class="settings-tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+              <div>
+                <h4 style="margin: 0; color: var(--text-main); font-weight: bold;">🚗 ระบบจัดการข้อมูลยานพาหนะ</h4>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">จัดการรถยนต์ พนักงานขับรถ และสถานะซ่อมบำรุง</p>
+              </div>
+              <button class="btn btn-primary" id="btn-add-car-settings" style="display: flex; align-items: center; gap: 0.35rem; font-weight: bold;">
+                ➕ เพิ่มรถยนต์ใหม่
+              </button>
+            </div>
+
+            <div class="table-responsive-container">
+              <table class="bookings-table">
+                <thead>
+                  <tr style="background: rgba(99, 102, 241, 0.05); border-bottom: 1px solid var(--border-color);">
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; width: 60px;">ID</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">รุ่นรถ / ประเภท</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">หมายเลขทะเบียน</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">พนักงานขับรถ / เบอร์โทร</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; text-align: center; width: 150px;">สถานะการใช้งาน</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; text-align: right; width: 160px;">การจัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-cars-list-container">
+                  <!-- Injected dynamically via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab 2: Users Management -->
+          <div id="tab-users" class="settings-tab-content hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+              <div>
+                <h4 style="margin: 0; color: var(--text-main); font-weight: bold;">👥 ระบบจัดการบัญชีผู้ใช้งาน</h4>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">เพิ่ม ลบ แก้ไขแผนก ตำแหน่ง และสิทธิ์ผู้อนุมัติพนักงาน</p>
+              </div>
+              <button class="btn btn-primary" id="btn-add-user-settings" style="display: flex; align-items: center; gap: 0.35rem; font-weight: bold;">
+                ➕ เพิ่มผู้ใช้งานใหม่
+              </button>
+            </div>
+
+            <div class="table-responsive-container">
+              <table class="bookings-table">
+                <thead>
+                  <tr style="background: rgba(99, 102, 241, 0.05); border-bottom: 1px solid var(--border-color);">
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; width: 100px;">รหัสพนักงาน</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">ชื่อ-นามสกุล</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">ชื่อผู้ใช้ / อีเมล</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">ตำแหน่ง / สังกัด</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem;">บทบาท / หัวหน้า</th>
+                    <th style="padding: 0.85rem 1rem; font-weight: 600; color: var(--text-main); font-size: 0.8rem; text-align: right; width: 160px;">การจัดการ</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-list-container">
+                  <!-- Injected dynamically via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -920,8 +966,80 @@
     </div>
   </div>
 
+  <!-- MODAL 7: Add/Edit User Account Form -->
+  <div class="modal-overlay" id="modal-user-editor">
+    <div class="modal-box" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 id="modal-user-editor-title">เพิ่มผู้ใช้งานใหม่</h3>
+        <button class="modal-close" id="btn-close-user-editor">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-user-editor">
+          <input type="hidden" id="input-user-edit-mode" value="add">
+          <input type="hidden" id="input-user-edit-username-orig" value="">
+          
+          <div class="form-row" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label for="input-user-empid">รหัสพนักงาน (Password เข้าสู่ระบบ)</label>
+              <input type="text" id="input-user-empid" class="form-control" placeholder="เช่น 07170028" required>
+            </div>
+            <div class="form-group">
+              <label for="input-user-username">ชื่อผู้ใช้ (Username)</label>
+              <input type="text" id="input-user-username" class="form-control" placeholder="เช่น panchit.p" required>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="input-user-name">ชื่อ-นามสกุลจริง</label>
+            <input type="text" id="input-user-name" class="form-control" placeholder="เช่น นายสมชาย รักดี" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="input-user-email">อีเมลหน่วยงาน</label>
+            <input type="email" id="input-user-email" class="form-control" placeholder="เช่น somchai.r@fishmarket.co.th" required>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label for="input-user-position">ตำแหน่งการทำงาน</label>
+            <input type="text" id="input-user-position" class="form-control" placeholder="เช่น พนักงานบริหารงานทั่วไป" required>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label for="input-user-dept1">ฝ่ายงานหลัก (department1)</label>
+              <input type="text" id="input-user-dept1" class="form-control" placeholder="เช่น ฝบง., ฝคบ., สยพ." required>
+            </div>
+            <div class="form-group">
+              <label for="input-user-dept2">สำนัก/ส่วน (department2)</label>
+              <input type="text" id="input-user-dept2" class="form-control" placeholder="เช่น สพด., สกง., สพบ." required>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-bottom: 1.25rem;">
+            <div class="form-group">
+              <label for="input-user-role">ประเภทบัญชีผู้ใช้</label>
+              <select id="input-user-role" class="form-control" required>
+                <option value="user">👤 ผู้ใช้เสนอขอทั่วไป (User)</option>
+                <option value="supervisor">✍️ หัวหน้างาน/ผู้อนุมัติ (Supervisor)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="input-user-manager">อีเมลหัวหน้าผู้อนุมัติ (L1)</label>
+              <input type="email" id="input-user-manager" class="form-control" placeholder="เช่น supervisor@fishmarket.co.th">
+            </div>
+          </div>
+
+          <div class="modal-footer" style="padding: 0; display: flex; gap: 0.5rem; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-user-editor">ยกเลิก</button>
+            <button type="submit" class="btn btn-primary" id="btn-submit-user-editor">💾 บันทึกข้อมูลพนักงาน</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=7.0"></script>
+  <script src="app.js?v=7.1"></script>
 </body>
 </html>
