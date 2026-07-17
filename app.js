@@ -402,6 +402,63 @@ function showToastPrompt(message, onConfirm, onCancel) {
   setTimeout(() => input.focus(), 100);
 }
 
+// Premium Toast Confirmation Dialog returning Promise
+function showToastConfirm(message) {
+  return new Promise((resolve) => {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast-message warning`; // warning style
+    toast.style.flexDirection = 'column';
+    toast.style.gap = '10px';
+    toast.style.pointerEvents = 'auto';
+
+    const iconHtml = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" style="width: 18px; height: 18px; color: var(--warning-color);"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.008v.008H12v-.008z" /></svg>`;
+
+    toast.innerHTML = `
+      <div style="display: flex; gap: 10px; align-items: center; width: 100%;">
+        ${iconHtml}
+        <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-main); line-height: 1.4; text-align: left;">${message.replace(/\n/g, '<br>')}</div>
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end; width: 100%; margin-top: 4px;">
+        <button class="btn btn-secondary btn-sm" id="btn-confirm-cancel" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-color); background: white;">ยกเลิก</button>
+        <button class="btn btn-warning btn-sm" id="btn-confirm-ok" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold; background: #ef4444; color: white; border: 1px solid #ef4444;">ยืนยัน</button>
+      </div>
+    `;
+
+    container.appendChild(toast);
+
+    // Trigger Slide In
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+    const closeToast = (result) => {
+      toast.classList.remove('show');
+      toast.classList.add('hide');
+      setTimeout(() => {
+        if (toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+        resolve(result);
+      }, 400);
+    };
+
+    toast.querySelector('#btn-confirm-cancel').addEventListener('click', () => {
+      closeToast(false);
+    });
+
+    toast.querySelector('#btn-confirm-ok').addEventListener('click', () => {
+      closeToast(true);
+    });
+  });
+}
+
 // Signature pad instances
 let requesterSig = null;
 let approverSig = null;
@@ -1066,12 +1123,13 @@ function loginUser(userObj) {
     }
   }
 
-  // แสดงเมนูตั้งค่าระบบเฉพาะ L2 หรือ คุณรณิดา
+  // แสดงเมนูตั้งค่าระบบเฉพาะ L2, คุณรณิดา หรือ คุณณัฐอนงค์
   const navItemAdminSettings = document.getElementById('nav-item-admin-settings');
   if (navItemAdminSettings) {
     const isFleetAdmin = currentUser.canApprove && currentUser.canApprove.includes(2);
     const isRanida = usernameLower === 'ranida.c';
-    if (isFleetAdmin || isRanida) {
+    const isNattanong = usernameLower === 'natanong.s';
+    if (isFleetAdmin || isRanida || isNattanong) {
       navItemAdminSettings.classList.remove('hidden');
     } else {
       navItemAdminSettings.classList.add('hidden');
@@ -1164,7 +1222,7 @@ if (logoutBtn) {
 
 async function clearDatabase() {
   // 1. แจ้งเตือนยืนยันให้ชัดเจน
-  if (confirm("⚠️ อันตราย: คุณกำลังจะล้าง 'ข้อมูลการจองทั้งหมด' และ 'ประวัติอีเมลจำลอง' ออกจากระบบ!\n\nการกระทำนี้จะส่งผลกับผู้ใช้งานทุกคน และไม่สามารถกู้คืนข้อมูลกลับมาได้\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?")) {
+  if (await showToastConfirm("⚠️ อันตราย: คุณกำลังจะล้าง 'ข้อมูลการจองทั้งหมด' และ 'ประวัติอีเมลจำลอง' ออกจากระบบ!\n\nการกระทำนี้จะส่งผลกับผู้ใช้งานทุกคน และไม่สามารถกู้คืนข้อมูลกลับมาได้\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?")) {
     
     // 2. ล้างตัวแปรและข้อมูลใน LocalStorage ฝั่งหน้าเว็บ
     bookings = [];
@@ -1307,8 +1365,9 @@ function showView(viewName) {
     // Control tabs visibility based on user
     const btnTabUsers = document.getElementById('btn-tab-users-settings');
     const isRanida = currentUser && (currentUser.username || '').toLowerCase() === 'ranida.c';
+    const isNattanong = currentUser && (currentUser.username || '').toLowerCase() === 'natanong.s';
     if (btnTabUsers) {
-      if (isRanida) {
+      if (isRanida || isNattanong) {
         btnTabUsers.style.display = 'block';
       } else {
         btnTabUsers.style.display = 'none';
@@ -4164,7 +4223,7 @@ function setupEventListeners() {
   document.getElementById('btn-approve-request').addEventListener('click', () => handleApprovalAction(true));
   document.getElementById('btn-reject-request').addEventListener('click', () => handleApprovalAction(false));
 
-  document.getElementById('btn-confirm-cancel-booking').addEventListener('click', () => {
+  document.getElementById('btn-confirm-cancel-booking').addEventListener('click', async () => {
     if (!activeBookingIdForApproval) return;
     const booking = bookings.find(b => b.id === activeBookingIdForApproval);
     if (!booking) return;
@@ -4175,7 +4234,7 @@ function setupEventListeners() {
 
     if (booking.status.startsWith('pending') || booking.status === 'pending') {
       // Pre-approval stage: Direct cancellation
-      const ok = confirm("คุณต้องการถอนคำขอและยกเลิกใบขอจองรถยนต์นี้ใช่หรือไม่?");
+      const ok = await showToastConfirm("คุณต้องการถอนคำขอและยกเลิกใบขอจองรถยนต์นี้ใช่หรือไม่?");
       if (!ok) return;
 
       booking.status = 'cancelled';
@@ -4195,7 +4254,7 @@ function setupEventListeners() {
           showToast("กรุณาระบุเหตุผลที่ขอร้องเรียนยกเลิกใบขอจองรถยนต์", "warning");
           return;
         }
-        const ok = confirm("ยืนยันส่งคำขอร้องเรียนยกเลิกใบเสนอขออนุญาตนี้?");
+        const ok = await showToastConfirm("ยืนยันส่งคำขอร้องเรียนยกเลิกใบเสนอขออนุญาตนี้?");
         if (!ok) return;
 
         booking.status = 'cancellation_requested';
@@ -4208,7 +4267,7 @@ function setupEventListeners() {
         renderBookingsLists();
         renderMonthCalendar();
       } else if (isFleetAdmin) {
-        const ok = confirm("⚠️ คุณแน่ใจที่จะลบและยกเลิกคิวงาน พขร. นี้ใช่หรือไม่?\n\n(ระบบจะส่งข้อความแจ้งยกเลิกเข้ากลุ่ม LINE ทันที)");
+        const ok = await showToastConfirm("⚠️ คุณแน่ใจที่จะลบและยกเลิกคิวงาน พขร. นี้ใช่หรือไม่?\n\n(ระบบจะส่งข้อความแจ้งยกเลิกเข้ากลุ่ม LINE ทันที)");
         if (!ok) return;
 
         booking.status = 'cancelled';
@@ -4227,7 +4286,7 @@ function setupEventListeners() {
       }
     } else if (booking.status === 'cancellation_requested') {
       if (isFleetAdmin) {
-        const ok = confirm("⚠️ อนุมัติการร้องขอยกเลิกและสั่งยกเลิกคิวงาน พขร. นี้ใช่หรือไม่?\n\n(ระบบจะส่งข้อความแจ้งยกเลิกเข้ากลุ่ม LINE ทันที)");
+        const ok = await showToastConfirm("⚠️ อนุมัติการร้องขอยกเลิกและสั่งยกเลิกคิวงาน พขร. นี้ใช่หรือไม่?\n\n(ระบบจะส่งข้อความแจ้งยกเลิกเข้ากลุ่ม LINE ทันที)");
         if (!ok) return;
 
         booking.status = 'cancelled';
@@ -5974,9 +6033,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Hook up deactivation button for ranida.c
   const btnDeactivate = document.getElementById('btn-deactivate-system');
   if (btnDeactivate) {
-    btnDeactivate.addEventListener('click', (e) => {
+    btnDeactivate.addEventListener('click', async (e) => {
       e.preventDefault();
-      const confirmLock = confirm("⚠️ คุณต้องการปิดใช้งานระบบชั่วคราวใช่หรือไม่?\n\nเมื่อปิดใช้งานแล้ว ระบบจะกลับเข้าสู่โหมดปรับปรุงและแสดงข้อความแจ้งเตือนต่อผู้ใช้งานทั่วไปทันที");
+      const confirmLock = await showToastConfirm("⚠️ คุณต้องการปิดใช้งานระบบชั่วคราวใช่หรือไม่?\n\nเมื่อปิดใช้งานแล้ว ระบบจะกลับเข้าสู่โหมดปรับปรุงและแสดงข้อความแจ้งเตือนต่อผู้ใช้งานทั่วไปทันที");
       if (confirmLock) {
         deactivateSystemGlobally();
       }
@@ -6134,11 +6193,11 @@ window.openEditCar = function(carId) {
   document.getElementById('modal-car-editor').classList.add('active');
 };
 
-window.deleteCar = function(carId) {
+window.deleteCar = async function(carId) {
   const index = cars.findIndex(c => c.id === carId);
   if (index === -1) return;
 
-  const ok = confirm(`⚠️ คุณแน่ใจที่จะลบข้อมูลรถทะเบียน "${cars[index].plate}" ใช่หรือไม่?\n\n(การลบรถยนต์จะไม่มีผลกระทบต่อรายการจองเก่าที่เลือกคันนี้ไว้แล้ว)`);
+  const ok = await showToastConfirm(`⚠️ คุณแน่ใจที่จะลบข้อมูลรถทะเบียน "${cars[index].plate}" ใช่หรือไม่?\n\n(การลบรถยนต์จะไม่มีผลกระทบต่อรายการจองเก่าที่เลือกคันนี้ไว้แล้ว)`);
   if (!ok) return;
 
   cars.splice(index, 1);
@@ -6473,17 +6532,18 @@ window.openEditUser = function(usernameVal) {
 };
 
 // Delete User Action
-window.deleteUser = function(usernameVal) {
+window.deleteUser = async function(usernameVal) {
   const index = usersList.findIndex(u => u.username === usernameVal);
   if (index === -1) return;
 
   const userObj = usersList[index];
-  if ((userObj.username || '').toLowerCase() === 'ranida.c') {
-    showToast("ขออภัย ระบบไม่อนุญาตให้ลบบัญชีของคุณ รณิดา ได้ครับ", "error");
+  const userLower = (userObj.username || '').toLowerCase();
+  if (userLower === 'ranida.c' || userLower === 'natanong.s') {
+    showToast("ขออภัย ระบบไม่อนุญาตให้ลบบัญชีผู้ดูแลระบบได้ครับ", "error");
     return;
   }
 
-  const ok = confirm(`⚠️ คุณแน่ใจที่จะลบผู้ใช้งาน "${userObj.name}"ออกจากระบบใช่หรือไม่?\n\n(การดำเนินการนี้จะมีผลต่อการยืนยันตัวตนเข้าระบบของพนักงานคนนี้ทันที)`);
+  const ok = await showToastConfirm(`⚠️ คุณแน่ใจที่จะลบผู้ใช้งาน "${userObj.name}" ออกจากระบบใช่หรือไม่?\n\n(การดำเนินการนี้จะมีผลต่อการยืนยันตัวตนเข้าระบบของพนักงานคนนี้ทันที)`);
   if (!ok) return;
 
   usersList.splice(index, 1);
