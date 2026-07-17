@@ -1363,12 +1363,13 @@ function updateStats() {
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
   if (tabAllHistoryBadge) {
     const historyCount = bookings.filter(b => {
-      if (b.status !== 'approved' && b.status !== 'rejected') return false;
+      if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
       const isMyRequest = currentUser && (
         (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
         b.requester === currentUser.name
       );
       const canSeeAll = currentUser && (
+        currentUser.role === 'supervisor' ||
         currentUser.role === 'fleet_admin' || 
         currentUser.role === 'director' || 
         currentUser.role === 'executive'
@@ -1874,6 +1875,7 @@ function renderBookingsLists() {
         b.requester === currentUser.name
       );
       const canSeeAll = currentUser && (
+        currentUser.role === 'supervisor' ||
         currentUser.role === 'fleet_admin' || 
         currentUser.role === 'director' || 
         currentUser.role === 'executive'
