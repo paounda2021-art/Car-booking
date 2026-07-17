@@ -1449,7 +1449,7 @@ function checkIsManagerOrApprover(b, userObj) {
   if (!userObj) return false;
   
   const uEmail = (userObj.email || '').trim().toLowerCase();
-  const mEmail = (b.managerEmail || '').trim().toLowerCase();
+  const mEmail = resolveManagerEmail(b).toLowerCase();
   if (uEmail && mEmail && uEmail === mEmail) return true;
   
   if (b.signatures) {
