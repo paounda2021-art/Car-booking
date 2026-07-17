@@ -165,6 +165,8 @@ try {
                 $reader.Close()
 
                 $payload = ConvertFrom-Json $bodyText
+                $origin = if ($payload.origin) { $payload.origin } else { "http://localhost:8080" }
+                Write-Host "LINE: Simulated job acceptance link: $origin/index.html?action=accept-job&id=$($payload.bookingId)"
                 
                 $lineConfigPath = Join-Path $rootDir "line_config.json"
                 if (Test-Path $lineConfigPath) {
