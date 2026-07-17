@@ -576,7 +576,7 @@ async function initDatabase() {
 
   // Load users from users.json
   try {
-    const response = await fetch('users.json?v=2.9');
+    const response = await fetch('users.json?t=' + Date.now());
     usersList = await response.json();
   } catch (error) {
     console.error("Error loading users list from users.json:", error);
