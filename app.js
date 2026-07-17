@@ -2668,6 +2668,12 @@ function openApprovalModal(bookingId) {
           booking.endDate = new Date().toISOString();
           booking.returnedEarly = true;
           saveBookings();
+
+          // Trigger LINE status update (finish)
+          let carObj = cars.find(c => c.id === booking.carId);
+          const carPlate = carObj ? carObj.plate : '-';
+          triggerLineNotification(booking, carPlate, 'finish');
+
           localStorage.setItem('return_early_toast_success', `ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบคำขอ ${booking.id} เรียบร้อยแล้ว`);
           window.location.reload();
         };
@@ -4731,6 +4737,11 @@ function setupEventListeners() {
             booking.returnedEarly = true;
             saveBookings();
             
+            // Trigger LINE status update (finish)
+            let carObj = cars.find(c => c.id === booking.carId);
+            const carPlate = carObj ? carObj.plate : '-';
+            triggerLineNotification(booking, carPlate, 'finish');
+
             // Set toast indicator to show after reload
             localStorage.setItem('return_early_toast_success', `ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบคำขอ ${bookingId} เรียบร้อยแล้ว`);
             window.location.reload();
@@ -5483,10 +5494,39 @@ if (storedUser) {
     if (booking) {
       booking.driverAccepted = true;
       saveBookings();
+
+      // Trigger LINE status update (accept)
+      let carObj = cars.find(c => c.id === booking.carId);
+      const carPlate = carObj ? carObj.plate : '-';
+      triggerLineNotification(booking, carPlate, 'accept');
+
       // Remove query parameters from URL to avoid repeating on refresh
       const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
       window.history.replaceState({path: cleanUrl}, '', cleanUrl);
       showToast(`พขร. ได้รับงานสำหรับใบขอใช้รถเลขที่ ${actionBookingId} เรียบร้อยแล้ว`, "success");
+      // Open approval modal to show details
+      setTimeout(() => {
+        openApprovalModal(actionBookingId);
+      }, 500);
+    }
+  }
+
+  if (action === 'return-early' && actionBookingId) {
+    const booking = bookings.find(b => b.id === actionBookingId);
+    if (booking) {
+      booking.returnedEarly = true;
+      booking.endDate = new Date().toISOString();
+      saveBookings();
+
+      // Trigger LINE status update (finish)
+      let carObj = cars.find(c => c.id === booking.carId);
+      const carPlate = carObj ? carObj.plate : '-';
+      triggerLineNotification(booking, carPlate, 'finish');
+
+      // Remove query parameters from URL to avoid repeating on refresh
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+      showToast(`ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบขอใช้รถ ${actionBookingId} เรียบร้อยแล้ว`, "success");
       // Open approval modal to show details
       setTimeout(() => {
         openApprovalModal(actionBookingId);
@@ -6151,8 +6191,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Helper function to send LINE Group notification when booking is approved
-function triggerLineNotification(booking, carPlate) {
+function triggerLineNotification(booking, carPlate, type) {
   const payload = {
+    type: type || 'default',
     bookingId: booking.id,
     origin: window.location.origin,
     driverName: booking.driverName || 'ไม่ระบุ',
