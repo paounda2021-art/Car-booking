@@ -2340,9 +2340,14 @@ function openApprovalModal(bookingId) {
     if (booking.travelType === 'fmo_car' && booking.driverName && booking.driverName !== '-') {
       const phone = getDriverPhoneByName(booking.driverName);
       const phoneStr = phone ? ` (เบอร์โทร: ${phone})` : ' (ไม่มีข้อมูลเบอร์โทร)';
-      const acceptBadge = booking.driverAccepted 
-        ? '<span class="badge success" style="margin-left: 0.5rem; font-size: 0.75rem;">✅ รับงานแล้ว</span>' 
-        : '<span class="badge warning" style="margin-left: 0.5rem; font-size: 0.75rem; color: #d97706; background: rgba(217,119,6,0.1);">⏳ รอรับงาน</span>';
+      let acceptBadge = '';
+      if (booking.returnedEarly) {
+        acceptBadge = '<span class="badge info" style="margin-left: 0.5rem; font-size: 0.75rem; background-color: #0ea5e9; color: white;">🏁 คืนรถแล้ว</span>';
+      } else if (booking.driverAccepted) {
+        acceptBadge = '<span class="badge success" style="margin-left: 0.5rem; font-size: 0.75rem;">✅ รับงานแล้ว</span>';
+      } else {
+        acceptBadge = '<span class="badge warning" style="margin-left: 0.5rem; font-size: 0.75rem; color: #d97706; background: rgba(217,119,6,0.1);">⏳ รอรับงาน</span>';
+      }
       driverEl.innerHTML = `<strong>${booking.driverName}</strong>${phoneStr}${acceptBadge}`;
       driverRow.style.display = 'table-row';
     } else {
