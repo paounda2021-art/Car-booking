@@ -14,26 +14,54 @@ fs.readFile(bookingsFile, 'utf8', (err, data) => {
     process.exit(1);
   }
 
-  let repairedData = data;
+  let bookings = [];
+  try {
+    bookings = JSON.parse(data);
+  } catch (e) {
+    console.error('ข้อผิดพลาดในการ parse JSON:', e);
+    process.exit(1);
+  }
 
-  // Replace corrupted "อสป." patterns (e.g. "อป.", "อป.")
-  repairedData = repairedData.replace(/อ\uFFFD+ป\./g, 'อสป.');
-  
-  // Replace corrupted "สัมมนา" patterns (e.g. "สนา", "สนา")
-  repairedData = repairedData.replace(/ส\uFFFD+นา/g, 'สัมมนา');
-  repairedData = repairedData.replace(/ส\uFFFD+มนา/g, 'สัมมนา');
-  repairedData = repairedData.replace(/สั\uFFFD+นา/g, 'สัมมนา');
+  let isRepaired = false;
+  let repairedCount = 0;
 
-  if (repairedData === data) {
-    console.log('ไม่พบตัวอักษรเพี้ยนในฐานข้อมูล หรือข้อมูลได้รับการแก้ไขเรียบร้อยแล้ว');
+  bookings.forEach(booking => {
+    Object.keys(booking).forEach(key => {
+      if (typeof booking[key] === 'string' && booking[key].includes('\uFFFD')) {
+        const originalVal = booking[key];
+        let newVal = originalVal;
+
+        // Repair "อสป."
+        newVal = newVal.replace(/อ\uFFFD+ป\./g, 'อสป.');
+        
+        // Repair "สัมมนา"
+        newVal = newVal.replace(/ส\uFFFD+นา/g, 'สัมมนา');
+        newVal = newVal.replace(/ส\uFFFD+มนา/g, 'สัมมนา');
+        newVal = newVal.replace(/สั\uFFFD+นา/g, 'สัมมนา');
+
+        // Check if there are other corrupted characters and try to clean them by removing \uFFFD
+        if (newVal.includes('\uFFFD')) {
+          console.warn(`⚠️ Warning: [${booking.id}] ฟิลด์ "${key}" มีอักษรเพี้ยนที่ไม่สามารถระบุคำแก้ได้โดยอัตโนมัติ: "${newVal}"`);
+        } else {
+          booking[key] = newVal;
+          isRepaired = true;
+          repairedCount++;
+          console.log(`✅ Fixed: [${booking.id}] ฟิลด์ "${key}": "${originalVal}" -> "${newVal}"`);
+        }
+      }
+    });
+  });
+
+  if (!isRepaired) {
+    console.log('🎉 ไม่พบตัวอักษรเพี้ยนหลงเหลืออยู่ในระบบแล้ว!');
     process.exit(0);
   }
 
-  fs.writeFile(bookingsFile, repairedData, 'utf8', err => {
+  fs.writeFile(bookingsFile, JSON.stringify(bookings), 'utf8', err => {
     if (err) {
       console.error('ไม่สามารถเขียนทับไฟล์ bookings.json:', err);
       process.exit(1);
     }
-    console.log('ซ่อมแซมตัวอักษรเพี้ยนในฐานข้อมูลสำเร็จแล้ว!');
+    console.log(`\n🚀 ซ่อมแซมตัวอักษรสำเร็จไปทั้งหมด ${repairedCount} รายการ!`);
   });
 });
