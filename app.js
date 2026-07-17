@@ -1444,6 +1444,28 @@ function checkCanSeeAll(userObj) {
          isNattanong;
 }
 
+// Helper to check if a supervisor is the manager or approver for a subordinate's booking
+function checkIsManagerOrApprover(b, userObj) {
+  if (!userObj) return false;
+  
+  const uEmail = (userObj.email || '').trim().toLowerCase();
+  const mEmail = (b.managerEmail || '').trim().toLowerCase();
+  if (uEmail && mEmail && uEmail === mEmail) return true;
+  
+  if (b.signatures) {
+    const l1Sig = b.signatures.find(s => s.level === 1);
+    if (l1Sig && l1Sig.status === 'approved') {
+      const normalize = (n) => n ? n.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.ส\.|ว่าที่ร\.ต\.|ว่าที่ร้อยตรี|ดร\.)\s*/, '') : '';
+      const uNameNormalized = normalize(userObj.name);
+      const approverNameNormalized = normalize(l1Sig.approverName);
+      if (uNameNormalized && approverNameNormalized && uNameNormalized === approverNameNormalized) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Update stats on Dashboard
 function updateStats() {
   autoGenerateMissingEmailLogs();
@@ -1527,7 +1549,8 @@ function updateStats() {
       if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
       const isMyRequest = checkIsMyRequest(b, currentUser);
       const canSeeAll = checkCanSeeAll(currentUser);
-      return (canSeeAll || isMyRequest);
+      const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
+      return (canSeeAll || isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover));
     }).length;
     tabAllHistoryBadge.textContent = historyCount;
   }
@@ -2038,7 +2061,8 @@ function renderBookingsLists() {
     if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
       const isMyRequest = checkIsMyRequest(b, currentUser);
       const canSeeAll = checkCanSeeAll(currentUser);
-      if (canSeeAll || isMyRequest) {
+      const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
+      if (canSeeAll || isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
     }
