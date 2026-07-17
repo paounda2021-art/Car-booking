@@ -2372,7 +2372,7 @@ function openApprovalModal(bookingId) {
     if (showEditPanel) {
       activeBookingIdForApproval = booking.id;
     } else {
-      activeBookingIdForApproval = null;
+      activeBookingIdForApproval = booking.id; // Keep booking.id for cancellation/detail actions
     }
   }
 
