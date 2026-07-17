@@ -1596,7 +1596,13 @@ function setBookingViewLayout(layout) {
 function helperCreateTableRow(b, isPendingForMe) {
   let statusClass = 'warning';
   let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
-  if (b.waitingForRequesterInput) {
+  if (b.status === 'cancelled') {
+    statusClass = 'danger';
+    statusText = '🚫 ยกเลิกใบเสนอขอ';
+  } else if (b.status === 'cancellation_requested') {
+    statusClass = 'warning';
+    statusText = '⏳ ร้องขอยกเลิก';
+  } else if (b.waitingForRequesterInput) {
     statusClass = 'danger';
     statusText = '⏳ รอระบุค่าพาหนะ';
   } else if (b.status === 'approved') {
@@ -1741,7 +1747,13 @@ function renderBookingsLists() {
   const helperCreateCard = (b, isPendingForMe) => {
     let statusClass = 'warning';
     let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
-    if (b.waitingForRequesterInput) {
+    if (b.status === 'cancelled') {
+      statusClass = 'danger';
+      statusText = '🚫 ยกเลิกใบเสนอขอ';
+    } else if (b.status === 'cancellation_requested') {
+      statusClass = 'warning';
+      statusText = '⏳ ร้องขอยกเลิก';
+    } else if (b.waitingForRequesterInput) {
       statusClass = 'danger';
       statusText = '⏳ รอระบุค่าพาหนะ';
     } else if (b.status === 'approved') {
@@ -5664,7 +5676,11 @@ window.performExportToCSV = function(list, startVal, endVal) {
     }
     
     let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
-    if (b.waitingForRequesterInput) {
+    if (b.status === 'cancelled') {
+      statusText = 'ยกเลิกใบเสนอขอ';
+    } else if (b.status === 'cancellation_requested') {
+      statusText = 'ร้องขอยกเลิก';
+    } else if (b.waitingForRequesterInput) {
       statusText = 'รอระบุค่าพาหนะ';
     } else if (b.status === 'approved') {
       statusText = 'อนุมัติเสร็จสิ้น';
