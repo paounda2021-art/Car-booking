@@ -1,4 +1,4 @@
-# PowerShell Static Web Server for Windows
+﻿# PowerShell Static Web Server for Windows
 # Run this script to serve index.html, style.css, and app.js locally.
 
 $port = 8080
