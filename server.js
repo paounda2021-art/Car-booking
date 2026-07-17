@@ -408,7 +408,23 @@ const server = http.createServer((req, res) => {
                     type: "box",
                     layout: "vertical",
                     contents: bodyContents
-                  }
+                  },
+                  footer: !isCancel ? {
+                    type: "box",
+                    layout: "vertical",
+                    contents: [
+                      {
+                        type: "button",
+                        action: {
+                          type: "uri",
+                          label: "✅ กดรับงาน",
+                          uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`
+                        },
+                        style: "primary",
+                        color: "#10b981"
+                      }
+                    ]
+                  } : undefined
                 }
               }
             ]

@@ -1545,7 +1545,9 @@ function renderDashboard() {
       statusDesc = isApproved ? `ไม่ว่าง (เรื่อง: ${activeBkg.purpose})` : `จองล่วงหน้า (เรื่อง: ${activeBkg.purpose})`;
 
       const isL2 = currentUser && currentUser.role === 'fleet_admin';
-      if (isL2 && isApproved) {
+      const isRequester = currentUser && activeBkg.requester === currentUser.name;
+      const isDriver = currentUser && activeBkg.driverName && currentUser.name && activeBkg.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
+      if ((isL2 || isRequester || isDriver) && isApproved) {
         actionBtnHtml = `
           <button class="btn btn-warning btn-sm btn-return-early" data-booking-id="${activeBkg.id}" style="width: 100%; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.25rem 0.5rem;">
             เปลี่ยนเป็นว่าง (คืนรถก่อนเวลา)
@@ -1652,9 +1654,10 @@ function renderTimelineScheduler() {
         const sh = formatThaiTimeOnlyNoSuffix(b.startDate);
         const eh = formatThaiTimeOnlyNoSuffix(b.endDate);
 
+        const checkPrefix = b.driverAccepted ? '✅ ' : '';
         bookingBarsHtml += `
           <div class="${badgeClass}" title="${b.purpose} (${sh} - ${eh}) ผู้จอง: ${b.requester}" style="position: absolute; left: ${leftPercent}%; width: ${widthPercent}%; top: 50%; transform: translateY(-50%); height: 38px; border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: default; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-sm); z-index: 2;">
-            <strong style="color: var(--text-main); text-overflow: ellipsis; overflow: hidden; display: block;">${b.purpose}</strong>
+            <strong style="color: var(--text-main); text-overflow: ellipsis; overflow: hidden; display: block;">${checkPrefix}${b.purpose}</strong>
             <span style="color: var(--text-muted); font-size: 0.65rem;">${sh}-${eh} (${b.requester})</span>
           </div>
         `;
@@ -1743,7 +1746,7 @@ function helperCreateTableRow(b, isPendingForMe) {
     statusText = '⏳ รอระบุค่าพาหนะ';
   } else if (b.status === 'approved') {
     statusClass = 'success';
-    statusText = 'อนุมัติเสร็จสิ้น';
+    statusText = b.driverAccepted ? 'อนุมัติเสร็จสิ้น (พขร. รับงานแล้ว)' : 'อนุมัติเสร็จสิ้น';
   } else if (b.status === 'rejected') {
     statusClass = 'danger';
     statusText = 'ปฏิเสธคำขอ';
@@ -1895,7 +1898,7 @@ function renderBookingsLists() {
       statusText = '⏳ รอระบุค่าพาหนะ';
     } else if (b.status === 'approved') {
       statusClass = 'success';
-      statusText = 'อนุมัติเสร็จสิ้น';
+      statusText = b.driverAccepted ? 'อนุมัติเสร็จสิ้น (พขร. รับงานแล้ว)' : 'อนุมัติเสร็จสิ้น';
     } else if (b.status === 'rejected') {
       statusClass = 'danger';
       statusText = 'ปฏิเสธคำขอ';
@@ -2329,7 +2332,10 @@ function openApprovalModal(bookingId) {
     if (booking.travelType === 'fmo_car' && booking.driverName && booking.driverName !== '-') {
       const phone = getDriverPhoneByName(booking.driverName);
       const phoneStr = phone ? ` (เบอร์โทร: ${phone})` : ' (ไม่มีข้อมูลเบอร์โทร)';
-      driverEl.innerHTML = `<strong>${booking.driverName}</strong>${phoneStr}`;
+      const acceptBadge = booking.driverAccepted 
+        ? '<span class="badge success" style="margin-left: 0.5rem; font-size: 0.75rem;">✅ รับงานแล้ว</span>' 
+        : '<span class="badge warning" style="margin-left: 0.5rem; font-size: 0.75rem; color: #d97706; background: rgba(217,119,6,0.1);">⏳ รอรับงาน</span>';
+      driverEl.innerHTML = `<strong>${booking.driverName}</strong>${phoneStr}${acceptBadge}`;
       driverRow.style.display = 'table-row';
     } else {
       driverEl.textContent = '-';
@@ -2601,6 +2607,54 @@ function openApprovalModal(bookingId) {
           document.getElementById('btn-confirm-cancel-booking').textContent = '🔴 ยืนยันอนุมัติยกเลิกใบจอง';
         }
       }
+    }
+  }
+
+  // Handle Driver Acceptance Panel display
+  const driverAcceptPanel = document.getElementById('driver-accept-action-panel');
+  if (driverAcceptPanel) {
+    const isDriver = currentUser && booking.driverName && currentUser.name && booking.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
+    if (booking.status === 'approved' && isDriver && !booking.driverAccepted) {
+      driverAcceptPanel.style.display = 'block';
+      const btnAccept = document.getElementById('btn-modal-accept-job');
+      if (btnAccept) {
+        btnAccept.onclick = () => {
+          booking.driverAccepted = true;
+          saveBookings();
+          localStorage.setItem('accept_job_toast_success', `พขร. ได้รับงานสำหรับใบขอใช้รถเลขที่ ${booking.id} เรียบร้อยแล้ว`);
+          window.location.reload();
+        };
+      }
+    } else {
+      driverAcceptPanel.style.display = 'none';
+    }
+  }
+
+  // Handle Return Early Panel display
+  const returnEarlyPanel = document.getElementById('return-early-action-panel');
+  if (returnEarlyPanel) {
+    const now = new Date();
+    const startD = new Date(booking.startDate);
+    const endD = new Date(booking.endDate);
+    const isActive = booking.status === 'approved' && startD <= now && endD >= now;
+    
+    const isL2 = currentUser && currentUser.role === 'fleet_admin';
+    const isRequester = currentUser && (booking.requester === currentUser.name || booking.username === currentUser.username);
+    const isDriver = currentUser && booking.driverName && currentUser.name && booking.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
+    
+    if (isActive && (isL2 || isRequester || isDriver)) {
+      returnEarlyPanel.style.display = 'block';
+      const btnReturnEarly = document.getElementById('btn-modal-return-early');
+      if (btnReturnEarly) {
+        btnReturnEarly.onclick = () => {
+          booking.endDate = new Date().toISOString();
+          saveBookings();
+          localStorage.setItem('return_early_toast_success', `ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบคำขอ ${booking.id} เรียบร้อยแล้ว`);
+          window.location.reload();
+        };
+      }
+    } else {
+      returnEarlyPanel.style.display = 'none';
     }
   }
 }
@@ -5399,6 +5453,39 @@ if (storedUser) {
 
   // Load initial simulated inbox state
   updateEmailInboxUI();
+
+  // Parse query parameters for actions (e.g. accepting job from LINE link)
+  const urlParams = new URLSearchParams(window.location.search);
+  const action = urlParams.get('action');
+  const actionBookingId = urlParams.get('id');
+  if (action === 'accept-job' && actionBookingId) {
+    const booking = bookings.find(b => b.id === actionBookingId);
+    if (booking) {
+      booking.driverAccepted = true;
+      saveBookings();
+      // Remove query parameters from URL to avoid repeating on refresh
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+      showToast(`พขร. ได้รับงานสำหรับใบขอใช้รถเลขที่ ${actionBookingId} เรียบร้อยแล้ว`, "success");
+      // Open approval modal to show details
+      setTimeout(() => {
+        openApprovalModal(actionBookingId);
+      }, 500);
+    }
+  }
+
+  // Show return early / accept job success toast if set in localStorage
+  const acceptJobToast = localStorage.getItem('accept_job_toast_success');
+  if (acceptJobToast) {
+    showToast(acceptJobToast, 'success');
+    localStorage.removeItem('accept_job_toast_success');
+  }
+
+  const returnEarlyToast = localStorage.getItem('return_early_toast_success');
+  if (returnEarlyToast) {
+    showToast(returnEarlyToast, 'success');
+    localStorage.removeItem('return_early_toast_success');
+  }
 });
 
 // Populate driver list in the dropdown
@@ -6047,6 +6134,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function triggerLineNotification(booking, carPlate) {
   const payload = {
     bookingId: booking.id,
+    origin: window.location.origin,
     driverName: booking.driverName || 'ไม่ระบุ',
     carInfo: booking.carId === 'taxi' ? 'รถรับจ้างสาธารณะ (TAXI)' : `รถยนต์ อสป. ทะเบียน ${carPlate || '-'}`,
     destination: booking.destination || 'ไม่ระบุ',

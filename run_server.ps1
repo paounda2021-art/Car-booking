@@ -1,4 +1,4 @@
-﻿# PowerShell Static Web Server for Windows
+# PowerShell Static Web Server for Windows
 # Run this script to serve index.html, style.css, and app.js locally.
 
 $port = 8080
@@ -265,30 +265,52 @@ try {
                             )
                         }) > $null
 
+                        $bubbleContents = [System.Collections.Hashtable]@{
+                            type = "bubble"
+                            header = @{
+                                type = "box"
+                                layout = "vertical"
+                                contents = @(
+                                    @{ type = "text"; text = $headerTitle; weight = "bold"; size = "lg"; color = $headerColor },
+                                    @{ type = "text"; text = "ระบบจองรถยนต์สะพานปลา (FMO)"; size = "xs"; color = "#64748b"; margin = "xs" }
+                                )
+                                backgroundColor = $headerBg
+                                paddingAll = "15px"
+                            }
+                            body = @{
+                                type = "box"
+                                layout = "vertical"
+                                contents = $bodyContents
+                            }
+                        }
+
+                        if (-not $isCancel) {
+                            $origin = if ($payload.origin) { $payload.origin } else { "http://localhost:8080" }
+                            $bubbleContents.Add("footer", @{
+                                type = "box"
+                                layout = "vertical"
+                                contents = @(
+                                    @{
+                                        type = "button"
+                                        action = @{
+                                            type = "uri"
+                                            label = "✅ กดรับงาน"
+                                            uri = "$origin/index.html?action=accept-job&id=$($payload.bookingId)"
+                                        }
+                                        style = "primary"
+                                        color = "#10b981"
+                                    }
+                                )
+                            })
+                        }
+
                         $linePayload = @{
                             to = $groupId
                             messages = @(
                                 @{
                                     type = "flex"
                                     altText = $altText
-                                    contents = @{
-                                        type = "bubble"
-                                        header = @{
-                                            type = "box"
-                                            layout = "vertical"
-                                            contents = @(
-                                                @{ type = "text"; text = $headerTitle; weight = "bold"; size = "lg"; color = $headerColor },
-                                                @{ type = "text"; text = "ระบบจองรถยนต์สะพานปลา (FMO)"; size = "xs"; color = "#64748b"; margin = "xs" }
-                                            )
-                                            backgroundColor = $headerBg
-                                            paddingAll = "15px"
-                                        }
-                                        body = @{
-                                            type = "box"
-                                            layout = "vertical"
-                                            contents = $bodyContents
-                                        }
-                                    }
+                                    contents = $bubbleContents
                                 }
                             )
                         }
