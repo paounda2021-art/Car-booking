@@ -1745,8 +1745,13 @@ function helperCreateTableRow(b, isPendingForMe) {
     statusClass = 'danger';
     statusText = '⏳ รอระบุค่าพาหนะ';
   } else if (b.status === 'approved') {
-    statusClass = 'success';
-    statusText = b.driverAccepted ? 'อนุมัติเสร็จสิ้น (พขร. รับงานแล้ว)' : 'อนุมัติเสร็จสิ้น';
+    if (b.returnedEarly) {
+      statusClass = 'info';
+      statusText = 'คืนรถก่อนเวลา';
+    } else {
+      statusClass = 'success';
+      statusText = b.driverAccepted ? 'อนุมัติเสร็จสิ้น (พขร. รับงานแล้ว)' : 'อนุมัติเสร็จสิ้น';
+    }
   } else if (b.status === 'rejected') {
     statusClass = 'danger';
     statusText = 'ปฏิเสธคำขอ';
@@ -1897,8 +1902,13 @@ function renderBookingsLists() {
       statusClass = 'danger';
       statusText = '⏳ รอระบุค่าพาหนะ';
     } else if (b.status === 'approved') {
-      statusClass = 'success';
-      statusText = b.driverAccepted ? 'อนุมัติเสร็จสิ้น (พขร. รับงานแล้ว)' : 'อนุมัติเสร็จสิ้น';
+      if (b.returnedEarly) {
+        statusClass = 'info';
+        statusText = 'คืนรถก่อนเวลา';
+      } else {
+        statusClass = 'success';
+        statusText = b.driverAccepted ? 'อนุมัติเสร็จสิ้น (พขร. รับงานแล้ว)' : 'อนุมัติเสร็จสิ้น';
+      }
     } else if (b.status === 'rejected') {
       statusClass = 'danger';
       statusText = 'ปฏิเสธคำขอ';
@@ -2658,6 +2668,7 @@ function openApprovalModal(bookingId) {
       if (btnReturnEarly) {
         btnReturnEarly.onclick = () => {
           booking.endDate = new Date().toISOString();
+          booking.returnedEarly = true;
           saveBookings();
           localStorage.setItem('return_early_toast_success', `ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบคำขอ ${booking.id} เรียบร้อยแล้ว`);
           window.location.reload();
@@ -4719,6 +4730,7 @@ function setupEventListeners() {
             
             // Set end date to current time to free the car
             booking.endDate = new Date().toISOString();
+            booking.returnedEarly = true;
             saveBookings();
             
             // Set toast indicator to show after reload
@@ -5932,7 +5944,7 @@ window.performExportToCSV = function(list, startVal, endVal) {
     } else if (b.waitingForRequesterInput) {
       statusText = 'รอระบุค่าพาหนะ';
     } else if (b.status === 'approved') {
-      statusText = 'อนุมัติเสร็จสิ้น';
+      statusText = b.returnedEarly ? 'คืนรถก่อนเวลา' : 'อนุมัติเสร็จสิ้น';
     } else if (b.status === 'rejected') {
       statusText = 'ปฏิเสธคำขอ';
     }

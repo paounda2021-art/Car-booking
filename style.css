@@ -1555,6 +1555,7 @@ body {
 .badge.warning, .badge-pending { background: var(--warning-light); color: var(--warning); }
 .badge.success, .badge-approved { background: var(--success-light); color: var(--success); }
 .badge.danger, .badge-rejected { background: var(--danger-light); color: var(--danger); }
+.badge.info { background: rgba(8, 145, 178, 0.1); color: #0891b2; }
 
 /* Print Media Styles */
 @media print {
