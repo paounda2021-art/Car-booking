@@ -1306,18 +1306,18 @@ function updateStats() {
 
   if (currentUser) {
     bookings.forEach(b => {
-      // 🚨 จุดที่แก้ไข: เปลี่ยนเป็นเช็คว่าสถานะ "ขึ้นต้นด้วย pending" (รองรับ pending_l1, pending_l2)
-      if (b.status.startsWith('pending') && !b.waitingForRequesterInput) {
+      // ตรวจสอบว่า เป็นการร้องขอยกเลิกของ L2 หรือไม่
+      const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser.canApprove && currentUser.canApprove.includes(2);
+      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel || (b.status === 'cancellation_requested' && activeLevel === 'all'));
+
+      if ((b.status.startsWith('pending') || isCancellationRequestForL2) && !b.waitingForRequesterInput) {
         
         // ตรวจสอบว่า งานเลเวลนี้ (b.currentApprovalLevel) อยู่ในสิทธิ์ที่ User คนนี้อนุมัติได้จริงไหม
-        const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel);
+        const canApproveThisLevel = (currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel)) || isCancellationRequestForL2;
         
-        // ตรวจสอบว่า ตรงกับระดับอนุมัติที่เลือกสลับบทบาทใน Dropdown อยู่หรือไม่
-        const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel);
-
         if (canApproveThisLevel && isSelectedLevel) {
           // เงื่อนไขคัดกรองพิเศษเพิ่มเติมสำหรับระดับ L1 (Supervisor)
-          if (b.currentApprovalLevel === 1) {
+          if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
             const mEmail = resolveManagerEmail(b).toLowerCase();
             const cEmail = (currentUser.email || '').toLowerCase();
             if (mEmail === cEmail || mEmail === '') {
@@ -1839,13 +1839,15 @@ function renderBookingsLists() {
     const isMyRequest = currentUser && b.requester === currentUser.name;
     
     let isPendingForMe = false;
-    if (b.status.startsWith('pending') && currentUser && !b.waitingForRequesterInput) {
+    const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
+    
+    if ((b.status.startsWith('pending') || isCancellationRequestForL2) && currentUser && !b.waitingForRequesterInput) {
       const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
-      const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel);
-      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel);
+      const canApproveThisLevel = (currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel)) || isCancellationRequestForL2;
+      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel || (b.status === 'cancellation_requested' && activeLevel === 'all'));
 
       if (canApproveThisLevel && isSelectedLevel) {
-        if (b.currentApprovalLevel === 1) {
+        if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
           // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
           const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
@@ -1864,7 +1866,7 @@ function renderBookingsLists() {
     if (isPendingForMe) {
       pendingBookingsList.push({ booking: b, isPendingForMe });
     }
-    if (b.status === 'approved' || b.status === 'rejected') {
+    if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
       const isMyRequest = currentUser && (
         (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
         b.requester === currentUser.name
@@ -4960,9 +4962,15 @@ function getActiveEmailLogs() {
     if (bookingId) {
       const b = bookings.find(x => x.id === bookingId);
       if (b) {
-        // หากใบจองอนุมัติเสร็จสิ้นหรือปฏิเสธแล้ว การแจ้งเตือนกระดิ่งจะหายไป
-        if (b.status === 'approved' || b.status === 'rejected') {
+        // หากใบจองอนุมัติเสร็จสิ้น ปฏิเสธ หรือยกเลิกแล้ว การแจ้งเตือนกระดิ่งจะหายไป
+        if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
           return false;
+        }
+
+        // หากเป็นคำขอร้องเรียนยกเลิก แสดงเฉพาะสำหรับ L2 (แอดมินจัดรถ)
+        if (b.status === 'cancellation_requested') {
+          const isL2 = currentUser.canApprove && currentUser.canApprove.includes(2);
+          return isL2;
         }
         
         // หากอยู่ในขั้นตอนผู้จองกรอกข้อมูลค่าพาหนะเพิ่ม
