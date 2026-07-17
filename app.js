@@ -6370,17 +6370,11 @@ function renderAdminUsers() {
         return `<span style="display:inline-block; font-size: 0.7rem; color: #fff; background: ${badgeColor}; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: bold; margin-right: 0.15rem;">L${lvl}</span>`;
       }).join('');
       approvalsHtml = `<div style="margin-top: 0.25rem;">${badges}</div>`;
-    } else {
-      // Default roles text
-      const defaultRole = u.role === 'supervisor' 
-        ? '<span style="font-size: 0.75rem; color: #d97706;">L1 (ตามตำแหน่ง)</span>'
-        : '<span style="font-size: 0.75rem; color: #6b7280;">L0 (ทั่วไป)</span>';
-      approvalsHtml = `<div style="margin-top: 0.25rem;">${defaultRole}</div>`;
     }
 
     const roleText = u.role === 'supervisor' 
-      ? '<span class="badge warning" style="color: #d97706; background: rgba(217,119,6,0.1);">✍️ Supervisor</span>' 
-      : '<span class="badge info" style="color: #2563eb; background: rgba(37,99,235,0.1);">👤 User (L0)</span>';
+      ? '<span class="badge warning" style="color: #d97706; background: rgba(217,119,6,0.1); display: inline-block;">✍️ Supervisor</span>' 
+      : '<span class="badge info" style="color: #2563eb; background: rgba(37,99,235,0.1); display: inline-block;">👤 User (L0)</span>';
 
     return `
       <tr style="border-bottom: 1px solid var(--border-color); font-size: 0.85rem;">
@@ -6397,7 +6391,6 @@ function renderAdminUsers() {
         <td style="padding: 0.85rem 1rem;">
           ${roleText}
           ${approvalsHtml}
-          <span style="font-size: 0.75rem; color: var(--text-muted); font-family: monospace; display: block; margin-top: 0.25rem;">หัวหน้า: ${u.manager_email || '-'}</span>
         </td>
         <td style="padding: 0.85rem 1rem; text-align: right;">
           <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
