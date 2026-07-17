@@ -206,13 +206,30 @@ const server = http.createServer((req, res) => {
           }
 
           const isCancel = payload.type === 'cancel';
+          const isAccept = payload.type === 'accept';
+          const isFinish = payload.type === 'finish';
           
-          const headerTitle = isCancel ? "⚠️ แจ้งยกเลิกใบสั่งงาน พขร." : "📋 ใบสั่งงานพนักงานขับรถ";
-          const headerColor = isCancel ? "#dc2626" : "#1e3a8a";
-          const headerBg = isCancel ? "#fef2f2" : "#f8fafc";
-          const altText = isCancel 
-            ? `⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}` 
-            : `📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`;
+          let headerTitle = "📋 ใบสั่งงานพนักงานขับรถ";
+          let headerColor = "#1e3a8a";
+          let headerBg = "#f8fafc";
+          let altText = `📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`;
+
+          if (isCancel) {
+            headerTitle = "⚠️ แจ้งยกเลิกใบสั่งงาน พขร.";
+            headerColor = "#dc2626";
+            headerBg = "#fef2f2";
+            altText = `⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}`;
+          } else if (isAccept) {
+            headerTitle = "🟢 พขร. รับงานแล้ว";
+            headerColor = "#10b981";
+            headerBg = "#f0fdf4";
+            altText = `🟢 พขร. รับงานแล้ว - ปลายทาง: ${payload.destination || ''}`;
+          } else if (isFinish) {
+            headerTitle = "🏁 เสร็จสิ้นใบสั่งงาน (พขร. คืนรถแล้ว)";
+            headerColor = "#64748b";
+            headerBg = "#f1f5f9";
+            altText = `🏁 เสร็จสิ้นคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}`;
+          }
 
           // Construct body contents list dynamically
           const bodyContents = [];
@@ -413,22 +430,47 @@ const server = http.createServer((req, res) => {
                     layout: "vertical",
                     contents: bodyContents
                   },
-                  footer: !isCancel ? {
+                  footer: (!isCancel && !isFinish) ? {
                     type: "box",
                     layout: "vertical",
-                    contents: [
-                      {
-                        type: "button",
-                        action: {
-                          type: "postback",
-                          label: "✅ กดรับงาน",
-                          data: `action=accept-job&id=${payload.bookingId}`,
-                          displayText: "✅ กดรับงาน"
-                        },
-                        style: "primary",
-                        color: "#10b981"
+                    contents: (() => {
+                      const isLocal = !payload.origin || payload.origin.includes('localhost') || payload.origin.includes('127.0.0.1') || payload.origin.startsWith('http://');
+                      const list = [];
+                      if (isLocal) {
+                        list.push({
+                          type: "button",
+                          action: isAccept ? {
+                            type: "uri",
+                            label: "🔴 จบงาน (คืนรถ)",
+                            uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=return-early&id=${payload.bookingId}`
+                          } : {
+                            type: "uri",
+                            label: "✅ กดรับงาน",
+                            uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`
+                          },
+                          style: isAccept ? "secondary" : "primary",
+                          color: isAccept ? "#ef4444" : "#10b981"
+                        });
+                      } else {
+                        list.push({
+                          type: "button",
+                          action: isAccept ? {
+                            type: "postback",
+                            label: "🔴 จบงาน (คืนรถ)",
+                            data: `action=return-early&id=${payload.bookingId}`,
+                            displayText: "🔴 จบงาน"
+                          } : {
+                            type: "postback",
+                            label: "✅ กดรับงาน",
+                            data: `action=accept-job&id=${payload.bookingId}`,
+                            displayText: "✅ กดรับงาน"
+                          },
+                          style: isAccept ? "secondary" : "primary",
+                          color: isAccept ? "#ef4444" : "#10b981"
+                        });
                       }
-                    ]
+                      return list;
+                    })()
                   } : undefined
                 }
               }
