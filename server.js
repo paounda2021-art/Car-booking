@@ -151,12 +151,185 @@ const server = http.createServer((req, res) => {
             return;
           }
 
+          const isCancel = payload.type === 'cancel';
+          
+          const headerTitle = isCancel ? "⚠️ แจ้งยกเลิกใบสั่งงาน พขร." : "📋 ใบสั่งงานพนักงานขับรถ";
+          const headerColor = isCancel ? "#dc2626" : "#1e3a8a";
+          const headerBg = isCancel ? "#fef2f2" : "#f8fafc";
+          const altText = isCancel 
+            ? `⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}` 
+            : `📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`;
+
+          // Construct body contents list dynamically
+          const bodyContents = [];
+          if (isCancel) {
+            bodyContents.push(
+              {
+                type: "text",
+                text: "❌ คิวงานนี้ถูกยกเลิกแล้ว",
+                weight: "bold",
+                size: "md",
+                color: "#dc2626"
+              },
+              {
+                type: "text",
+                text: `💬 เหตุผล: ${payload.cancelReason || 'ไม่ระบุ'}`,
+                size: "sm",
+                color: "#ef4444",
+                margin: "xs",
+                wrap: true
+              },
+              {
+                type: "separator",
+                margin: "md",
+                color: "#e2e8f0"
+              }
+            );
+          }
+
+          // Add standard fields
+          bodyContents.push(
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                {
+                  type: "text",
+                  text: "👤 พขร. ปฏิบัติหน้าที่:",
+                  size: "sm",
+                  color: "#64748b",
+                  flex: 4
+                },
+                {
+                  type: "text",
+                  text: payload.driverName || 'ไม่ระบุ',
+                  size: "sm",
+                  color: "#1e293b",
+                  weight: "bold",
+                  flex: 6,
+                  wrap: true
+                }
+              ],
+              margin: isCancel ? "md" : "none"
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                {
+                  type: "text",
+                  text: "🚗 ยานพาหนะ:",
+                  size: "sm",
+                  color: "#64748b",
+                  flex: 4
+                },
+                {
+                  type: "text",
+                  text: payload.carInfo || 'ไม่ระบุ',
+                  size: "sm",
+                  color: "#1e293b",
+                  flex: 6,
+                  wrap: true
+                }
+              ],
+              margin: "md"
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                {
+                  type: "text",
+                  text: "📍 สถานที่ปลายทาง:",
+                  size: "sm",
+                  color: "#64748b",
+                  flex: 4
+                },
+                {
+                  type: "text",
+                  text: payload.destination || 'ไม่ระบุ',
+                  size: "sm",
+                  color: "#1e293b",
+                  flex: 6,
+                  wrap: true
+                }
+              ],
+              margin: "md"
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                {
+                  type: "text",
+                  text: "📅 วันเวลาเดินทาง:",
+                  size: "sm",
+                  color: "#64748b",
+                  flex: 4
+                },
+                {
+                  type: "text",
+                  text: payload.dateTime || 'ไม่ระบุ',
+                  size: "sm",
+                  color: "#1e293b",
+                  flex: 6,
+                  wrap: true
+                }
+              ],
+              margin: "md"
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                {
+                  type: "text",
+                  text: "👥 ผู้ขอใช้รถ:",
+                  size: "sm",
+                  color: "#64748b",
+                  flex: 4
+                },
+                {
+                  type: "text",
+                  text: payload.passenger || 'ไม่ระบุ',
+                  size: "sm",
+                  color: "#1e293b",
+                  flex: 6,
+                  wrap: true
+                }
+              ],
+              margin: "md"
+            },
+            {
+              type: "box",
+              layout: "horizontal",
+              contents: [
+                {
+                  type: "text",
+                  text: "👨‍👩‍👦‍👦 ผู้ร่วมเดินทาง:",
+                  size: "sm",
+                  color: "#64748b",
+                  flex: 4
+                },
+                {
+                  type: "text",
+                  text: payload.passengers || 'ไม่มี',
+                  size: "sm",
+                  color: "#1e293b",
+                  flex: 6,
+                  wrap: true
+                }
+              ],
+              margin: "md"
+            }
+          );
+
           const postData = JSON.stringify({
             to: groupId,
             messages: [
               {
                 type: "flex",
-                altText: `📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`,
+                altText: altText,
                 contents: {
                   type: "bubble",
                   header: {
@@ -165,10 +338,10 @@ const server = http.createServer((req, res) => {
                     contents: [
                       {
                         type: "text",
-                        text: "📋 ใบสั่งงานพนักงานขับรถ",
+                        text: headerTitle,
                         weight: "bold",
                         size: "lg",
-                        color: "#1e3a8a"
+                        color: headerColor
                       },
                       {
                         type: "text",
@@ -178,146 +351,13 @@ const server = http.createServer((req, res) => {
                         margin: "xs"
                       }
                     ],
-                    backgroundColor: "#f8fafc",
+                    backgroundColor: headerBg,
                     paddingAll: "15px"
                   },
                   body: {
                     type: "box",
                     layout: "vertical",
-                    contents: [
-                      {
-                        type: "box",
-                        layout: "horizontal",
-                        contents: [
-                          {
-                            type: "text",
-                            text: "👤 พขร. ปฏิบัติหน้าที่:",
-                            size: "sm",
-                            color: "#64748b",
-                            flex: 4
-                          },
-                          {
-                            type: "text",
-                            text: payload.driverName || 'ไม่ระบุ',
-                            size: "sm",
-                            color: "#1e293b",
-                            weight: "bold",
-                            flex: 6,
-                            wrap: true
-                          }
-                        ]
-                      },
-                      {
-                        type: "box",
-                        layout: "horizontal",
-                        contents: [
-                          {
-                            type: "text",
-                            text: "🚗 ยานพาหนะ:",
-                            size: "sm",
-                            color: "#64748b",
-                            flex: 4
-                          },
-                          {
-                            type: "text",
-                            text: payload.carInfo || 'ไม่ระบุ',
-                            size: "sm",
-                            color: "#1e293b",
-                            flex: 6,
-                            wrap: true
-                          }
-                        ],
-                        margin: "md"
-                      },
-                      {
-                        type: "box",
-                        layout: "horizontal",
-                        contents: [
-                          {
-                            type: "text",
-                            text: "📍 สถานที่ปลายทาง:",
-                            size: "sm",
-                            color: "#64748b",
-                            flex: 4
-                          },
-                          {
-                            type: "text",
-                            text: payload.destination || 'ไม่ระบุ',
-                            size: "sm",
-                            color: "#1e293b",
-                            flex: 6,
-                            wrap: true
-                          }
-                        ],
-                        margin: "md"
-                      },
-                       {
-                        type: "box",
-                        layout: "horizontal",
-                        contents: [
-                          {
-                            type: "text",
-                            text: "📅 วันเวลาเดินทาง:",
-                            size: "sm",
-                            color: "#64748b",
-                            flex: 4
-                          },
-                          {
-                            type: "text",
-                            text: payload.dateTime || 'ไม่ระบุ',
-                            size: "sm",
-                            color: "#1e293b",
-                            flex: 6,
-                            wrap: true
-                          }
-                        ],
-                        margin: "md"
-                      },
-                      {
-                        type: "box",
-                        layout: "horizontal",
-                        contents: [
-                          {
-                            type: "text",
-                            text: "👥 ผู้ขอใช้รถ:",
-                            size: "sm",
-                            color: "#64748b",
-                            flex: 4
-                          },
-                          {
-                            type: "text",
-                            text: payload.passenger || 'ไม่ระบุ',
-                            size: "sm",
-                            color: "#1e293b",
-                            flex: 6,
-                            wrap: true
-                          }
-                        ],
-                        margin: "md"
-                      },
-                      {
-                        type: "box",
-                        layout: "horizontal",
-                        contents: [
-                          {
-                            type: "text",
-                            text: "👨‍👩‍👦‍👦 ผู้ร่วมเดินทาง:",
-                            size: "sm",
-                            color: "#64748b",
-                            flex: 4
-                          },
-                          {
-                            type: "text",
-                            text: payload.passengers || 'ไม่มี',
-                            size: "sm",
-                            color: "#1e293b",
-                            flex: 6,
-                            wrap: true
-                          }
-                        ],
-                        margin: "md"
-                      }
-                    ],
+                    contents: bodyContents
                   }
                 }
               }

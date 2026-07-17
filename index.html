@@ -735,6 +735,20 @@
           </div>
         </div>
 
+        <!-- Cancellation Action Panel -->
+        <div id="cancellation-action-panel" style="display:none; margin-top: 1.5rem; border-top: 1px dashed var(--border-color); padding-top: 1.5rem; background: rgba(220, 38, 38, 0.05); border: 1px solid rgba(220, 38, 38, 0.2); padding: 1rem; border-radius: 8px;">
+          <h4 style="margin-bottom: 0.5rem; color: #f87171; font-size: 1rem;">🚫 ดำเนินการยกเลิกใบเสนอขออนุญาต</h4>
+          
+          <div class="form-group" id="cancel-reason-group" style="margin-bottom: 1rem;">
+            <label id="cancel-reason-label" for="cancel-reason" style="color: var(--text-color);">ระบุเหตุผลในการยกเลิกใบขอจองรถ</label>
+            <input type="text" id="cancel-reason" class="form-control" placeholder="ระบุเหตุผล เช่น งานถูกเลื่อน, เปลี่ยนไปใช้รถสาธารณะ" style="border-color: rgba(220,38,38,0.4);">
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+            <button type="button" class="btn btn-danger btn-sm" id="btn-confirm-cancel-booking">🔴 ยืนยันการยกเลิก</button>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -805,6 +819,6 @@
 
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=5.8"></script>
+  <script src="app.js?v=5.9"></script>
 </body>
 </html>

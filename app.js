@@ -2406,6 +2406,49 @@ function openApprovalModal(bookingId) {
       }
     }
   }
+
+  // Handle Cancellation Panel display
+  const cancellationPanel = document.getElementById('cancellation-action-panel');
+  if (cancellationPanel) {
+    cancellationPanel.style.display = 'none';
+    document.getElementById('cancel-reason').value = '';
+    
+    const isRequester = currentUser && (booking.requester === currentUser.name || booking.username === currentUser.username);
+    const isFleetAdmin = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
+
+    if (booking.status !== 'cancelled' && booking.status !== 'rejected') {
+      if (booking.status.startsWith('pending') || booking.status === 'pending') {
+        // Pre-approval stage
+        if (isRequester || isFleetAdmin) {
+          cancellationPanel.style.display = 'block';
+          document.getElementById('cancel-reason-group').style.display = 'none'; // No reason needed for pre-approval cancel/withdraw
+          document.getElementById('btn-confirm-cancel-booking').textContent = '🔴 ยืนยันการถอนคำขอจอง';
+        }
+      } else if (booking.status === 'approved') {
+        // Post-approval stage
+        if (isRequester) {
+          cancellationPanel.style.display = 'block';
+          document.getElementById('cancel-reason-group').style.display = 'block'; // Reason required
+          document.getElementById('cancel-reason-label').textContent = 'ระบุเหตุผลในการขอร้องเรียนยกเลิกใบขอจองรถยนต์ (ส่งแอดมินพิจารณา)';
+          document.getElementById('btn-confirm-cancel-booking').textContent = '🟡 ส่งคำขอร้องเรียนยกเลิก';
+        } else if (isFleetAdmin) {
+          cancellationPanel.style.display = 'block';
+          document.getElementById('cancel-reason-group').style.display = 'block'; // Reason optional/recommended
+          document.getElementById('cancel-reason-label').textContent = 'ระบุเหตุผลการยกเลิก (เพื่อส่งแจ้งเตือนไลน์ พขร.)';
+          document.getElementById('btn-confirm-cancel-booking').textContent = '🔴 อนุมัติและสั่งยกเลิกงาน';
+        }
+      } else if (booking.status === 'cancellation_requested') {
+        // Cancellation requested stage
+        if (isFleetAdmin) {
+          cancellationPanel.style.display = 'block';
+          document.getElementById('cancel-reason-group').style.display = 'block';
+          document.getElementById('cancel-reason-label').textContent = 'เหตุผลการร้องขอยกเลิกจากผู้จอง';
+          document.getElementById('cancel-reason').value = booking.cancelReason || '';
+          document.getElementById('btn-confirm-cancel-booking').textContent = '🔴 ยืนยันอนุมัติยกเลิกใบจอง';
+        }
+      }
+    }
+  }
 }
 
 // Render Visual pipeline steps
@@ -4025,6 +4068,85 @@ function setupEventListeners() {
   // Review Approvals action panel buttons
   document.getElementById('btn-approve-request').addEventListener('click', () => handleApprovalAction(true));
   document.getElementById('btn-reject-request').addEventListener('click', () => handleApprovalAction(false));
+
+  document.getElementById('btn-confirm-cancel-booking').addEventListener('click', () => {
+    if (!activeBookingIdForApproval) return;
+    const booking = bookings.find(b => b.id === activeBookingIdForApproval);
+    if (!booking) return;
+
+    const reason = document.getElementById('cancel-reason').value.trim();
+    const isRequester = currentUser && (booking.requester === currentUser.name || booking.username === currentUser.username);
+    const isFleetAdmin = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
+
+    if (booking.status.startsWith('pending') || booking.status === 'pending') {
+      // Pre-approval stage: Direct cancellation
+      const ok = confirm("คุณต้องการถอนคำขอและยกเลิกใบขอจองรถยนต์นี้ใช่หรือไม่?");
+      if (!ok) return;
+
+      booking.status = 'cancelled';
+      booking.cancelReason = 'ผู้ใช้ถอนคำขอ';
+      saveBookings();
+      showToast("ถอนคำขอและยกเลิกใบจองเรียบร้อยแล้ว", "success");
+      document.getElementById('modal-approval').classList.remove('active');
+      updateStats();
+      renderDashboard();
+      renderBookingsLists();
+      renderMonthCalendar();
+    } else if (booking.status === 'approved') {
+      // Post-approval stage
+      if (isRequester) {
+        if (!reason) {
+          showToast("กรุณาระบุเหตุผลที่ขอร้องเรียนยกเลิกใบขอจองรถยนต์", "warning");
+          return;
+        }
+        const ok = confirm("ยืนยันส่งคำขอร้องเรียนยกเลิกใบเสนอขออนุญาตนี้?");
+        if (!ok) return;
+
+        booking.status = 'cancellation_requested';
+        booking.cancelReason = reason;
+        saveBookings();
+        showToast("ส่งคำขอร้องเรียนยกเลิกไปยังแอดมินแล้ว", "success");
+        document.getElementById('modal-approval').classList.remove('active');
+        updateStats();
+        renderDashboard();
+        renderBookingsLists();
+        renderMonthCalendar();
+      } else if (isFleetAdmin) {
+        const ok = confirm("⚠️ คุณแน่ใจที่จะลบและยกเลิกคิวงาน พขร. นี้ใช่หรือไม่?\n\n(ระบบจะส่งข้อความแจ้งยกเลิกเข้ากลุ่ม LINE ทันที)");
+        if (!ok) return;
+
+        booking.status = 'cancelled';
+        booking.cancelReason = reason || 'ผู้จัดรถยกเลิกงาน';
+        saveBookings();
+        showToast("ยกเลิกใบขอจองรถยนต์เรียบร้อยแล้ว", "success");
+        document.getElementById('modal-approval').classList.remove('active');
+        updateStats();
+        renderDashboard();
+        renderBookingsLists();
+        renderMonthCalendar();
+
+        // Send LINE Cancellation Notification
+        triggerLineCancellation(booking, reason || 'ผู้จัดรถยกเลิกงาน');
+      }
+    } else if (booking.status === 'cancellation_requested') {
+      if (isFleetAdmin) {
+        const ok = confirm("⚠️ อนุมัติการร้องขอยกเลิกและสั่งยกเลิกคิวงาน พขร. นี้ใช่หรือไม่?\n\n(ระบบจะส่งข้อความแจ้งยกเลิกเข้ากลุ่ม LINE ทันที)");
+        if (!ok) return;
+
+        booking.status = 'cancelled';
+        saveBookings();
+        showToast("อนุมัติยกเลิกใบขอจองเรียบร้อยแล้ว", "success");
+        document.getElementById('modal-approval').classList.remove('active');
+        updateStats();
+        renderDashboard();
+        renderBookingsLists();
+        renderMonthCalendar();
+
+        // Send LINE Cancellation Notification
+        triggerLineCancellation(booking, booking.cancelReason || 'อนุมัติการร้องขอยกเลิก');
+      }
+    }
+  });
 
   // Report Sheet controls
   document.getElementById('btn-report-back').addEventListener('click', () => {
@@ -5783,5 +5905,45 @@ function triggerLineNotification(booking, carPlate) {
   })
   .catch(err => {
     console.error('Failed to send LINE notification:', err);
+  });
+}
+
+// Helper function to send LINE Group cancellation notification
+function triggerLineCancellation(booking, reason) {
+  let carObj = cars.find(c => c.id === booking.carId);
+  if (!carObj && booking.driverName && booking.driverName !== '-') {
+    const searchName = booking.driverName.replace(/\s+/g, '');
+    carObj = cars.find(c => c.driverName && c.driverName.replace(/\s+/g, '') === searchName);
+  }
+  const carPlate = carObj ? carObj.plate : '-';
+
+  const payload = {
+    type: 'cancel',
+    bookingId: booking.id,
+    driverName: booking.driverName || 'ไม่ระบุ',
+    carInfo: booking.carId === 'taxi' ? 'รถรับจ้างสาธารณะ (TAXI)' : `รถยนต์ อสป. ทะเบียน ${carPlate || '-'}`,
+    destination: booking.destination || 'ไม่ระบุ',
+    dateTime: formatThaiDateTime(booking.startDate),
+    passenger: booking.name || booking.requester || '',
+    passengers: booking.passengers || 'ไม่มี',
+    cancelReason: reason || 'ไม่ระบุเหตุผล'
+  };
+
+  fetch('/api/notify-driver-group', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8'
+    },
+    body: JSON.stringify(payload)
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === 'success') {
+      console.log('LINE Cancellation notification sent successfully');
+      showToast('ส่งแจ้งเตือนยกเลิกงานไปยังไลน์กลุ่ม พขร. เรียบร้อยแล้ว', 'success');
+    }
+  })
+  .catch(err => {
+    console.error('Failed to send LINE cancellation:', err);
   });
 }

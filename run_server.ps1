@@ -157,6 +157,196 @@ try {
             continue
         }
 
+        # API: notify-driver-group
+        if ($urlPath -eq "/api/notify-driver-group" -and $request.HttpMethod -eq "POST") {
+            try {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $bodyText = $reader.ReadToEnd()
+                $reader.Close()
+
+                $payload = ConvertFrom-Json $bodyText
+                
+                $lineConfigPath = Join-Path $rootDir "line_config.json"
+                if (Test-Path $lineConfigPath) {
+                    $config = Get-Content $lineConfigPath -Raw | ConvertFrom-Json
+                    $accessToken = $config.channelAccessToken
+                    $groupId = $config.groupId
+                    
+                    if ($accessToken -and $groupId -and -not $accessToken.Contains("YOUR_LINE_") -and -not $groupId.Contains("YOUR_LINE_")) {
+                        
+                        $isCancel = $payload.type -eq "cancel"
+                        $headerTitle = if ($isCancel) { "⚠️ แจ้งยกเลิกใบสั่งงาน พขร." } else { "📋 ใบสั่งงานพนักงานขับรถ" }
+                        $headerColor = if ($isCancel) { "#dc2626" } else { "#1e3a8a" }
+                        $headerBg = if ($isCancel) { "#fef2f2" } else { "#f8fafc" }
+                        $altText = if ($isCancel) { "⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: $($payload.destination)" } else { "📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: $($payload.destination)" }
+
+                        # Build body contents list dynamically
+                        $bodyContents = [System.Collections.ArrayList]::new()
+                        if ($isCancel) {
+                            $bodyContents.Add(@{
+                                type = "text"
+                                text = "❌ คิวงานนี้ถูกยกเลิกแล้ว"
+                                weight = "bold"
+                                size = "md"
+                                color = "#dc2626"
+                            }) > $null
+                            $bodyContents.Add(@{
+                                type = "text"
+                                text = "💬 เหตุผล: $($payload.cancelReason)"
+                                size = "sm"
+                                color = "#ef4444"
+                                margin = "xs"
+                                wrap = $true
+                            }) > $null
+                            $bodyContents.Add(@{
+                                type = "separator"
+                                margin = "md"
+                                color = "#e2e8f0"
+                            }) > $null
+                        }
+
+                        $bodyContents.Add(@{
+                            type = "box"
+                            layout = "horizontal"
+                            margin = if ($isCancel) { "md" } else { "none" }
+                            contents = @(
+                                @{ type = "text"; text = "👤 พขร. ปฏิบัติหน้าที่:"; size = "sm"; color = "#64748b"; flex = 4 },
+                                @{ type = "text"; text = $payload.driverName; size = "sm"; color = "#1e293b"; weight = "bold"; flex = 6; wrap = $true }
+                            )
+                        }) > $null
+
+                        $bodyContents.Add(@{
+                            type = "box"
+                            layout = "horizontal"
+                            margin = "md"
+                            contents = @(
+                                @{ type = "text"; text = "🚗 ยานพาหนะ:"; size = "sm"; color = "#64748b"; flex = 4 },
+                                @{ type = "text"; text = $payload.carInfo; size = "sm"; color = "#1e293b"; flex = 6; wrap = $true }
+                            )
+                        }) > $null
+
+                        $bodyContents.Add(@{
+                            type = "box"
+                            layout = "horizontal"
+                            margin = "md"
+                            contents = @(
+                                @{ type = "text"; text = "📍 สถานที่ปลายทาง:"; size = "sm"; color = "#64748b"; flex = 4 },
+                                @{ type = "text"; text = $payload.destination; size = "sm"; color = "#1e293b"; flex = 6; wrap = $true }
+                            )
+                        }) > $null
+
+                        $bodyContents.Add(@{
+                            type = "box"
+                            layout = "horizontal"
+                            margin = "md"
+                            contents = @(
+                                @{ type = "text"; text = "📅 วันเวลาเดินทาง:"; size = "sm"; color = "#64748b"; flex = 4 },
+                                @{ type = "text"; text = $payload.dateTime; size = "sm"; color = "#1e293b"; flex = 6; wrap = $true }
+                            )
+                        }) > $null
+
+                        $bodyContents.Add(@{
+                            type = "box"
+                            layout = "horizontal"
+                            margin = "md"
+                            contents = @(
+                                @{ type = "text"; text = "👥 ผู้ขอใช้รถ:"; size = "sm"; color = "#64748b"; flex = 4 },
+                                @{ type = "text"; text = $payload.passenger; size = "sm"; color = "#1e293b"; flex = 6; wrap = $true }
+                            )
+                        }) > $null
+
+                        $bodyContents.Add(@{
+                            type = "box"
+                            layout = "horizontal"
+                            margin = "md"
+                            contents = @(
+                                @{ type = "text"; text = "👨‍👩‍👦‍👦 ผู้ร่วมเดินทาง:"; size = "sm"; color = "#64748b"; flex = 4 },
+                                @{ type = "text"; text = $payload.passengers; size = "sm"; color = "#1e293b"; flex = 6; wrap = $true }
+                            )
+                        }) > $null
+
+                        $linePayload = @{
+                            to = $groupId
+                            messages = @(
+                                @{
+                                    type = "flex"
+                                    altText = $altText
+                                    contents = @{
+                                        type = "bubble"
+                                        header = @{
+                                            type = "box"
+                                            layout = "vertical"
+                                            contents = @(
+                                                @{ type = "text"; text = $headerTitle; weight = "bold"; size = "lg"; color = $headerColor },
+                                                @{ type = "text"; text = "ระบบจองรถยนต์สะพานปลา (FMO)"; size = "xs"; color = "#64748b"; margin = "xs" }
+                                            )
+                                            backgroundColor = $headerBg
+                                            paddingAll = "15px"
+                                        }
+                                        body = @{
+                                            type = "box"
+                                            layout = "vertical"
+                                            contents = $bodyContents
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        $headers = @{
+                            "Authorization" = "Bearer $accessToken"
+                            "Content-Type" = "application/json"
+                        }
+                        
+                        $jsonPayload = $linePayload | ConvertTo-Json -Depth 10
+                        $utf8Bytes = [System.Text.Encoding]::UTF8.GetBytes($jsonPayload)
+                        
+                        $requestUri = "https://api.line.me/v2/bot/message/push"
+                        
+                        # Send to LINE API asynchronously using Start-Job
+                        Start-Job -ScriptBlock {
+                            param($uri, $headers, $bytes)
+                            try {
+                                $webRequest = [System.Net.WebRequest]::Create($uri)
+                                $webRequest.Method = "POST"
+                                $webRequest.ContentType = "application/json"
+                                foreach ($h in $headers.Keys) {
+                                    if ($h -eq "Authorization") {
+                                        $webRequest.Headers.Add($h, $headers[$h])
+                                    }
+                                }
+                                $webRequest.ContentLength = $bytes.Length
+                                $requestStream = $webRequest.GetRequestStream()
+                                $requestStream.Write($bytes, 0, $bytes.Length)
+                                $requestStream.Close()
+                                
+                                $webResponse = $webRequest.GetResponse()
+                                $webResponse.Close()
+                            } catch {
+                                Write-Host "Error in background LINE push: $_"
+                            }
+                        } -ArgumentList $requestUri, $headers, $utf8Bytes
+                    }
+                }
+
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Notification queued"}')
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            } catch {
+                Write-Host "Error in notify-driver-group: $_"
+                $response.StatusCode = 500
+                $response.ContentType = "application/json; charset=utf-8"
+                $errObj = @{ status = "error"; message = $_.ToString() } | ConvertTo-Json
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($errObj)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            }
+            $response.Close()
+            continue
+        }
+
         if ($urlPath -eq "/") { $urlPath = "/index.html" }
 
         # Resolve clean paths
