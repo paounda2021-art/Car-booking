@@ -2741,6 +2741,9 @@ function renderApprovalPipeline(booking) {
     { level: 4, title: 'ผู้อำนวยการฝ่ายบัญชีการเงิน (ผฝ.บง.) (L4)', role: 'executive' }
   ];
 
+  const rejectSig = booking.signatures.find(s => s.status === 'rejected');
+  const rejectLevel = rejectSig ? rejectSig.level : null;
+
   stepsDef.forEach(step => {
     const sig = booking.signatures.find(s => s.level === step.level);
     let stepClass = 'pipeline-step';
@@ -2781,6 +2784,9 @@ function renderApprovalPipeline(booking) {
           </div>
         </div>
       `;
+    } else if (rejectLevel !== null && step.level > rejectLevel) {
+      statusText = 'ไม่ดำเนินการต่อ';
+      icon = '⚪';
     }
 
     const stepDiv = document.createElement('div');
