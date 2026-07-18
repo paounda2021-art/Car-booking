@@ -87,7 +87,8 @@ try {
       driverAccepted INTEGER,
       signatures TEXT,
       waitingForRequesterInput INTEGER,
-      taxiInfo TEXT
+      taxiInfo TEXT,
+      active INTEGER
     )
   `);
 
@@ -147,13 +148,13 @@ try {
       driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince,
       purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price,
       goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures,
-      waitingForRequesterInput, taxiInfo
+      waitingForRequesterInput, taxiInfo, active
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?,
-      ?, ?
+      ?, ?, ?
     )
   `);
 
@@ -164,6 +165,7 @@ try {
     const returnedEarly = b.returnedEarly ? 1 : 0;
     const driverAccepted = b.driverAccepted ? 1 : 0;
     const waitingForRequesterInput = b.waitingForRequesterInput ? 1 : 0;
+    const active = b.active ? 1 : 0;
 
     // Serialize objects/arrays to JSON string
     const signaturesStr = b.signatures ? JSON.stringify(b.signatures) : '[]';
@@ -206,7 +208,8 @@ try {
       driverAccepted,
       signaturesStr,
       waitingForRequesterInput,
-      taxiInfoStr
+      taxiInfoStr,
+      active
     );
   });
 

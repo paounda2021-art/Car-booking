@@ -11,6 +11,13 @@ const ROOT_DIR = __dirname;
 // Initialize SQLite database
 const db = new DatabaseSync(path.join(ROOT_DIR, 'database.db'));
 
+// Ensure schema is updated with active column for system_config
+try {
+  db.exec("ALTER TABLE bookings ADD COLUMN active INTEGER DEFAULT 0;");
+} catch(e) {
+  // Ignore if column already exists
+}
+
 // SQLite Helper Functions
 
 function sqliteGetBookings() {
@@ -24,6 +31,7 @@ function sqliteGetBookings() {
       b.returnedEarly = r.returnedEarly === 1;
       b.driverAccepted = r.driverAccepted === 1;
       b.waitingForRequesterInput = r.waitingForRequesterInput === 1;
+      b.active = r.active === 1;
       
       try { b.signatures = JSON.parse(r.signatures || '[]'); } catch(e) { b.signatures = []; }
       try { b.taxiInfo = JSON.parse(r.taxiInfo || '{}'); } catch(e) { b.taxiInfo = {}; }
@@ -44,13 +52,13 @@ function sqliteSaveBookings(bookingsList) {
         driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince,
         purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price,
         goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures,
-        waitingForRequesterInput, taxiInfo
+        waitingForRequesterInput, taxiInfo, active
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?
+        ?, ?, ?
       )
     `);
     
@@ -92,7 +100,8 @@ function sqliteSaveBookings(bookingsList) {
         b.driverAccepted ? 1 : 0,
         b.signatures ? JSON.stringify(b.signatures) : '[]',
         b.waitingForRequesterInput ? 1 : 0,
-        b.taxiInfo ? JSON.stringify(b.taxiInfo) : '{}'
+        b.taxiInfo ? JSON.stringify(b.taxiInfo) : '{}',
+        b.active ? 1 : 0
       );
     });
     console.log("SQLite: Saved all bookings successfully");
