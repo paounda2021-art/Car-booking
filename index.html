@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบขออนุมัติใช้รถยนต์และเบิกจ่าย - องค์การสะพานปลา</title>
   <link rel="stylesheet" href="flatpickr.min.css?v=1.0">
-  <link rel="stylesheet" href="style.css?v=5.5">
+  <link rel="stylesheet" href="style.css?v=5.6">
 </head>
 <body>
   <!-- MAINTENANCE SCREEN (Overlay) -->
@@ -143,24 +143,24 @@
       <div class="sidebar-footer" style="padding: 1rem 0.75rem; width: 100%; border-top: 1px solid var(--border-color); margin-top: auto; display: flex; flex-direction: column; gap: 0.75rem;">
         
         <!-- Login Button -->
-        <button class="btn btn-primary" id="btn-top-login" style="width: 100%; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 0.35rem; background: var(--primary-color); border-color: var(--primary-color);">
+        <button class="btn btn-primary" id="btn-top-login" style="width: 100%; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 0.35rem; color: white !important;">
           🔓 เข้าสู่ระบบ
         </button>
 
         <!-- User Profile (hidden by default) -->
-        <div id="header-user-profile" class="header-user-profile hidden" style="display: none; flex-direction: column; align-items: stretch; gap: 0.75rem; background: rgba(255,255,255,0.08); padding: 0.75rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); width: 100%;">
+        <div id="header-user-profile" class="header-user-profile hidden" style="display: none; flex-direction: column; align-items: stretch; gap: 0.75rem; padding: 0.75rem 1rem; width: 100%;">
           <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <div id="email-inbox-trigger" style="position: relative; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.15); border-radius: 50%; width: 32px; height: 32px; border: 1px solid rgba(255,255,255,0.15);">
+            <div id="email-inbox-trigger" style="position: relative; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.75); border-radius: 50%; width: 36px; height: 36px; border: 1px solid var(--border-color);">
               <span>🔔</span>
-              <span id="email-inbox-badge" style="position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; padding: 1px 5px; font-size: 0.65rem; font-weight: bold; display: none;">0</span>
+              <span id="email-inbox-badge" style="position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;">0</span>
             </div>
-            <div class="avatar" id="user-avatar" style="width: 32px; height: 32px; font-size: 0.85rem; background: var(--primary-color); color: white;">?</div>
-            <div class="user-info" style="display: flex; flex-direction: column; min-width: 0;">
-              <span class="user-name" id="user-display-name" style="color: white; font-weight: 500; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;">ผู้ใช้</span>
-              <span class="user-role-badge" id="user-role-label" style="background: rgba(255,255,255,0.15); color: #cbd5e1; font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; width: fit-content; margin-top: 2px; line-height: 1.2;">ตำแหน่ง</span>
+            <div class="avatar" id="user-avatar">?</div>
+            <div class="user-info">
+              <span class="user-name" id="user-display-name">ผู้ใช้</span>
+              <span class="user-role-badge" id="user-role-label">ตำแหน่ง</span>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-logout" style="width: 100%; color: var(--danger); border-color: rgba(220, 38, 38, 0.3); background: rgba(220, 38, 38, 0.1); font-size: 0.75rem; padding: 0.4rem; border-radius: 6px;">
+          <button class="btn btn-secondary btn-sm" id="btn-logout" style="width: 100%; color: var(--danger); border-color: rgba(220, 38, 38, 0.2);">
             🚪 ออกจากระบบ
           </button>
         </div>
@@ -1105,6 +1105,6 @@
 
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=8.1"></script>
+  <script src="app.js?v=8.2"></script>
 </body>
 </html>
