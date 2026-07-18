@@ -24,6 +24,9 @@ try { db.exec("ALTER TABLE cars ADD COLUMN icon TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN driverName TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN phone TEXT;"); } catch(e) {}
 
+// Ensure schema is updated with customApprovalLevels for users
+try { db.exec("ALTER TABLE users ADD COLUMN customApprovalLevels TEXT;"); } catch(e) {}
+
 // SQLite Helper Functions
 
 function sqliteGetBookings() {
@@ -161,7 +164,18 @@ function sqliteSaveCars(carsList) {
 function sqliteGetUsers() {
   try {
     const query = db.prepare("SELECT * FROM users");
-    return query.all();
+    const rows = query.all();
+    return rows.map(r => {
+      const u = { ...r };
+      if (r.customApprovalLevels) {
+        try {
+          u.customApprovalLevels = JSON.parse(r.customApprovalLevels);
+        } catch(e) {
+          delete u.customApprovalLevels;
+        }
+      }
+      return u;
+    });
   } catch (e) {
     console.error("SQLite Read error (users):", e);
     return null;
@@ -172,8 +186,8 @@ function sqliteSaveUsers(usersList) {
   try {
     db.exec("DELETE FROM users");
     const insertUser = db.prepare(`
-      INSERT INTO users (employee_id, username, email, name, position, department1, department2, role, manager_email, sign)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (employee_id, username, email, name, position, department1, department2, role, manager_email, sign, customApprovalLevels)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     usersList.forEach(u => {
       insertUser.run(
@@ -186,7 +200,8 @@ function sqliteSaveUsers(usersList) {
         u.department2 || '',
         u.role || '',
         u.manager_email || '',
-        u.sign || ''
+        u.sign || '',
+        u.customApprovalLevels ? JSON.stringify(u.customApprovalLevels) : null
       );
     });
     console.log("SQLite: Saved all users successfully");

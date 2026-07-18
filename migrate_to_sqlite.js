@@ -31,7 +31,8 @@ try {
       department2 TEXT,
       role TEXT,
       manager_email TEXT,
-      sign TEXT
+      sign TEXT,
+      customApprovalLevels TEXT
     )
   `);
 
@@ -108,8 +109,8 @@ try {
   // 5. Populate users
   console.log(`Migrating ${usersList.length} users...`);
   const insertUser = db.prepare(`
-    INSERT INTO users (employee_id, username, email, name, position, department1, department2, role, manager_email, sign)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (employee_id, username, email, name, position, department1, department2, role, manager_email, sign, customApprovalLevels)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   usersList.forEach(u => {
     insertUser.run(
@@ -122,7 +123,8 @@ try {
       u.department2 || '',
       u.role || '',
       u.manager_email || '',
-      u.sign || ''
+      u.sign || '',
+      u.customApprovalLevels ? JSON.stringify(u.customApprovalLevels) : null
     );
   });
 
