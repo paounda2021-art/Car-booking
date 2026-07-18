@@ -73,14 +73,15 @@ body {
 .sidebar {
   background: var(--bg-card);
   border-right: 1px solid var(--border-color);
-  padding: 2rem 1.5rem;
+  padding: 1.25rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
   position: sticky;
   top: 0;
   height: 100vh;
   z-index: 10;
+  overflow-y: auto;
 }
 
 .logo-section {
