@@ -2711,6 +2711,11 @@ span.flatpickr-weekday {
   .settings-tabs-bar .tab-btn {
     flex-shrink: 0 !important;
   }
+
+/* Sidebar Profile Layout */
+.sidebar .header-user-profile {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  width: 100% !important;
 }
-
-
