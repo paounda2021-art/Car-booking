@@ -2712,3 +2712,20 @@ span.flatpickr-weekday {
     flex-shrink: 0 !important;
   }
 }
+
+/* Sidebar User Profile Styling */
+.sidebar .header-user-profile {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  display: flex !important;
+}
+.sidebar .header-user-profile .user-name {
+  color: white !important;
+}
+.sidebar .header-user-profile .user-role-badge {
+  color: #cbd5e1 !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
