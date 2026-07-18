@@ -39,10 +39,14 @@ try {
   db.exec(`
     CREATE TABLE cars (
       id TEXT PRIMARY KEY,
-      plate TEXT,
+      name TEXT,
       type TEXT,
-      brand TEXT,
+      plate TEXT,
       status TEXT,
+      icon TEXT,
+      driverName TEXT,
+      phone TEXT,
+      brand TEXT,
       driver TEXT,
       controlUnit TEXT
     )
@@ -125,16 +129,20 @@ try {
   // 6. Populate cars
   console.log(`Migrating ${carsList.length} cars...`);
   const insertCar = db.prepare(`
-    INSERT INTO cars (id, plate, type, brand, status, driver, controlUnit)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO cars (id, name, type, plate, status, icon, driverName, phone, brand, driver, controlUnit)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   carsList.forEach(c => {
     insertCar.run(
       c.id || '',
-      c.plate || '',
+      c.name || '',
       c.type || '',
-      c.brand || '',
+      c.plate || '',
       c.status || '',
+      c.icon || '',
+      c.driverName || '',
+      c.phone || '',
+      c.brand || '',
       c.driver || '',
       c.controlUnit || ''
     );
