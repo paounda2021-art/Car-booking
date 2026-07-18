@@ -1109,9 +1109,10 @@ function loginUser(userObj) {
     btnOpenBooking.classList.remove('hidden'); // พนักงานทั่วไป, L1 หรือ L2 สามารถเห็นปุ่มเขียนใบได้ปกติ
   }
 
-  // ซ่อนปุ่มเข้าสู่ระบบ / แสดงการ์ดโปรไฟล์
+  // ซ่อนปุ่มเข้าสู่ระบบ / แสดงการ์ดโปรไฟล์ / แสดงปุ่มออกจากระบบใน sidebar
   document.getElementById('btn-top-login').classList.add('hidden');
   document.getElementById('header-user-profile').classList.remove('hidden');
+  document.getElementById('btn-logout')?.classList.remove('hidden');
   
   // แสดงปุ่มปิดระบบชั่วคราวเฉพาะ ranida.c
   const sidebarDeactivateContainer = document.getElementById('sidebar-deactivate-container');
@@ -1302,6 +1303,7 @@ function checkLoginStatus() {
     // Header actions
     document.getElementById('btn-top-login').classList.remove('hidden');
     document.getElementById('header-user-profile').classList.add('hidden');
+    document.getElementById('btn-logout')?.classList.add('hidden');
     document.getElementById('btn-open-booking').classList.add('hidden');
 
     

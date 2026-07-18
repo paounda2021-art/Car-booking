@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบขออนุมัติใช้รถยนต์และเบิกจ่าย - องค์การสะพานปลา</title>
   <link rel="stylesheet" href="flatpickr.min.css?v=1.0">
-  <link rel="stylesheet" href="style.css?v=5.7">
+  <link rel="stylesheet" href="style.css?v=5.8">
 </head>
 <body>
   <!-- MAINTENANCE SCREEN (Overlay) -->
@@ -147,23 +147,10 @@
           🔓 เข้าสู่ระบบ
         </button>
 
-        <!-- User Profile (hidden by default) -->
-        <div id="header-user-profile" class="header-user-profile hidden">
-          <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <div id="email-inbox-trigger" style="position: relative; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.75); border-radius: 50%; width: 36px; height: 36px; border: 1px solid var(--border-color);">
-              <span>🔔</span>
-              <span id="email-inbox-badge" style="position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;">0</span>
-            </div>
-            <div class="avatar" id="user-avatar">?</div>
-            <div class="user-info">
-              <span class="user-name" id="user-display-name">ผู้ใช้</span>
-              <span class="user-role-badge" id="user-role-label">ตำแหน่ง</span>
-            </div>
-          </div>
-          <button class="btn btn-secondary btn-sm" id="btn-logout" style="width: 100%; color: var(--danger); border-color: rgba(220, 38, 38, 0.2);">
-            🚪 ออกจากระบบ
-          </button>
-        </div>
+        <!-- Logout Button (hidden by default) -->
+        <button class="btn btn-secondary btn-sm hidden" id="btn-logout" style="width: 100%; color: var(--danger); border-color: rgba(220, 38, 38, 0.2); font-weight: bold; padding: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 6px;">
+          🚪 ออกจากระบบ
+        </button>
 
         <!-- Deactivation button for Ranida (hidden by default) -->
         <div class="hidden" id="sidebar-deactivate-container" style="display: none; width: 100%;">
@@ -188,6 +175,20 @@
       </div>
 
       <div class="header-actions" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; width: 320px; flex-shrink: 0;">
+
+        <div id="header-user-profile" class="header-user-profile hidden" style="flex-direction: row; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.65); padding: 0.5rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); margin: 0; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 0.75rem; width: 100%;">
+            <div id="email-inbox-trigger" style="position: relative; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.75); border-radius: 50%; width: 36px; height: 36px; border: 1px solid var(--border-color);">
+              <span>🔔</span>
+              <span id="email-inbox-badge" style="position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; font-weight: bold; display: none;">0</span>
+            </div>
+            <div class="avatar" id="user-avatar">?</div>
+            <div class="user-info">
+              <span class="user-name" id="user-display-name">ผู้ใช้</span>
+              <span class="user-role-badge" id="user-role-label">ตำแหน่ง</span>
+            </div>
+          </div>
+        </div>
 
         <div id="approval-level-container" class="hidden" style="display: none; width: 100%;">
   <select id="approval-level-switcher" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--primary-color); background-color: #f8fafc; color: var(--primary-color); font-weight: bold;">
@@ -1105,6 +1106,6 @@
 
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=8.3"></script>
+  <script src="app.js?v=8.4"></script>
 </body>
 </html>
