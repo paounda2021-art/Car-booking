@@ -6572,7 +6572,6 @@ function renderAdminUsers() {
 
     return `
       <tr style="border-bottom: 1px solid var(--border-color); font-size: 0.85rem;">
-        <td style="padding: 0.85rem 1rem; font-family: monospace; font-weight: bold; color: var(--text-main);">${u.employee_id || '-'}</td>
         <td style="padding: 0.85rem 1rem; font-weight: 500; color: var(--text-main);">${u.name}</td>
         <td style="padding: 0.85rem 1rem; color: var(--text-main);">
           <strong>${u.username}</strong><br>
