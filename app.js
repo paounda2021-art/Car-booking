@@ -2357,11 +2357,31 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
 }
 
 // Open Approval Details Modal
-function openApprovalModal(bookingId) {
+async function openApprovalModal(bookingId) {
   if (!bookingId) return;
-  const booking = bookings.find(b => b.id === bookingId || (b.id && b.id.trim() === bookingId.trim()));
+
+  let booking = bookings.find(b => b.id === bookingId || (b.id && b.id.trim() === bookingId.trim()));
+
   if (!booking) {
-    console.warn("openApprovalModal: Booking not found for ID", bookingId);
+    try {
+      const dbResponse = await fetch('/api/get-bookings?t=' + Date.now(), { cache: 'no-store' });
+      if (dbResponse.ok) {
+        let dbBookings = await dbResponse.json();
+        if (dbBookings && Array.isArray(dbBookings)) {
+          bookings = dbBookings.filter(b => b.id !== 'system_config');
+          localStorage.setItem('bookings_data', JSON.stringify(bookings));
+          booking = bookings.find(b => b.id === bookingId || (b.id && b.id.trim() === bookingId.trim()));
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching booking details fallback:", e);
+    }
+  }
+
+  if (!booking) {
+    if (typeof showToast === 'function') {
+      showToast(`ไม่พบข้อมูลคำขอเลขที่ ${bookingId} ในระบบ`, "error");
+    }
     return;
   }
 
@@ -2370,7 +2390,8 @@ function openApprovalModal(bookingId) {
   const modal = document.getElementById('modal-approval');
   if (!modal) return;
 
-  modal.style.display = '';
+  modal.style.display = 'flex';
+  modal.style.zIndex = '99999';
   modal.classList.add('active');
 
   // We will resize and load signature in setTimeout to ensure proper layout and avoid signature clear
@@ -4158,7 +4179,11 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-close-approval').addEventListener('click', () => {
-    document.getElementById('modal-approval').classList.remove('active');
+    const modal = document.getElementById('modal-approval');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    }
   });
 
 
