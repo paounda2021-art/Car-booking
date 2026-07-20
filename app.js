@@ -1929,6 +1929,11 @@ function renderBookingsLists() {
   const helperCreateCard = (b, isPendingForMe) => {
     let statusClass = 'warning';
     let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
+
+    const isL2User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
+    const l2Sig = (b.signatures && Array.isArray(b.signatures)) ? b.signatures.find(s => s.level === 2) : null;
+    const isApprovedByL2 = l2Sig && l2Sig.status === 'approved';
+
     if (b.status === 'cancelled') {
       statusClass = 'danger';
       const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
@@ -1950,6 +1955,9 @@ function renderBookingsLists() {
     } else if (b.status === 'rejected') {
       statusClass = 'danger';
       statusText = 'ปฏิเสธคำขอ';
+    } else if (isL2User && isApprovedByL2 && b.currentApprovalLevel > 2) {
+      statusClass = 'info';
+      statusText = `✅ L2 ผ่านแล้ว (รอ L${b.currentApprovalLevel})`;
     }
 
     const startDateStr = formatThaiDateTime(b.startDate);
