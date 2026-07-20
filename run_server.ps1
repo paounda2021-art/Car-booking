@@ -1,4 +1,4 @@
-# PowerShell Static Web Server for Windows
+﻿# PowerShell Static Web Server for Windows
 # Run this script to serve index.html, style.css, and app.js locally.
 
 $port = 8080
@@ -68,6 +68,60 @@ try {
                 $response.StatusCode = 200
                 $response.ContentType = "application/json; charset=utf-8"
                 $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Bookings saved successfully"}')
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            } catch {
+                $response.StatusCode = 500
+                $response.ContentType = "application/json; charset=utf-8"
+                $errObj = @{ status = "error"; message = $_.ToString() } | ConvertTo-Json
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($errObj)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            }
+            $response.Close()
+            continue
+        }
+
+        # API: save-cars
+        if ($urlPath -eq "/api/save-cars" -and $request.HttpMethod -eq "POST") {
+            try {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $bodyText = $reader.ReadToEnd()
+                $reader.Close()
+
+                $carsFile = Join-Path $rootDir "cars.json"
+                Set-Content -Path $carsFile -Value $bodyText -Encoding UTF8
+
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Cars saved successfully"}')
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            } catch {
+                $response.StatusCode = 500
+                $response.ContentType = "application/json; charset=utf-8"
+                $errObj = @{ status = "error"; message = $_.ToString() } | ConvertTo-Json
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes($errObj)
+                $response.ContentLength64 = $resBytes.Length
+                $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+            }
+            $response.Close()
+            continue
+        }
+
+        # API: save-users
+        if ($urlPath -eq "/api/save-users" -and $request.HttpMethod -eq "POST") {
+            try {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $bodyText = $reader.ReadToEnd()
+                $reader.Close()
+
+                $usersFile = Join-Path $rootDir "users.json"
+                Set-Content -Path $usersFile -Value $bodyText -Encoding UTF8
+
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $resBytes = [System.Text.Encoding]::UTF8.GetBytes('{"status":"success","message":"Users saved successfully"}')
                 $response.ContentLength64 = $resBytes.Length
                 $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
             } catch {
@@ -177,10 +231,30 @@ try {
                     if ($accessToken -and $groupId -and -not $accessToken.Contains("YOUR_LINE_") -and -not $groupId.Contains("YOUR_LINE_")) {
                         
                         $isCancel = $payload.type -eq "cancel"
-                        $headerTitle = if ($isCancel) { "⚠️ แจ้งยกเลิกใบสั่งงาน พขร." } else { "📋 ใบสั่งงานพนักงานขับรถ" }
-                        $headerColor = if ($isCancel) { "#dc2626" } else { "#1e3a8a" }
-                        $headerBg = if ($isCancel) { "#fef2f2" } else { "#f8fafc" }
-                        $altText = if ($isCancel) { "⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: $($payload.destination)" } else { "📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: $($payload.destination)" }
+                        $isAccept = $payload.type -eq "accept"
+                        $isFinish = $payload.type -eq "finish"
+
+                        $headerTitle = "📋 ใบสั่งงานพนักงานขับรถ"
+                        $headerColor = "#1e3a8a"
+                        $headerBg = "#f8fafc"
+                        $altText = "📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: $($payload.destination)"
+
+                        if ($isCancel) {
+                            $headerTitle = "⚠️ แจ้งยกเลิกใบสั่งงาน พขร."
+                            $headerColor = "#dc2626"
+                            $headerBg = "#fef2f2"
+                            $altText = "⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: $($payload.destination)"
+                        } elseif ($isAccept) {
+                            $headerTitle = "🟢 พขร. รับงานแล้ว"
+                            $headerColor = "#10b981"
+                            $headerBg = "#f0fdf4"
+                            $altText = "🟢 พขร. รับงานแล้ว - ปลายทาง: $($payload.destination)"
+                        } elseif ($isFinish) {
+                            $headerTitle = "🏁 เสร็จสิ้นใบสั่งงาน (พขร. คืนรถแล้ว)"
+                            $headerColor = "#64748b"
+                            $headerBg = "#f1f5f9"
+                            $altText = "🏁 เสร็จสิ้นคิวงาน พขร. - ปลายทาง: $($payload.destination)"
+                        }
 
                         # Build body contents list dynamically
                         $bodyContents = [System.Collections.ArrayList]::new()
@@ -286,8 +360,20 @@ try {
                             }
                         }
 
-                        if (-not $isCancel) {
+                        if (-not $isCancel -and -not $isFinish) {
                             $origin = if ($payload.origin) { $payload.origin } else { "http://localhost:8080" }
+                            $btnLabel = "✅ กดรับงาน"
+                            $btnActionUri = "$origin/index.html?action=accept-job&id=$($payload.bookingId)"
+                            $btnStyle = "primary"
+                            $btnColor = "#10b981"
+
+                            if ($isAccept) {
+                                $btnLabel = "🔴 จบงาน (คืนรถ)"
+                                $btnActionUri = "$origin/index.html?action=return-early&id=$($payload.bookingId)"
+                                $btnStyle = "secondary"
+                                $btnColor = "#ef4444"
+                            }
+
                             $bubbleContents.Add("footer", @{
                                 type = "box"
                                 layout = "vertical"
@@ -296,11 +382,11 @@ try {
                                         type = "button"
                                         action = @{
                                             type = "uri"
-                                            label = "✅ กดรับงาน"
-                                            uri = "$origin/index.html?action=accept-job&id=$($payload.bookingId)"
+                                            label = $btnLabel
+                                            uri = $btnActionUri
                                         }
-                                        style = "primary"
-                                        color = "#10b981"
+                                        style = $btnStyle
+                                        color = $btnColor
                                     }
                                 )
                             })

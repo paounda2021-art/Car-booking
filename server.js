@@ -3,9 +3,214 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
+const { DatabaseSync } = require('node:sqlite');
 
 const PORT = 8080;
 const ROOT_DIR = __dirname;
+
+// Initialize SQLite database
+const db = new DatabaseSync(path.join(ROOT_DIR, 'database.db'));
+
+// Ensure schema is updated with active column for system_config
+try {
+  db.exec("ALTER TABLE bookings ADD COLUMN active INTEGER DEFAULT 0;");
+} catch(e) {
+  // Ignore if column already exists
+}
+
+// Ensure schema is updated with missing cars columns from cars.json
+try { db.exec("ALTER TABLE cars ADD COLUMN name TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE cars ADD COLUMN icon TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE cars ADD COLUMN driverName TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE cars ADD COLUMN phone TEXT;"); } catch(e) {}
+
+// Ensure schema is updated with customApprovalLevels for users
+try { db.exec("ALTER TABLE users ADD COLUMN customApprovalLevels TEXT;"); } catch(e) {}
+
+// SQLite Helper Functions
+
+function sqliteGetBookings() {
+  try {
+    const query = db.prepare("SELECT * FROM bookings");
+    const rows = query.all();
+    return rows.map(r => {
+      const b = { ...r };
+      b.goCheck = r.goCheck === 1;
+      b.backCheck = r.backCheck === 1;
+      b.returnedEarly = r.returnedEarly === 1;
+      b.driverAccepted = r.driverAccepted === 1;
+      b.waitingForRequesterInput = r.waitingForRequesterInput === 1;
+      b.active = r.active === 1;
+      
+      try { b.signatures = JSON.parse(r.signatures || '[]'); } catch(e) { b.signatures = []; }
+      try { b.taxiInfo = JSON.parse(r.taxiInfo || '{}'); } catch(e) { b.taxiInfo = {}; }
+      return b;
+    });
+  } catch (e) {
+    console.error("SQLite Read error (bookings):", e);
+    return null;
+  }
+}
+
+function sqliteSaveBookings(bookingsList) {
+  try {
+    db.exec("DELETE FROM bookings");
+    const insertBooking = db.prepare(`
+      INSERT INTO bookings (
+        id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
+        driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince,
+        purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price,
+        goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures,
+        waitingForRequesterInput, taxiInfo, active
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?
+      )
+    `);
+    
+    bookingsList.forEach(b => {
+      insertBooking.run(
+        b.id || '',
+        b.requester || '',
+        b.requesterEmail || '',
+        b.managerEmail || '',
+        b.position || '',
+        b.department || '',
+        b.office || '',
+        b.division || '',
+        b.controlUnit || '',
+        b.driverLicenseFile || '',
+        b.addressNo || '',
+        b.addressMoo || '',
+        b.addressRoad || '',
+        b.addressSubdistrict || '',
+        b.addressDistrict || '',
+        b.addressProvince || '',
+        b.purpose || '',
+        b.destination || '',
+        b.ref || '',
+        b.passengers || '',
+        b.startDate || '',
+        b.endDate || '',
+        b.trips || 0,
+        b.travelType || '',
+        b.carId || '',
+        b.distance || 0,
+        b.price || 0,
+        b.goCheck ? 1 : 0,
+        b.backCheck ? 1 : 0,
+        b.status || '',
+        b.currentApprovalLevel || 0,
+        b.driverName || '',
+        b.returnedEarly ? 1 : 0,
+        b.driverAccepted ? 1 : 0,
+        b.signatures ? JSON.stringify(b.signatures) : '[]',
+        b.waitingForRequesterInput ? 1 : 0,
+        b.taxiInfo ? JSON.stringify(b.taxiInfo) : '{}',
+        b.active ? 1 : 0
+      );
+    });
+    console.log("SQLite: Saved all bookings successfully");
+    return true;
+  } catch (e) {
+    console.error("SQLite Write error (bookings):", e);
+    return false;
+  }
+}
+
+function sqliteGetCars() {
+  try {
+    const query = db.prepare("SELECT * FROM cars");
+    return query.all();
+  } catch (e) {
+    console.error("SQLite Read error (cars):", e);
+    return null;
+  }
+}
+
+function sqliteSaveCars(carsList) {
+  try {
+    db.exec("DELETE FROM cars");
+    const insertCar = db.prepare(`
+      INSERT INTO cars (id, name, type, plate, status, icon, driverName, phone, brand, driver, controlUnit)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    carsList.forEach(c => {
+      insertCar.run(
+        c.id || '',
+        c.name || '',
+        c.type || '',
+        c.plate || '',
+        c.status || '',
+        c.icon || '',
+        c.driverName || '',
+        c.phone || '',
+        c.brand || '',
+        c.driver || '',
+        c.controlUnit || ''
+      );
+    });
+    console.log("SQLite: Saved all cars successfully");
+    return true;
+  } catch (e) {
+    console.error("SQLite Write error (cars):", e);
+    return false;
+  }
+}
+
+function sqliteGetUsers() {
+  try {
+    const query = db.prepare("SELECT * FROM users");
+    const rows = query.all();
+    return rows.map(r => {
+      const u = { ...r };
+      if (r.customApprovalLevels) {
+        try {
+          u.customApprovalLevels = JSON.parse(r.customApprovalLevels);
+        } catch(e) {
+          delete u.customApprovalLevels;
+        }
+      }
+      return u;
+    });
+  } catch (e) {
+    console.error("SQLite Read error (users):", e);
+    return null;
+  }
+}
+
+function sqliteSaveUsers(usersList) {
+  try {
+    db.exec("DELETE FROM users");
+    const insertUser = db.prepare(`
+      INSERT INTO users (employee_id, username, email, name, position, department1, department2, role, manager_email, sign, customApprovalLevels)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    usersList.forEach(u => {
+      insertUser.run(
+        u.employee_id || '',
+        u.username || '',
+        u.email || '',
+        u.name || '',
+        u.position || '',
+        u.department1 || '',
+        u.department2 || '',
+        u.role || '',
+        u.manager_email || '',
+        u.sign || '',
+        u.customApprovalLevels ? JSON.stringify(u.customApprovalLevels) : null
+      );
+    });
+    console.log("SQLite: Saved all users successfully");
+    return true;
+  } catch (e) {
+    console.error("SQLite Write error (users):", e);
+    return false;
+  }
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -34,11 +239,17 @@ const server = http.createServer((req, res) => {
 
   // API: get-bookings
   if (urlPath === '/api/get-bookings' && req.method === 'GET') {
-    const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
-    fs.readFile(bookingsFile, 'utf8', (err, data) => {
+    const sqlData = sqliteGetBookings();
+    if (sqlData) {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(err ? '[]' : data);
-    });
+      res.end(JSON.stringify(sqlData));
+    } else {
+      const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
+      fs.readFile(bookingsFile, 'utf8', (err, data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(err ? '[]' : data);
+      });
+    }
     return;
   }
 
@@ -48,12 +259,21 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { chunks.push(chunk); });
     req.on('end', () => {
       const body = Buffer.concat(chunks).toString('utf8');
+      
+      // Dual-Write 1: bookings.json file
       const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
       fs.writeFile(bookingsFile, body, 'utf8', err => {
         if (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'error', message: err.message }));
         } else {
+          // Dual-Write 2: SQLite database
+          try {
+            const list = JSON.parse(body);
+            sqliteSaveBookings(list);
+          } catch(sqliteErr) {
+            console.error("SQLite Dual-Write failed:", sqliteErr);
+          }
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'success', message: 'Bookings saved successfully' }));
         }
@@ -64,11 +284,17 @@ const server = http.createServer((req, res) => {
 
   // API: get-cars
   if (urlPath === '/api/get-cars' && req.method === 'GET') {
-    const carsFile = path.join(ROOT_DIR, 'cars.json');
-    fs.readFile(carsFile, 'utf8', (err, data) => {
+    const sqlData = sqliteGetCars();
+    if (sqlData) {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(err ? '[]' : data);
-    });
+      res.end(JSON.stringify(sqlData));
+    } else {
+      const carsFile = path.join(ROOT_DIR, 'cars.json');
+      fs.readFile(carsFile, 'utf8', (err, data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(err ? '[]' : data);
+      });
+    }
     return;
   }
 
@@ -78,12 +304,21 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { chunks.push(chunk); });
     req.on('end', () => {
       const body = Buffer.concat(chunks).toString('utf8');
+      
+      // Dual-Write 1: cars.json file
       const carsFile = path.join(ROOT_DIR, 'cars.json');
       fs.writeFile(carsFile, body, 'utf8', err => {
         if (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'error', message: err.message }));
         } else {
+          // Dual-Write 2: SQLite database
+          try {
+            const list = JSON.parse(body);
+            sqliteSaveCars(list);
+          } catch(sqliteErr) {
+            console.error("SQLite Dual-Write failed:", sqliteErr);
+          }
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'success', message: 'Cars saved successfully' }));
         }
@@ -98,12 +333,21 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => { chunks.push(chunk); });
     req.on('end', () => {
       const body = Buffer.concat(chunks).toString('utf8');
+      
+      // Dual-Write 1: users.json file
       const usersFile = path.join(ROOT_DIR, 'users.json');
       fs.writeFile(usersFile, body, 'utf8', err => {
         if (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'error', message: err.message }));
         } else {
+          // Dual-Write 2: SQLite database
+          try {
+            const list = JSON.parse(body);
+            sqliteSaveUsers(list);
+          } catch(sqliteErr) {
+            console.error("SQLite Dual-Write failed:", sqliteErr);
+          }
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'success', message: 'Users saved successfully' }));
         }
@@ -206,13 +450,30 @@ const server = http.createServer((req, res) => {
           }
 
           const isCancel = payload.type === 'cancel';
+          const isAccept = payload.type === 'accept';
+          const isFinish = payload.type === 'finish';
           
-          const headerTitle = isCancel ? "⚠️ แจ้งยกเลิกใบสั่งงาน พขร." : "📋 ใบสั่งงานพนักงานขับรถ";
-          const headerColor = isCancel ? "#dc2626" : "#1e3a8a";
-          const headerBg = isCancel ? "#fef2f2" : "#f8fafc";
-          const altText = isCancel 
-            ? `⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}` 
-            : `📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`;
+          let headerTitle = "📋 ใบสั่งงานพนักงานขับรถ";
+          let headerColor = "#1e3a8a";
+          let headerBg = "#f8fafc";
+          let altText = `📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`;
+
+          if (isCancel) {
+            headerTitle = "⚠️ แจ้งยกเลิกใบสั่งงาน พขร.";
+            headerColor = "#dc2626";
+            headerBg = "#fef2f2";
+            altText = `⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}`;
+          } else if (isAccept) {
+            headerTitle = "🟢 พขร. รับงานแล้ว";
+            headerColor = "#10b981";
+            headerBg = "#f0fdf4";
+            altText = `🟢 พขร. รับงานแล้ว - ปลายทาง: ${payload.destination || ''}`;
+          } else if (isFinish) {
+            headerTitle = "🏁 เสร็จสิ้นใบสั่งงาน (พขร. คืนรถแล้ว)";
+            headerColor = "#64748b";
+            headerBg = "#f1f5f9";
+            altText = `🏁 เสร็จสิ้นคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}`;
+          }
 
           // Construct body contents list dynamically
           const bodyContents = [];
@@ -413,22 +674,47 @@ const server = http.createServer((req, res) => {
                     layout: "vertical",
                     contents: bodyContents
                   },
-                  footer: !isCancel ? {
+                  footer: (!isCancel && !isFinish) ? {
                     type: "box",
                     layout: "vertical",
-                    contents: [
-                      {
-                        type: "button",
-                        action: {
-                          type: "postback",
-                          label: "✅ กดรับงาน",
-                          data: `action=accept-job&id=${payload.bookingId}`,
-                          displayText: "✅ กดรับงาน"
-                        },
-                        style: "primary",
-                        color: "#10b981"
+                    contents: (() => {
+                      const isLocal = !payload.origin || payload.origin.includes('localhost') || payload.origin.includes('127.0.0.1') || payload.origin.startsWith('http://');
+                      const list = [];
+                      if (isLocal) {
+                        list.push({
+                          type: "button",
+                          action: isAccept ? {
+                            type: "uri",
+                            label: "🔴 จบงาน (คืนรถ)",
+                            uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=return-early&id=${payload.bookingId}`
+                          } : {
+                            type: "uri",
+                            label: "✅ กดรับงาน",
+                            uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`
+                          },
+                          style: isAccept ? "secondary" : "primary",
+                          color: isAccept ? "#ef4444" : "#10b981"
+                        });
+                      } else {
+                        list.push({
+                          type: "button",
+                          action: isAccept ? {
+                            type: "postback",
+                            label: "🔴 จบงาน (คืนรถ)",
+                            data: `action=return-early&id=${payload.bookingId}`,
+                            displayText: "🔴 จบงาน"
+                          } : {
+                            type: "postback",
+                            label: "✅ กดรับงาน",
+                            data: `action=accept-job&id=${payload.bookingId}`,
+                            displayText: "✅ กดรับงาน"
+                          },
+                          style: isAccept ? "secondary" : "primary",
+                          color: isAccept ? "#ef4444" : "#10b981"
+                        });
                       }
-                    ]
+                      return list;
+                    })()
                   } : undefined
                 }
               }
@@ -710,7 +996,14 @@ const server = http.createServer((req, res) => {
               if (updatedAny) {
                 fs.writeFile(bookingsFile, JSON.stringify(bookings, null, 2), 'utf8', (wErr) => {
                   if (wErr) console.error("Error writing bookings.json:", wErr);
-                  else console.log("LINE Webhook: Database updated successfully");
+                  else {
+                    console.log("LINE Webhook: bookings.json updated successfully");
+                    try {
+                      sqliteSaveBookings(bookings);
+                    } catch(sqliteErr) {
+                      console.error("SQLite Dual-Write failed in webhook:", sqliteErr);
+                    }
+                  }
                 });
               }
               

@@ -24,3 +24,5 @@ test_email.ps1
 view_func*.ps1
 view_utf8.ps1
 diff.txt
+*.db
+database.db
