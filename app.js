@@ -2240,6 +2240,7 @@ function renderMonthCalendar() {
         else if (b.status === 'pending' || b.status.startsWith('pending')) badgeClass += ' pending';
 
         badge.className = badgeClass;
+        badge.setAttribute('data-booking-id', b.id);
         
         let icon = '🚗';
         if (b.travelType === 'public_car') icon = '🚐';
@@ -5918,6 +5919,19 @@ function generateDriverReport() {
 window.openApprovalModal = openApprovalModal;
 window.openReportView = openReportView;
 window.renderMonthCalendar = renderMonthCalendar;
+
+// Global Capture-Phase Event Delegation for Calendar Event Badges & Booking Click Elements
+document.addEventListener('click', function(e) {
+  const targetBadge = e.target ? e.target.closest('.calendar-event-badge, [data-booking-id]') : null;
+  if (targetBadge) {
+    const bookingId = targetBadge.getAttribute('data-booking-id');
+    if (bookingId) {
+      e.preventDefault();
+      e.stopPropagation();
+      openApprovalModal(bookingId);
+    }
+  }
+}, true);
 window.openFillTaxiModal = openFillTaxiModal;
 window.generateDriverReport = generateDriverReport;
 window.populateDriversDropdown = populateDriversDropdown;

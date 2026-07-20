@@ -1536,6 +1536,10 @@ body {
   z-index: 20;
 }
 
+.calendar-event-badge * {
+  pointer-events: none !important;
+}
+
 .calendar-event-badge.pending {
   background: var(--warning);
 }
