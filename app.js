@@ -163,26 +163,23 @@ function compressImage(file, callback) {
 function resolveManagerEmail(booking) {
   if (!booking) return 'ranida.c@fishmarket.co.th';
   
-  // 1. If managerEmail is set and is NOT the fallback email 'ranida.c@fishmarket.co.th'
-  if (booking.managerEmail && booking.managerEmail.trim() !== '' && booking.managerEmail !== 'ranida.c@fishmarket.co.th') {
-    return booking.managerEmail;
-  }
-  
-  // 2. Look up the requester in the usersList loaded from users.json
+  // 1. Prioritize looking up requester in usersList (always accurate according to current user hierarchy!)
   if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
     const requesterName = booking.requester.trim();
+    const normalizeName = n => n ? n.replace(/\s+/g, '') : '';
+    const reqNorm = normalizeName(requesterName);
     const userObj = usersList.find(u => 
-      u.name.trim() === requesterName || 
+      normalizeName(u.name) === reqNorm || 
       (booking.requesterEmail && u.email && u.email.toLowerCase() === booking.requesterEmail.toLowerCase())
     );
     if (userObj && userObj.manager_email && userObj.manager_email.trim() !== '') {
-      return userObj.manager_email;
+      return userObj.manager_email.trim();
     }
   }
   
-  // 3. Fallback: if booking has managerEmail, use it even if it is the fallback email
+  // 2. Fallback to booking.managerEmail
   if (booking.managerEmail && booking.managerEmail.trim() !== '') {
-    return booking.managerEmail;
+    return booking.managerEmail.trim();
   }
   
   return 'ranida.c@fishmarket.co.th'; // Default fallback

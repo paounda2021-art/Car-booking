@@ -1017,7 +1017,7 @@
     "id": "BGK-6907-013",
     "requester": "น.ส.ณัฏฐณิชา   ฤทธิรุตม์",
     "requesterEmail": "nuttanicha.r@fishmarket.co.th",
-    "managerEmail": "pimrada.a@fishmarket.co.th",
+    "managerEmail": "trakarnkul.p@fishmarket.co.th",
     "position": "เจ้าหน้าที่งานนโยบายและแผน",
     "department": "-",
     "office": "ผงป.",
@@ -1044,7 +1044,7 @@
     "goCheck": true,
     "backCheck": true,
     "status": "pending",
-    "currentApprovalLevel": 3,
+    "currentApprovalLevel": 1,
     "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
@@ -1060,21 +1060,21 @@
       {
         "level": 1,
         "role": "supervisor",
-        "approverName": "น.ส.พิมพ์ลดา  อัศวเศรษฐชัย",
-        "status": "approved",
-        "comment": "เห็นชอบ",
-        "timestamp": "2026-07-16T09:05:00.000Z",
+        "approverName": "",
+        "status": "pending",
+        "comment": "",
+        "timestamp": "",
         "signature": ""
       },
       {
         "level": 2,
         "role": "fleet_admin",
-        "approverName": "นายฉลอง  เจียมผักแว่น",
-        "status": "approved",
-        "comment": "อนุมัติใช้รถรับจ้างสาธารณะ (Taxi)",
-        "timestamp": "2026-07-16T10:20:00.000Z",
+        "approverName": "",
+        "status": "pending",
+        "comment": "",
+        "timestamp": "",
         "signature": "",
-        "driverName": "-"
+        "driverName": ""
       },
       {
         "level": 3,
