@@ -585,7 +585,7 @@ async function initDatabase() {
   // Try to load bookings from Cloudflare KV database first
   let dbBookingsLoaded = false;
   try {
-    const dbResponse = await fetch('/api/get-bookings');
+    const dbResponse = await fetch('/api/get-bookings?t=' + Date.now(), { cache: 'no-store' });
     if (dbResponse.ok) {
       let dbBookings = await dbResponse.json();
       if (dbBookings && Array.isArray(dbBookings)) {
