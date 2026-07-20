@@ -8,8 +8,13 @@ const { DatabaseSync } = require('node:sqlite');
 const PORT = 8080;
 const ROOT_DIR = __dirname;
 
-// Initialize SQLite database
-const db = new DatabaseSync(path.join(ROOT_DIR, 'database.db'));
+// Initialize SQLite database (supports C:\apps\car-booking\database.db if opened in DB Browser)
+const DB_PATH = fs.existsSync('C:\\apps\\car-booking\\database.db')
+  ? 'C:\\apps\\car-booking\\database.db'
+  : path.join(ROOT_DIR, 'database.db');
+
+console.log(`[SQLite] Using database path: ${DB_PATH}`);
+const db = new DatabaseSync(DB_PATH);
 
 // Ensure schema is updated with active column for system_config
 try {
