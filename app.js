@@ -1109,9 +1109,10 @@ function loginUser(userObj) {
     btnOpenBooking.classList.remove('hidden'); // พนักงานทั่วไป, L1 หรือ L2 สามารถเห็นปุ่มเขียนใบได้ปกติ
   }
 
-  // ซ่อนปุ่มเข้าสู่ระบบ / แสดงการ์ดโปรไฟล์
+  // ซ่อนปุ่มเข้าสู่ระบบ / แสดงการ์ดโปรไฟล์ / แสดงปุ่มออกจากระบบใน sidebar
   document.getElementById('btn-top-login').classList.add('hidden');
   document.getElementById('header-user-profile').classList.remove('hidden');
+  document.getElementById('btn-logout')?.classList.remove('hidden');
   
   // แสดงปุ่มปิดระบบชั่วคราวเฉพาะ ranida.c
   const sidebarDeactivateContainer = document.getElementById('sidebar-deactivate-container');
@@ -1302,6 +1303,7 @@ function checkLoginStatus() {
     // Header actions
     document.getElementById('btn-top-login').classList.remove('hidden');
     document.getElementById('header-user-profile').classList.add('hidden');
+    document.getElementById('btn-logout')?.classList.add('hidden');
     document.getElementById('btn-open-booking').classList.add('hidden');
 
     
@@ -1417,6 +1419,50 @@ function showView(viewName) {
   }
 }
 
+// Helper to check if a booking belongs to the current user (handles spelling and spacing robustly)
+function checkIsMyRequest(b, userObj) {
+  if (!userObj) return false;
+  const uEmail = (userObj.email || '').trim().toLowerCase();
+  const bEmail = (b.requesterEmail || '').trim().toLowerCase();
+  
+  const normalize = (n) => n ? n.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.ส\.|ว่าที่ร\.ต\.|ว่าที่ร้อยตรี|ดร\.)\s*/, '') : '';
+  const uNameNormalized = normalize(userObj.name);
+  const bNameNormalized = normalize(b.requester);
+  
+  return (bEmail && uEmail && bEmail === uEmail) || 
+         (bNameNormalized && uNameNormalized && bNameNormalized === uNameNormalized);
+}
+
+// Helper to check if a user is allowed to see all bookings in the system
+function checkCanSeeAll(userObj) {
+  if (!userObj) return false;
+  return userObj.role === 'fleet_admin' || 
+         userObj.role === 'director' || 
+         userObj.role === 'executive';
+}
+
+// Helper to check if a supervisor is the manager or approver for a subordinate's booking
+function checkIsManagerOrApprover(b, userObj) {
+  if (!userObj) return false;
+  
+  const uEmail = (userObj.email || '').trim().toLowerCase();
+  const mEmail = resolveManagerEmail(b).toLowerCase();
+  if (uEmail && mEmail && uEmail === mEmail) return true;
+  
+  if (b.signatures) {
+    const l1Sig = b.signatures.find(s => s.level === 1);
+    if (l1Sig && l1Sig.status === 'approved') {
+      const normalize = (n) => n ? n.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.ส\.|ว่าที่ร\.ต\.|ว่าที่ร้อยตรี|ดร\.)\s*/, '') : '';
+      const uNameNormalized = normalize(userObj.name);
+      const approverNameNormalized = normalize(l1Sig.approverName);
+      if (uNameNormalized && approverNameNormalized && uNameNormalized === approverNameNormalized) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Update stats on Dashboard
 function updateStats() {
   autoGenerateMissingEmailLogs();
@@ -1498,17 +1544,10 @@ function updateStats() {
   if (tabAllHistoryBadge) {
     const historyCount = bookings.filter(b => {
       if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
-      const isMyRequest = currentUser && (
-        (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
-        b.requester === currentUser.name
-      );
-      const canSeeAll = currentUser && (
-        currentUser.role === 'supervisor' ||
-        currentUser.role === 'fleet_admin' || 
-        currentUser.role === 'director' || 
-        currentUser.role === 'executive'
-      );
-      return (canSeeAll || isMyRequest);
+      const isMyRequest = checkIsMyRequest(b, currentUser);
+      const canSeeAll = checkCanSeeAll(currentUser);
+      const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
+      return (canSeeAll || isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover));
     }).length;
     tabAllHistoryBadge.textContent = historyCount;
   }
@@ -1986,7 +2025,7 @@ function renderBookingsLists() {
   const allBookingsList = [];
 
   bookings.forEach(b => {
-    const isMyRequest = currentUser && b.requester === currentUser.name;
+    const isMyRequest = checkIsMyRequest(b, currentUser);
     
     let isPendingForMe = false;
     const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
@@ -2017,17 +2056,10 @@ function renderBookingsLists() {
       pendingBookingsList.push({ booking: b, isPendingForMe });
     }
     if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
-      const isMyRequest = currentUser && (
-        (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || 
-        b.requester === currentUser.name
-      );
-      const canSeeAll = currentUser && (
-        currentUser.role === 'supervisor' ||
-        currentUser.role === 'fleet_admin' || 
-        currentUser.role === 'director' || 
-        currentUser.role === 'executive'
-      );
-      if (canSeeAll || isMyRequest) {
+      const isMyRequest = checkIsMyRequest(b, currentUser);
+      const canSeeAll = checkCanSeeAll(currentUser);
+      const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
+      if (canSeeAll || isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
     }
@@ -2342,9 +2374,14 @@ function openApprovalModal(bookingId) {
     if (booking.travelType === 'fmo_car' && booking.driverName && booking.driverName !== '-') {
       const phone = getDriverPhoneByName(booking.driverName);
       const phoneStr = phone ? ` (เบอร์โทร: ${phone})` : ' (ไม่มีข้อมูลเบอร์โทร)';
-      const acceptBadge = booking.driverAccepted 
-        ? '<span class="badge success" style="margin-left: 0.5rem; font-size: 0.75rem;">✅ รับงานแล้ว</span>' 
-        : '<span class="badge warning" style="margin-left: 0.5rem; font-size: 0.75rem; color: #d97706; background: rgba(217,119,6,0.1);">⏳ รอรับงาน</span>';
+      let acceptBadge = '';
+      if (booking.returnedEarly) {
+        acceptBadge = '<span class="badge info" style="margin-left: 0.5rem; font-size: 0.75rem; background-color: #0ea5e9; color: white;">🏁 คืนรถแล้ว</span>';
+      } else if (booking.driverAccepted) {
+        acceptBadge = '<span class="badge success" style="margin-left: 0.5rem; font-size: 0.75rem;">✅ รับงานแล้ว</span>';
+      } else {
+        acceptBadge = '<span class="badge warning" style="margin-left: 0.5rem; font-size: 0.75rem; color: #d97706; background: rgba(217,119,6,0.1);">⏳ รอรับงาน</span>';
+      }
       driverEl.innerHTML = `<strong>${booking.driverName}</strong>${phoneStr}${acceptBadge}`;
       driverRow.style.display = 'table-row';
     } else {
@@ -2670,6 +2707,12 @@ function openApprovalModal(bookingId) {
           booking.endDate = new Date().toISOString();
           booking.returnedEarly = true;
           saveBookings();
+
+          // Trigger LINE status update (finish)
+          let carObj = cars.find(c => c.id === booking.carId);
+          const carPlate = carObj ? carObj.plate : '-';
+          triggerLineNotification(booking, carPlate, 'finish');
+
           localStorage.setItem('return_early_toast_success', `ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบคำขอ ${booking.id} เรียบร้อยแล้ว`);
           window.location.reload();
         };
@@ -2699,6 +2742,9 @@ function renderApprovalPipeline(booking) {
     { level: 3, title: 'หัวหน้าสำนักงานบริหารการพัสดุ (หส.พด.) (L3)', role: 'director' },
     { level: 4, title: 'ผู้อำนวยการฝ่ายบัญชีการเงิน (ผฝ.บง.) (L4)', role: 'executive' }
   ];
+
+  const rejectSig = booking.signatures.find(s => s.status === 'rejected');
+  const rejectLevel = rejectSig ? rejectSig.level : null;
 
   stepsDef.forEach(step => {
     const sig = booking.signatures.find(s => s.level === step.level);
@@ -2740,6 +2786,9 @@ function renderApprovalPipeline(booking) {
           </div>
         </div>
       `;
+    } else if (rejectLevel !== null && step.level > rejectLevel) {
+      statusText = 'ไม่ดำเนินการต่อ';
+      icon = '⚪';
     }
 
     const stepDiv = document.createElement('div');
@@ -3954,7 +4003,12 @@ function setupEventListeners() {
     if (btn) {
       e.preventDefault();
       const username = btn.getAttribute('data-user');
-      const matched = usersList.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
+      const uClean = username.trim().toLowerCase();
+      const matched = usersList.find(u => 
+        (u.username && u.username.toLowerCase() === uClean) ||
+        (u.email && u.email.toLowerCase() === uClean) ||
+        (u.email && u.email.split('@')[0].toLowerCase() === uClean)
+      );
       if (matched) {
         loginUser(matched);
       } else {
@@ -4256,10 +4310,12 @@ function setupEventListeners() {
   // Login Form Submission
   document.getElementById('form-login').addEventListener('submit', (e) => {
     e.preventDefault();
-    const user = document.getElementById('login-username').value;
-    const pass = document.getElementById('login-password').value;
-
-    const matched = usersList.find(u => u.username.toLowerCase() === user.trim().toLowerCase());
+    const userClean = user.trim().toLowerCase();
+    const matched = usersList.find(u => 
+      (u.username && u.username.toLowerCase() === userClean) ||
+      (u.email && u.email.toLowerCase() === userClean) ||
+      (u.email && u.email.split('@')[0].toLowerCase() === userClean)
+    );
     if (matched) {
       // Validate password (accept employee_id or demo quick keys)
       if (pass === matched.employee_id || pass === '1' || pass === '2' || pass === '07170004' || pass === '07170005' || pass === '07170010' || pass === 'admin') {
@@ -4733,6 +4789,11 @@ function setupEventListeners() {
             booking.returnedEarly = true;
             saveBookings();
             
+            // Trigger LINE status update (finish)
+            let carObj = cars.find(c => c.id === booking.carId);
+            const carPlate = carObj ? carObj.plate : '-';
+            triggerLineNotification(booking, carPlate, 'finish');
+
             // Set toast indicator to show after reload
             localStorage.setItem('return_early_toast_success', `ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบคำขอ ${bookingId} เรียบร้อยแล้ว`);
             window.location.reload();
@@ -5485,10 +5546,39 @@ if (storedUser) {
     if (booking) {
       booking.driverAccepted = true;
       saveBookings();
+
+      // Trigger LINE status update (accept)
+      let carObj = cars.find(c => c.id === booking.carId);
+      const carPlate = carObj ? carObj.plate : '-';
+      triggerLineNotification(booking, carPlate, 'accept');
+
       // Remove query parameters from URL to avoid repeating on refresh
       const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
       window.history.replaceState({path: cleanUrl}, '', cleanUrl);
       showToast(`พขร. ได้รับงานสำหรับใบขอใช้รถเลขที่ ${actionBookingId} เรียบร้อยแล้ว`, "success");
+      // Open approval modal to show details
+      setTimeout(() => {
+        openApprovalModal(actionBookingId);
+      }, 500);
+    }
+  }
+
+  if (action === 'return-early' && actionBookingId) {
+    const booking = bookings.find(b => b.id === actionBookingId);
+    if (booking) {
+      booking.returnedEarly = true;
+      booking.endDate = new Date().toISOString();
+      saveBookings();
+
+      // Trigger LINE status update (finish)
+      let carObj = cars.find(c => c.id === booking.carId);
+      const carPlate = carObj ? carObj.plate : '-';
+      triggerLineNotification(booking, carPlate, 'finish');
+
+      // Remove query parameters from URL to avoid repeating on refresh
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({path: cleanUrl}, '', cleanUrl);
+      showToast(`ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบขอใช้รถ ${actionBookingId} เรียบร้อยแล้ว`, "success");
       // Open approval modal to show details
       setTimeout(() => {
         openApprovalModal(actionBookingId);
@@ -6153,8 +6243,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Helper function to send LINE Group notification when booking is approved
-function triggerLineNotification(booking, carPlate) {
+function triggerLineNotification(booking, carPlate, type) {
   const payload = {
+    type: type || 'default',
     bookingId: booking.id,
     origin: window.location.origin,
     driverName: booking.driverName || 'ไม่ระบุ',
@@ -6488,7 +6579,6 @@ function renderAdminUsers() {
 
     return `
       <tr style="border-bottom: 1px solid var(--border-color); font-size: 0.85rem;">
-        <td style="padding: 0.85rem 1rem; font-family: monospace; font-weight: bold; color: var(--text-main);">${u.employee_id || '-'}</td>
         <td style="padding: 0.85rem 1rem; font-weight: 500; color: var(--text-main);">${u.name}</td>
         <td style="padding: 0.85rem 1rem; color: var(--text-main);">
           <strong>${u.username}</strong><br>
