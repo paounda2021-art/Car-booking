@@ -607,6 +607,7 @@ async function initDatabase() {
           dbBookings = [];
         }
         localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
+        bookings = dbBookings;
         dbBookingsLoaded = true;
       }
     }
@@ -614,22 +615,19 @@ async function initDatabase() {
     console.error("Failed to load bookings from Cloudflare KV database:", error);
   }
 
-  // Clear simulated email logs for production
-  // localStorage.removeItem('email_logs_data');
-  // emailLogs = [];
-
-  // Load default bookings mock data if empty or contains old spelling or Mojibake or JPEG signature format, or contains mock IDs
-  let bookingsData = localStorage.getItem('bookings_data');
-  if (bookingsData) {
-    if (bookingsData.includes('ผักเจียมแว่น') || bookingsData.includes('à¸') || !bookingsData.includes('data:image/png;base64') || bookingsData.includes('เธ') || bookingsData.includes('เฏร') || bookingsData.includes('เน€') || bookingsData.includes('BKG-FMO-00')) {
-      localStorage.removeItem('bookings_data');
+  if (!dbBookingsLoaded) {
+    let bookingsData = localStorage.getItem('bookings_data');
+    if (bookingsData) {
+      if (bookingsData.includes('ผักเจียมแว่น') || bookingsData.includes('à¸') || !bookingsData.includes('data:image/png;base64') || bookingsData.includes('เธ') || bookingsData.includes('เฏร') || bookingsData.includes('เน€') || bookingsData.includes('BKG-FMO-00')) {
+        localStorage.removeItem('bookings_data');
+      }
     }
-  }
 
-  if (!localStorage.getItem('bookings_data')) {
-    localStorage.setItem('bookings_data', JSON.stringify([]));
+    if (!localStorage.getItem('bookings_data')) {
+      localStorage.setItem('bookings_data', JSON.stringify([]));
+    }
+    bookings = JSON.parse(localStorage.getItem('bookings_data') || '[]');
   }
-  bookings = JSON.parse(localStorage.getItem('bookings_data'));
 
   // Migration: Add missing destination fields to sample bookings
   let bookingsUpdated = false;
@@ -2251,7 +2249,12 @@ function renderMonthCalendar() {
           ? `${startD} (เวลา ${startT} - ${endT})` 
           : `${startD} (${startT}) ถึง ${endD} (${endT})`;
 
-        badge.title = `ผู้จอง: ${b.requester || '-'}\nเรื่อง: ${b.purpose || '-'}\nสถานที่: ${b.destination || '-'}\nเวลา: ${timeText}`;
+        badge.style.cursor = 'pointer';
+        badge.title = `📌 ใบขอเลขที่: ${b.id}\n👤 ผู้จอง: ${b.requester || '-'}\n📝 เรื่อง: ${b.purpose || '-'}\n📍 สถานที่: ${b.destination || '-'}\n⏰ เวลา: ${timeText}\n👉 คลิกเพื่อเปิดดูรายละเอียดการอนุมัติ`;
+        badge.onclick = (e) => {
+          e.stopPropagation();
+          openApprovalModal(b.id);
+        };
         eventsContainer.appendChild(badge);
       });
 
