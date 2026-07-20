@@ -2259,8 +2259,12 @@ function renderMonthCalendar() {
 
         badge.style.cursor = 'pointer';
         badge.title = `📌 ใบขอเลขที่: ${b.id}\n👤 ผู้จอง: ${b.requester || '-'}\n📝 เรื่อง: ${b.purpose || '-'}\n📍 สถานที่: ${b.destination || '-'}\n⏰ เวลา: ${timeText}\n👉 คลิกเพื่อเปิดดูรายละเอียดการอนุมัติ`;
+        badge.setAttribute('onclick', `event.preventDefault(); event.stopPropagation(); openApprovalModal('${b.id}');`);
         badge.onclick = (e) => {
-          e.stopPropagation();
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
           openApprovalModal(b.id);
         };
         eventsContainer.appendChild(badge);
@@ -2353,14 +2357,19 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
 
 // Open Approval Details Modal
 function openApprovalModal(bookingId) {
-  const booking = bookings.find(b => b.id === bookingId);
-  if (!booking) return;
+  if (!bookingId) return;
+  const booking = bookings.find(b => b.id === bookingId || (b.id && b.id.trim() === bookingId.trim()));
+  if (!booking) {
+    console.warn("openApprovalModal: Booking not found for ID", bookingId);
+    return;
+  }
 
   activeBookingIdForApproval = booking.id;
 
   const modal = document.getElementById('modal-approval');
   if (!modal) return;
 
+  modal.style.display = '';
   modal.classList.add('active');
 
   // We will resize and load signature in setTimeout to ensure proper layout and avoid signature clear
