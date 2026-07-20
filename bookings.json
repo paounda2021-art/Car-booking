@@ -1294,7 +1294,7 @@
     "startDate": "2026-07-23T08:30",
     "endDate": "2026-07-23T13:00",
     "trips": 2,
-    "travelType": "public_car",
+    "travelType": "fmo_car",
     "carId": "",
     "distance": 0,
     "price": 0,
@@ -1302,7 +1302,7 @@
     "backCheck": true,
     "status": "pending",
     "currentApprovalLevel": 2,
-    "driverName": "-",
+    "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
     "signatures": [
