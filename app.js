@@ -1543,11 +1543,12 @@ function updateStats() {
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
   if (tabAllHistoryBadge) {
     const historyCount = bookings.filter(b => {
-      if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
       const isMyRequest = checkIsMyRequest(b, currentUser);
       const canSeeAll = checkCanSeeAll(currentUser);
       const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
-      return (canSeeAll || isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover));
+      if (canSeeAll) return true;
+      if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
+      return (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover));
     }).length;
     tabAllHistoryBadge.textContent = historyCount;
   }
@@ -2055,11 +2056,14 @@ function renderBookingsLists() {
     if (isPendingForMe) {
       pendingBookingsList.push({ booking: b, isPendingForMe });
     }
-    if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
-      const isMyRequest = checkIsMyRequest(b, currentUser);
-      const canSeeAll = checkCanSeeAll(currentUser);
-      const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
-      if (canSeeAll || isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
+    const isMyRequest = checkIsMyRequest(b, currentUser);
+    const canSeeAll = checkCanSeeAll(currentUser);
+    const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
+
+    if (canSeeAll) {
+      allBookingsList.push({ booking: b, isPendingForMe });
+    } else if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
+      if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
     }
