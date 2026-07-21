@@ -5,25 +5,16 @@ if (-not $rootDir) { $rootDir = Get-Location }
 
 Write-Host "Syncing database and codebase in $rootDir..."
 
-# 1. Download database from Cloudflare Pages (with robust error handling)
+# 1. Sync local database to Cloudflare Pages (push local data safely)
 $bookingsFile = Join-Path $rootDir "bookings.json"
-try {
-    $data = Invoke-RestMethod -Uri "https://car-booking-5l7.pages.dev/api/get-bookings" -ErrorAction Stop
-    $data | ConvertTo-Json -Depth 10 | Out-File -FilePath $bookingsFile -Encoding utf8
-    Write-Host "Bookings database successfully synced from Cloudflare."
-} catch {
-    Write-Warning "Cannot resolve or connect to Cloudflare for bookings: $_"
-    Write-Warning "Safe Mode: Keeping the existing bookings.json database file intact."
-}
-
-$carsFile = Join-Path $rootDir "cars.json"
-try {
-    $data = Invoke-RestMethod -Uri "https://car-booking-5l7.pages.dev/api/get-cars" -ErrorAction Stop
-    $data | ConvertTo-Json -Depth 10 | Out-File -FilePath $carsFile -Encoding utf8
-    Write-Host "Cars database successfully synced from Cloudflare."
-} catch {
-    Write-Warning "Cannot resolve or connect to Cloudflare for cars: $_"
-    Write-Warning "Safe Mode: Keeping the existing cars.json database file intact."
+if (Test-Path $bookingsFile) {
+    try {
+        $jsonContent = Get-Content -Path $bookingsFile -Raw -Encoding utf8
+        Invoke-RestMethod -Uri "https://car-booking-5l7.pages.dev/api/save-bookings" -Method Post -Body $jsonContent -ContentType "application/json" -ErrorAction Stop | Out-Null
+        Write-Host "Local bookings database successfully synced to Cloudflare Pages."
+    } catch {
+        Write-Warning "Could not push local bookings to Cloudflare: $_"
+    }
 }
 
 # 2. Copy to deploy directory if it exists
