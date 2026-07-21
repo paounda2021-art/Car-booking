@@ -621,7 +621,7 @@ async function initDatabase() {
   // Load default bookings mock data if empty or contains old spelling or Mojibake or JPEG signature format, or contains mock IDs
   let bookingsData = localStorage.getItem('bookings_data');
   if (bookingsData) {
-    if (bookingsData.includes('ผักเจียมแว่น') || bookingsData.includes('à¸') || !bookingsData.includes('data:image/png;base64') || bookingsData.includes('เธ') || bookingsData.includes('เฏร') || bookingsData.includes('เน€') || bookingsData.includes('BKG-FMO-00')) {
+    if (bookingsData.includes('ผักเจียมแว่น') || bookingsData.includes('à¸') || bookingsData.includes('เธ') || bookingsData.includes('เฏร') || bookingsData.includes('เน€') || bookingsData.includes('BKG-FMO-00')) {
       localStorage.removeItem('bookings_data');
     }
   }
@@ -4095,7 +4095,11 @@ function setupEventListeners() {
       if (requesterSig) {
         requesterSig.resize();
         requesterSig.clear();
-        if (currentUser && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+        const sigSrc = (currentUser && currentUser.sign && currentUser.sign.startsWith('data:image')) 
+          ? currentUser.sign 
+          : (currentUser && currentUser.name ? generateMockSignature(currentUser.name) : '');
+          
+        if (sigSrc) {
           const img = new Image();
           img.onload = () => {
             const canvas = document.getElementById('canvas-requester-signature');
@@ -4113,7 +4117,7 @@ function setupEventListeners() {
               if (placeholder) placeholder.style.display = 'none';
             }
           };
-          img.src = currentUser.sign;
+          img.src = sigSrc;
         }
       }
     }, 100);
@@ -4137,9 +4141,13 @@ function setupEventListeners() {
   document.getElementById('form-create-booking').addEventListener('submit', (e) => {
     e.preventDefault();
 
-    if (requesterSig.isEmpty()) {
-      showToast("กรุณาลงลายมือชื่อผู้ขอใช้รถในกระดานลงนามดิจิทัลด้านล่างก่อนส่งใบคำขอ", "warning");
-      return;
+    let requesterSignatureUrl = '';
+    if (!requesterSig.isEmpty()) {
+      requesterSignatureUrl = requesterSig.getDataUrl();
+    } else if (currentUser && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+      requesterSignatureUrl = currentUser.sign;
+    } else {
+      requesterSignatureUrl = generateMockSignature((currentUser && currentUser.name) || 'ผู้ขอใช้รถ');
     }
 
     const travelType = 'fmo_car';
@@ -4248,7 +4256,7 @@ function setupEventListeners() {
       currentApprovalLevel: 1,
       driverName: '',
       signatures: [
-        { level: 0, approverName: currentUser.name, status: 'approved', timestamp: new Date().toISOString(), signature: requesterSig.getDataUrl() },
+        { level: 0, approverName: currentUser.name, status: 'approved', timestamp: new Date().toISOString(), signature: requesterSignatureUrl },
         { level: 1, role: 'supervisor', approverName: '', status: 'pending', comment: '', timestamp: '', signature: '' },
         { level: 2, role: 'fleet_admin', approverName: '', status: 'pending', comment: '', timestamp: '', signature: '', driverName: '' },
         { level: 3, role: 'director', approverName: '', status: 'pending', comment: '', timestamp: '', signature: '' },
