@@ -7100,6 +7100,12 @@ function openL0ScheduleEditModal(bookingId) {
     return;
   }
 
+  // Must ONLY be allowed when status is 'waiting_for_requester_edit' (L2 sent it back)
+  if (b.status !== 'waiting_for_requester_edit') {
+    showToast("คำขอนี้ยังไม่ได้รับการส่งกลับเพื่อปรับปรุงวัน/เวลา จากผู้จัดรถ (L2)", "warning");
+    return;
+  }
+
   activeBookingIdForL0Edit = b.id;
 
   // Close any other open modals first to prevent overlap
