@@ -1173,13 +1173,8 @@ function loginUser(userObj) {
       }
     }
     
-    // หากมีรายการรออนุมัติสำหรับผู้ใช้คนนี้ (L2, L3, L4) ให้พาไปยังหน้า "งานรออนุมัติจากคุณ" ในหน้า bookings
-    const pendingTasks = getMyPendingTasksList();
-    if (pendingTasks && pendingTasks.length > 0) {
-      showView('bookings');
-    } else {
-      showView('dashboard');
-    }
+    // 10. เมื่อผู้ใช้งานเข้าระบบ ให้เข้าสู่หน้ารายการจอง & อนุมัติ (bookings) ทันที เพื่อพร้อมเขียนใบจองหรือพิจารณาอนุมัติ
+    showView('bookings');
   }
 }
 
@@ -1274,12 +1269,12 @@ function checkLoginStatus() {
       const dbUser = usersList.find(u => u.username.toLowerCase() === parsed.username.toLowerCase());
       if (dbUser) {
         loginUser(dbUser);
-        showView('calendar');
+        showView('bookings');
         return;
       }
     }
     loginUser(parsed);
-    showView('calendar');
+    showView('bookings');
   } else {
     // Guest mode: land on calendar, hide dashboard and bookings, show login button
     currentUser = null;
