@@ -1283,7 +1283,7 @@ function checkLoginStatus() {
     
     // Sidebar items visibility
     document.getElementById('nav-dashboard').closest('.nav-item').classList.add('hidden');
-    document.getElementById('nav-bookings').closest('.nav-item').classList.add('hidden');
+    document.getElementById('nav-bookings').closest('.nav-item').classList.remove('hidden');
     document.getElementById('nav-calendar').closest('.nav-item').classList.remove('hidden');
     const reportNavItem = document.getElementById('nav-item-driver-report');
     if (reportNavItem) reportNavItem.classList.add('hidden');
@@ -1300,9 +1300,10 @@ function checkLoginStatus() {
     // Populate dropdown and render views
     populateCarsDropdown();
     updateStats();
+    renderBookingsLists();
     renderMonthCalendar();
     
-    showView('calendar');
+    showView('bookings');
   }
 }
 
