@@ -124,14 +124,13 @@ function sqliteSaveBookings(bookingsList) {
   }
 }
 
-// Automatic startup sync: load bookings.json into SQLite if SQLite has fewer records or missing records
+// Automatic startup sync: load bookings.json into SQLite on server startup
 try {
   const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
   if (fs.existsSync(bookingsJsonPath)) {
     const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
     const fileBookings = JSON.parse(rawJson);
-    const sqlBookings = sqliteGetBookings();
-    if (!sqlBookings || sqlBookings.length < fileBookings.length) {
+    if (fileBookings && fileBookings.length > 0) {
       console.log(`[Startup Auto-Sync] Syncing ${fileBookings.length} records from bookings.json to SQLite database...`);
       sqliteSaveBookings(fileBookings);
     }
