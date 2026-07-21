@@ -1638,17 +1638,34 @@ function updateStats() {
 
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
   if (tabAllHistoryBadge) {
+    const statusFilterSelect = document.getElementById('history-status-filter');
+    const isL2OrL3 = currentUser && currentUser.canApprove && (currentUser.canApprove.includes(2) || currentUser.canApprove.includes(3) || currentUser.role === 'fleet_admin');
+    const filterVal = (statusFilterSelect && isL2OrL3) ? statusFilterSelect.value : 'all';
+
     const historyCount = bookings.filter(b => {
       const isMyRequest = checkIsMyRequest(b, currentUser);
       const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
       const isCompleted = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
       const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
       const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
+      const isL3User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(3);
 
-      if (isL2User) return true;
-      if (isL4User) return (b.status === 'approved' || isMyRequest);
-      if (!isCompleted) return false;
-      return (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || checkCanSeeAll(currentUser));
+      let isMatchRole = false;
+      if (isL2User || isL3User) isMatchRole = true;
+      else if (isL4User) isMatchRole = (b.status === 'approved' || isMyRequest);
+      else if (isCompleted) isMatchRole = (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || checkCanSeeAll(currentUser));
+
+      if (!isMatchRole) return false;
+
+      if (filterVal !== 'all' && (isL2User || isL3User)) {
+        const st = b.status;
+        if (filterVal === 'approved') return st === 'approved';
+        if (filterVal === 'pending') return st.startsWith('pending');
+        if (filterVal === 'rejected') return st === 'rejected';
+        if (filterVal === 'cancelled') return st === 'cancelled' || st === 'cancellation_requested';
+        if (filterVal === 'waiting_for_requester_edit') return st === 'waiting_for_requester_edit';
+      }
+      return true;
     }).length;
     tabAllHistoryBadge.textContent = historyCount;
   }
@@ -2181,8 +2198,9 @@ function renderBookingsLists() {
     const isCompleted = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
     const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
     const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
+    const isL3User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(3);
 
-    if (isL2User) {
+    if (isL2User || isL3User) {
       allBookingsList.push({ booking: b, isPendingForMe });
     } else if (isL4User) {
       if (b.status === 'approved' || isMyRequest) {
@@ -2194,6 +2212,31 @@ function renderBookingsLists() {
       }
     }
   });
+
+  // Handle Status Filter Bar Visibility and Filtering for L2/L3
+  const historyFilterBar = document.getElementById('history-filter-bar');
+  const statusFilterSelect = document.getElementById('history-status-filter');
+  
+  let filteredAllBookingsList = allBookingsList;
+
+  const isL2OrL3 = currentUser && currentUser.canApprove && (currentUser.canApprove.includes(2) || currentUser.canApprove.includes(3) || currentUser.role === 'fleet_admin');
+
+  if (historyFilterBar) {
+    historyFilterBar.style.display = isL2OrL3 ? 'flex' : 'none';
+  }
+
+  if (isL2OrL3 && statusFilterSelect && statusFilterSelect.value !== 'all') {
+    const filterVal = statusFilterSelect.value;
+    filteredAllBookingsList = allBookingsList.filter(item => {
+      const st = item.booking.status;
+      if (filterVal === 'approved') return st === 'approved';
+      if (filterVal === 'pending') return st.startsWith('pending');
+      if (filterVal === 'rejected') return st === 'rejected';
+      if (filterVal === 'cancelled') return st === 'cancelled' || st === 'cancellation_requested';
+      if (filterVal === 'waiting_for_requester_edit') return st === 'waiting_for_requester_edit';
+      return true;
+    });
+  }
 
   const renderToContainer = (container, listData, emptyHTML) => {
     if (!container) return;
@@ -2258,7 +2301,7 @@ function renderBookingsLists() {
 
   renderToContainer(
     allContainer,
-    allBookingsList,
+    filteredAllBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📚</div>
@@ -4584,6 +4627,11 @@ function setupEventListeners() {
     } else {
       showToast("ไม่พบข้อมูลผู้ใช้นี้ในระบบฐานข้อมูลองค์การสะพานปลา", "error");
     }
+  });
+
+  document.getElementById('history-status-filter')?.addEventListener('change', () => {
+    updateStats();
+    renderBookingsLists();
   });
 
   // Logout button
