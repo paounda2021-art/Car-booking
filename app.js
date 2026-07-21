@@ -1509,7 +1509,8 @@ function checkCanSeeAll(userObj) {
   if (!userObj) return false;
   return userObj.role === 'fleet_admin' || 
          userObj.role === 'director' || 
-         userObj.role === 'executive';
+         userObj.role === 'executive' ||
+         (userObj.canApprove && (userObj.canApprove.includes(2) || userObj.canApprove.includes(3) || userObj.canApprove.includes(4)));
 }
 
 // Helper to check if a supervisor is the manager or approver for a subordinate's booking
@@ -2174,7 +2175,7 @@ function renderBookingsLists() {
     const canSeeAll = checkCanSeeAll(currentUser);
     const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
 
-    if (canSeeAll) {
+    if (canSeeAll || isPendingForMe) {
       allBookingsList.push({ booking: b, isPendingForMe });
     } else if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
       if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
