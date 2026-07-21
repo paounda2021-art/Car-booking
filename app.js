@@ -1904,7 +1904,7 @@ function helperCreateTableRow(b, isPendingForMe) {
   } else if (b.status === 'approved') {
     if (b.returnedEarly) {
       statusClass = 'info';
-      statusText = 'คืนรถก่อนเวลา';
+      statusText = 'จบงาน คืนรถ';
     } else {
       statusClass = 'success';
       statusText = b.driverAccepted ? 'อนุมัติเสร็จสิ้น (พขร. รับงานแล้ว)' : 'อนุมัติเสร็จสิ้น';
@@ -2076,7 +2076,7 @@ function renderBookingsLists() {
     } else if (b.status === 'approved') {
       if (b.returnedEarly) {
         statusClass = 'info';
-        statusText = 'คืนรถก่อนเวลา';
+        statusText = 'จบงาน คืนรถ';
       } else {
         statusClass = 'success';
         statusText = b.driverAccepted ? 'อนุมัติเสร็จสิ้น (พขร. รับงานแล้ว)' : 'อนุมัติเสร็จสิ้น';
@@ -6357,7 +6357,7 @@ window.performExportToCSV = function(list, startVal, endVal) {
     } else if (b.waitingForRequesterInput) {
       statusText = 'รอระบุค่าพาหนะ';
     } else if (b.status === 'approved') {
-      statusText = b.returnedEarly ? 'คืนรถก่อนเวลา' : 'อนุมัติเสร็จสิ้น';
+      statusText = b.returnedEarly ? 'จบงาน คืนรถ' : 'อนุมัติเสร็จสิ้น';
     } else if (b.status === 'rejected') {
       statusText = 'ปฏิเสธคำขอ';
     }

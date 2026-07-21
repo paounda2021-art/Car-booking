@@ -624,23 +624,27 @@ const server = http.createServer((req, res) => {
           let headerTitle = "📋 ใบสั่งงานพนักงานขับรถ";
           let headerColor = "#1e3a8a";
           let headerBg = "#f8fafc";
-          let altText = `📢 ใบสั่งงาน พขร. คิวใหม่ (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`;
+          let headerIdColor = "#1e40af";
+          let altText = `📢 ใบสั่งงาน พขร. เลขที่ ${payload.bookingId || '-'} (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`;
 
           if (isCancel) {
             headerTitle = "⚠️ แจ้งยกเลิกใบสั่งงาน พขร.";
             headerColor = "#dc2626";
             headerBg = "#fef2f2";
-            altText = `⚠️ แจ้งยกเลิกคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}`;
+            headerIdColor = "#b91c1c";
+            altText = `⚠️ แจ้งยกเลิกคิวงาน พขร. เลขที่ ${payload.bookingId || '-'} - ปลายทาง: ${payload.destination || ''}`;
           } else if (isAccept) {
             headerTitle = "🟢 พขร. รับงานแล้ว";
             headerColor = "#10b981";
             headerBg = "#f0fdf4";
-            altText = `🟢 พขร. รับงานแล้ว - ปลายทาง: ${payload.destination || ''}`;
+            headerIdColor = "#047857";
+            altText = `🟢 พขร. รับงานแล้ว เลขที่ ${payload.bookingId || '-'} - ปลายทาง: ${payload.destination || ''}`;
           } else if (isFinish) {
-            headerTitle = "🏁 เสร็จสิ้นใบสั่งงาน (พขร. คืนรถแล้ว)";
-            headerColor = "#64748b";
+            headerTitle = "🏁 พขร. จบงาน คืนรถแล้ว";
+            headerColor = "#475569";
             headerBg = "#f1f5f9";
-            altText = `🏁 เสร็จสิ้นคิวงาน พขร. - ปลายทาง: ${payload.destination || ''}`;
+            headerIdColor = "#334155";
+            altText = `🏁 พขร. จบงาน คืนรถแล้ว เลขที่ ${payload.bookingId || '-'} - ปลายทาง: ${payload.destination || ''}`;
           }
 
           // Construct body contents list dynamically
@@ -828,6 +832,14 @@ const server = http.createServer((req, res) => {
                       },
                       {
                         type: "text",
+                        text: `📌 เลขที่ใบขอจอง: ${payload.bookingId || '-'}`,
+                        weight: "bold",
+                        size: "sm",
+                        color: headerIdColor,
+                        margin: "xs"
+                      },
+                      {
+                        type: "text",
                         text: "ระบบจองรถยนต์สะพานปลา (FMO)",
                         size: "xs",
                         color: "#64748b",
@@ -842,48 +854,110 @@ const server = http.createServer((req, res) => {
                     layout: "vertical",
                     contents: bodyContents
                   },
-                  footer: (!isCancel && !isFinish) ? {
-                    type: "box",
-                    layout: "vertical",
-                    contents: (() => {
-                      const isLocal = !payload.origin || payload.origin.includes('localhost') || payload.origin.includes('127.0.0.1') || payload.origin.startsWith('http://');
-                      const list = [];
+                  footer: (() => {
+                    const isLocal = !payload.origin || payload.origin.includes('localhost') || payload.origin.includes('127.0.0.1') || payload.origin.startsWith('http://');
+                    const list = [];
+                    
+                    if (isFinish) {
+                      list.push({
+                        type: "button",
+                        action: {
+                          type: "uri",
+                          label: "🏁 จบงาน คืนรถ เรียบร้อยแล้ว",
+                          uri: `${payload.origin || 'https://car-booking.fishmarket.co.th'}`
+                        },
+                        style: "secondary",
+                        color: "#9ca3af"
+                      });
+                    } else if (isAccept) {
+                      if (isLocal) {
+                        list.push(
+                          {
+                            type: "button",
+                            action: {
+                              type: "uri",
+                              label: "✅ รับงานแล้ว (เรียบร้อย)",
+                              uri: `${payload.origin || 'http://localhost:8080'}`
+                            },
+                            style: "secondary",
+                            color: "#9ca3af",
+                            margin: "xs"
+                          },
+                          {
+                            type: "button",
+                            action: {
+                              type: "uri",
+                              label: "🔴 จบงาน (คืนรถ)",
+                              uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=return-early&id=${payload.bookingId}`
+                            },
+                            style: "primary",
+                            color: "#ef4444",
+                            margin: "sm"
+                          }
+                        );
+                      } else {
+                        list.push(
+                          {
+                            type: "button",
+                            action: {
+                              type: "postback",
+                              label: "✅ รับงานแล้ว (เรียบร้อย)",
+                              data: `action=none`,
+                              displayText: "✅ รับงานแล้ว"
+                            },
+                            style: "secondary",
+                            color: "#9ca3af",
+                            margin: "xs"
+                          },
+                          {
+                            type: "button",
+                            action: {
+                              type: "postback",
+                              label: "🔴 จบงาน (คืนรถ)",
+                              data: `action=return-early&id=${payload.bookingId}`,
+                              displayText: "🔴 จบงาน คืนรถ"
+                            },
+                            style: "primary",
+                            color: "#ef4444",
+                            margin: "sm"
+                          }
+                        );
+                      }
+                    } else if (!isCancel) {
                       if (isLocal) {
                         list.push({
                           type: "button",
-                          action: isAccept ? {
-                            type: "uri",
-                            label: "🔴 จบงาน (คืนรถ)",
-                            uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=return-early&id=${payload.bookingId}`
-                          } : {
+                          action: {
                             type: "uri",
                             label: "✅ กดรับงาน",
                             uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`
                           },
-                          style: isAccept ? "secondary" : "primary",
-                          color: isAccept ? "#ef4444" : "#10b981"
+                          style: "primary",
+                          color: "#10b981"
                         });
                       } else {
                         list.push({
                           type: "button",
-                          action: isAccept ? {
-                            type: "postback",
-                            label: "🔴 จบงาน (คืนรถ)",
-                            data: `action=return-early&id=${payload.bookingId}`,
-                            displayText: "🔴 จบงาน"
-                          } : {
+                          action: {
                             type: "postback",
                             label: "✅ กดรับงาน",
                             data: `action=accept-job&id=${payload.bookingId}`,
                             displayText: "✅ กดรับงาน"
                           },
-                          style: isAccept ? "secondary" : "primary",
-                          color: isAccept ? "#ef4444" : "#10b981"
+                          style: "primary",
+                          color: "#10b981"
                         });
                       }
-                      return list;
-                    })()
-                  } : undefined
+                    }
+
+                    if (list.length === 0) return undefined;
+                    return {
+                      type: "box",
+                      layout: "vertical",
+                      contents: list,
+                      paddingAll: "15px"
+                    };
+                  })()
                 }
               }
             ]
