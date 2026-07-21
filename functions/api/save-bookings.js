@@ -26,17 +26,17 @@ export async function onRequestPost(context) {
         )
       `).run();
 
-      const statements = [];
-      statements.push(db.prepare("DELETE FROM bookings"));
+      await db.prepare("DELETE FROM bookings").run();
 
-      for (const b of bookings) {
-        statements.push(
+      const chunkSize = 5;
+      for (let i = 0; i < bookings.length; i += chunkSize) {
+        const chunk = bookings.slice(i, i + chunkSize);
+        const batch = chunk.map(b => 
           db.prepare("INSERT OR REPLACE INTO bookings (id, requester, startDate, endDate, status, data) VALUES (?, ?, ?, ?, ?, ?)")
             .bind(b.id, b.requester, b.startDate, b.endDate, b.status, JSON.stringify(b))
         );
+        await db.batch(batch);
       }
-
-      await db.batch(statements);
 
       return new Response(JSON.stringify({ status: 'success', message: 'Bookings saved to D1 Database successfully' }), {
         status: 200,
