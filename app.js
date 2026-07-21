@@ -1640,11 +1640,15 @@ function updateStats() {
   if (tabAllHistoryBadge) {
     const historyCount = bookings.filter(b => {
       const isMyRequest = checkIsMyRequest(b, currentUser);
-      const canSeeAll = checkCanSeeAll(currentUser);
       const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
-      if (canSeeAll) return true;
-      if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
-      return (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover));
+      const isCompleted = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
+      const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
+      const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
+
+      if (isL2User) return true;
+      if (isL4User) return isCompleted || isMyRequest;
+      if (!isCompleted) return false;
+      return (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || checkCanSeeAll(currentUser));
     }).length;
     tabAllHistoryBadge.textContent = historyCount;
   }
@@ -2174,11 +2178,18 @@ function renderBookingsLists() {
     }
     const canSeeAll = checkCanSeeAll(currentUser);
     const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
+    const isCompleted = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
+    const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
+    const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
 
-    if (canSeeAll || isPendingForMe) {
+    if (isL2User) {
       allBookingsList.push({ booking: b, isPendingForMe });
-    } else if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
-      if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
+    } else if (isL4User) {
+      if (isCompleted || isMyRequest) {
+        allBookingsList.push({ booking: b, isPendingForMe });
+      }
+    } else if (isCompleted) {
+      if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || canSeeAll) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
     }
