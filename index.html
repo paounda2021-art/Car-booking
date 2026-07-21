@@ -859,44 +859,6 @@
           </div>
         </div>
 
-        <!-- Modal for L0 Schedule Edit (Returned by L2) -->
-        <div id="modal-l0-schedule-edit" class="modal">
-          <div class="modal-content" style="max-width: 550px;">
-            <div class="modal-header">
-              <h3>✏️ แก้ไข วัน/เวลา เดินทาง (ส่งกลับจากผู้จัดรถ L2)</h3>
-              <button class="modal-close" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">&times;</button>
-            </div>
-            <div class="modal-body">
-              <div id="l0-edit-reason-banner" style="background: rgba(217, 119, 6, 0.15); border-left: 4px solid #d97706; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
-                <strong>📝 เหตุผลที่ L2 ส่งกลับ:</strong> <span id="l0-edit-reason-text">-</span>
-              </div>
-
-              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; border: 1px solid var(--border-color);">
-                <strong>⏰ วัน/เวลาเดิม:</strong> <span id="l0-edit-previous-schedule">-</span>
-              </div>
-
-              <div class="form-group">
-                <label for="l0-edit-start-date">วัน/เวลา เริ่มเดินทาง (ใหม่)</label>
-                <input type="text" id="l0-edit-start-date" class="form-control" placeholder="เลือกวันเวลาเริ่มเดินทาง">
-              </div>
-
-              <div class="form-group">
-                <label for="l0-edit-end-date">วัน/เวลา สิ้นสุดเดินทาง (ใหม่)</label>
-                <input type="text" id="l0-edit-end-date" class="form-control" placeholder="เลือกวันเวลาสิ้นสุดเดินทาง">
-              </div>
-
-              <div class="form-group">
-                <label for="l0-edit-purpose">เรื่อง/วัตถุประสงค์ (ถ้าต้องการแก้ไข)</label>
-                <input type="text" id="l0-edit-purpose" class="form-control" placeholder="ระบุเรื่อง/วัตถุประสงค์">
-              </div>
-            </div>
-            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
-              <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">ยกเลิก</button>
-              <button type="button" class="btn btn-warning" id="btn-save-l0-schedule-edit" style="background-color:#d97706; color:white; font-weight:600;">💾 บันทึกและส่งกลับให้ L2</button>
-            </div>
-          </div>
-        </div>
-
         <!-- Cancellation Action Panel -->
         <div id="cancellation-action-panel" style="display:none; margin-top: 1.5rem; border-top: 1px dashed var(--border-color); padding-top: 1.5rem; background: rgba(220, 38, 38, 0.05); border: 1px solid rgba(220, 38, 38, 0.2); padding: 1rem; border-radius: 8px;">
           <h4 style="margin-bottom: 0.5rem; color: #f87171; font-size: 1rem;">🚫 ดำเนินการยกเลิกใบเสนอขออนุญาต</h4>
@@ -956,6 +918,44 @@
             <button type="submit" class="btn btn-primary">💾 บันทึกเสนอหัวหน้างาน</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Standalone Modal for L0 Schedule Edit (Returned by L2) -->
+  <div id="modal-l0-schedule-edit" class="modal">
+    <div class="modal-content" style="max-width: 550px;">
+      <div class="modal-header">
+        <h3>✏️ แก้ไข วัน/เวลา เดินทาง (ส่งกลับจากผู้จัดรถ L2)</h3>
+        <button class="modal-close" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="l0-edit-reason-banner" style="background: rgba(217, 119, 6, 0.15); border-left: 4px solid #d97706; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+          <strong>📝 เหตุผลที่ L2 ส่งกลับ:</strong> <span id="l0-edit-reason-text">-</span>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; border: 1px solid var(--border-color);">
+          <strong>⏰ วัน/เวลาเดิม:</strong> <span id="l0-edit-previous-schedule">-</span>
+        </div>
+
+        <div class="form-group">
+          <label for="l0-edit-start-date">วัน/เวลา เริ่มเดินทาง (ใหม่)</label>
+          <input type="text" id="l0-edit-start-date" class="form-control" placeholder="เลือกวันเวลาเริ่มเดินทาง">
+        </div>
+
+        <div class="form-group">
+          <label for="l0-edit-end-date">วัน/เวลา สิ้นสุดเดินทาง (ใหม่)</label>
+          <input type="text" id="l0-edit-end-date" class="form-control" placeholder="เลือกวันเวลาสิ้นสุดเดินทาง">
+        </div>
+
+        <div class="form-group">
+          <label for="l0-edit-purpose">เรื่อง/วัตถุประสงค์ (ถ้าต้องการแก้ไข)</label>
+          <input type="text" id="l0-edit-purpose" class="form-control" placeholder="ระบุเรื่อง/วัตถุประสงค์">
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">ยกเลิก</button>
+        <button type="button" class="btn btn-warning" id="btn-save-l0-schedule-edit" style="background-color:#d97706; color:white; font-weight:600;">💾 บันทึกและส่งกลับให้ L2</button>
       </div>
     </div>
   </div>
@@ -1150,6 +1150,6 @@
 
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=9.3_strict_l0"></script>
+  <script src="app.js?v=9.4_modal_fix"></script>
 </body>
 </html>
