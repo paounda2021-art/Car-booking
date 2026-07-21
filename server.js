@@ -620,14 +620,21 @@ const server = http.createServer((req, res) => {
           const isCancel = payload.type === 'cancel';
           const isAccept = payload.type === 'accept';
           const isFinish = payload.type === 'finish';
-          
+          const isWelfare = payload.isWelfare || (payload.carInfo && payload.carInfo.includes('รถสวัสดิการ')) || (payload.controlUnit === 'รถสวัสดิการ');
+
           let headerTitle = "📋 ใบสั่งงานพนักงานขับรถ";
           let headerColor = "#1e3a8a";
           let headerBg = "#f8fafc";
           let headerIdColor = "#1e40af";
           let altText = `📢 ใบสั่งงาน พขร. เลขที่ ${payload.bookingId || '-'} (อนุมัติเสร็จสิ้น) - ปลายทาง: ${payload.destination || ''}`;
 
-          if (isCancel) {
+          if (isWelfare) {
+            headerTitle = "🚗 จัดสรรใช้รถสวัสดิการ";
+            headerColor = "#0284c7";
+            headerBg = "#f0f9ff";
+            headerIdColor = "#0369a1";
+            altText = `📢 จัดสรรใช้รถสวัสดิการ เลขที่ ${payload.bookingId || '-'} - ปลายทาง: ${payload.destination || ''}`;
+          } else if (isCancel) {
             headerTitle = "⚠️ แจ้งยกเลิกใบสั่งงาน พขร.";
             headerColor = "#dc2626";
             headerBg = "#fef2f2";
@@ -855,6 +862,10 @@ const server = http.createServer((req, res) => {
                     contents: bodyContents
                   },
                   footer: (() => {
+                    if (isWelfare) {
+                      // รถสวัสดิการ: ไม่ต้องมีปุ่ม กดรับงาน
+                      return undefined;
+                    }
                     const isLocal = !payload.origin || payload.origin.includes('localhost') || payload.origin.includes('127.0.0.1') || payload.origin.startsWith('http://');
                     const list = [];
                     

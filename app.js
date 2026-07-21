@@ -2135,6 +2135,16 @@ function renderBookingsLists() {
       l0EditBtn = `<button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openL0ScheduleEditModal('${b.id}')" style="background-color:#d97706; color:white; font-weight:bold;">✏️ แก้ไข วัน/เวลา เดินทาง</button>`;
     }
 
+    let welfareBtn = '';
+    const isWelfare = (b.controlUnit === 'รถสวัสดิการ');
+    if (isWelfare && b.status === 'approved' && isMyRequest) {
+      if (!b.carPickedUp) {
+        welfareBtn = `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); pickupWelfareCar('${b.id}')" style="background-color: #0284c7; border-color: #0284c7; color: white; font-weight: bold;">🔑 รับรถ</button>`;
+      } else if (!b.returnedEarly) {
+        welfareBtn = `<button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); returnWelfareCar('${b.id}')" style="background-color: #f59e0b; border-color: #f59e0b; color: white; font-weight: bold;">🏁 จบงาน คืนรถ</button>`;
+      }
+    }
+
     const card = document.createElement('div');
     card.className = 'booking-card';
     card.onclick = () => openApprovalModal(b.id);
@@ -2155,6 +2165,7 @@ function renderBookingsLists() {
           ${printBtn}
           ${fillTaxiBtn}
           ${l0EditBtn}
+          ${welfareBtn}
           <button class="btn ${actionBtnClass} btn-sm">${actionBtnText}</button>
         </div>
       </div>
@@ -3253,6 +3264,11 @@ function handleApprovalAction(isApproved) {
           <tr><td style="padding: 6px 0; font-weight: bold;">ประเภทการเดินทาง:</td><td style="padding: 6px 0;">${booking.travelType === 'fmo_car' ? `รถตู้ อสป. ทะเบียน ${carPlate}` : 'รถรับจ้างสาธารณะ (TAXI)'}</td></tr>
           ${booking.travelType === 'fmo_car' ? `<tr><td style="padding: 6px 0; font-weight: bold; width: 140px;">พนักงานขับรถ:</td><td style="padding: 6px 0;">${driverNameWithPhone}</td></tr>` : `<tr><td style="padding: 6px 0; font-weight: bold; width: 140px;">วงเงินอนุมัติเบิกจ่าย:</td><td style="padding: 6px 0;">ไม่เกิน ${booking.price} บาท</td></tr>`}
         </table>
+        ${booking.controlUnit === 'รถสวัสดิการ' ? `
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 15px; font-family: Sarabun, sans-serif;">🔑 รับรถสวัสดิการ</a>
+          </div>
+        ` : ''}
       `;
       sendEmailNotification(reqEmail, subject, body);
 
@@ -6200,6 +6216,39 @@ function generateDriverReport() {
   `;
 }
 
+// Welfare Car Pickup and Return Actions
+window.pickupWelfareCar = async function(bookingId) {
+  const b = bookings.find(x => x.id === bookingId);
+  if (!b) return;
+  b.carPickedUp = true;
+  saveBookings();
+  showToast(`บันทึกการรับรถสวัสดิการ สำหรับคำขอ ${bookingId} เรียบร้อยแล้ว`, 'success');
+  updateStats();
+  renderDashboard();
+  renderBookingsLists();
+};
+
+window.returnWelfareCar = async function(bookingId) {
+  const b = bookings.find(x => x.id === bookingId);
+  if (!b) return;
+  b.returnedEarly = true;
+  
+  // Set car status in cars.json back to 'available'
+  if (b.carId) {
+    const carObj = cars.find(c => c.id === b.carId);
+    if (carObj) {
+      carObj.status = 'available';
+      saveCars();
+    }
+  }
+  
+  saveBookings();
+  showToast(`บันทึกการจบงาน คืนรถ สำหรับคำขอ ${bookingId} เรียบร้อยแล้ว (สถานะรถเปลี่ยนเป็นว่างแล้ว)`, 'success');
+  updateStats();
+  renderDashboard();
+  renderBookingsLists();
+};
+
 // Expose globals for inline attributes or testing
 window.openApprovalModal = openApprovalModal;
 window.openReportView = openReportView;
@@ -6567,10 +6616,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Helper function to send LINE Group notification when booking is approved
 function triggerLineNotification(booking, carPlate, type) {
+  const isWelfare = (booking.controlUnit === 'รถสวัสดิการ') || (booking.carInfo && booking.carInfo.includes('รถสวัสดิการ')) || (carPlate && carPlate.includes('รถสวัสดิการ'));
   const payload = {
     type: type || 'default',
     bookingId: booking.id,
     origin: window.location.origin,
+    isWelfare: isWelfare,
     driverName: booking.driverName || 'ไม่ระบุ',
     carInfo: booking.carId === 'taxi' ? 'รถรับจ้างสาธารณะ (TAXI)' : `รถยนต์ อสป. ทะเบียน ${carPlate || '-'}`,
     destination: booking.destination || 'ไม่ระบุ',
