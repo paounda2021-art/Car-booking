@@ -2011,6 +2011,8 @@ function renderBookingsLists() {
 
   const pendingTabBtn = document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
   const myBkgTabBtn = document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
+  const allHistoryTabBtn = document.querySelector('.tab-btn[data-tab="tab-all-history"]');
+  const isViewingHistory = allHistoryTabBtn && allHistoryTabBtn.classList.contains('active');
 
   if (pendingTabBtn) {
     if (currentUser && currentUser.role === 'requester') {
@@ -2018,21 +2020,23 @@ function renderBookingsLists() {
       if (pendingTabBtn.classList.contains('active')) {
         pendingTabBtn.classList.remove('active');
         if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
-        document.getElementById('tab-pending-approvals').classList.remove('active');
+        document.getElementById('tab-pending-approvals')?.classList.remove('active');
         const myBkgTab = document.getElementById('tab-my-bookings');
         if (myBkgTab) myBkgTab.classList.add('active');
       }
     } else {
       pendingTabBtn.classList.remove('hidden');
-      // สลับหน้าจอมาที่ Tab งานรออนุมัติอัตโนมัติ หากเป็นผู้อนุมัติและมีงานค้าง
-      const pendingBadgeVal = document.getElementById('tab-pending-count');
-      if (pendingBadgeVal && parseInt(pendingBadgeVal.textContent) > 0 && !pendingTabBtn.classList.contains('active')) {
-        if (myBkgTabBtn) myBkgTabBtn.classList.remove('active');
-        pendingTabBtn.classList.add('active');
-        const myBkgTab = document.getElementById('tab-my-bookings');
-        if (myBkgTab) myBkgTab.classList.remove('active');
-        const pendingTab = document.getElementById('tab-pending-approvals');
-        if (pendingTab) pendingTab.classList.add('active');
+      // Do NOT auto-switch tab if user is currently viewing All History tab!
+      if (!isViewingHistory) {
+        const pendingBadgeVal = document.getElementById('tab-pending-count');
+        if (pendingBadgeVal && parseInt(pendingBadgeVal.textContent) > 0 && myBkgTabBtn && myBkgTabBtn.classList.contains('active')) {
+          if (myBkgTabBtn) myBkgTabBtn.classList.remove('active');
+          pendingTabBtn.classList.add('active');
+          const myBkgTab = document.getElementById('tab-my-bookings');
+          if (myBkgTab) myBkgTab.classList.remove('active');
+          const pendingTab = document.getElementById('tab-pending-approvals');
+          if (pendingTab) pendingTab.classList.add('active');
+        }
       }
     }
   }
