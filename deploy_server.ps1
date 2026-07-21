@@ -19,6 +19,7 @@ if (Test-Path $bookingsFile) {
 
 # 2. Copy to deploy directory if it exists
 $deployDir = "D:\deploy_latest"
+$carsFile = Join-Path $rootDir "cars.json"
 if (Test-Path $deployDir) {
     if (Test-Path $bookingsFile) {
         Copy-Item -Path $bookingsFile -Destination (Join-Path $deployDir "bookings.json") -Force
