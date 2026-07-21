@@ -603,6 +603,27 @@ async function initDatabase() {
           });
           dbBookings = [];
         }
+
+        // Merge with local storage bookings to ensure newly created local bookings are not lost during network/cache delays
+        const localDataStr = localStorage.getItem('bookings_data');
+        if (localDataStr) {
+          try {
+            const localBookings = JSON.parse(localDataStr);
+            if (Array.isArray(localBookings)) {
+              let hasMergedNew = false;
+              localBookings.forEach(localB => {
+                if (localB && localB.id && localB.id !== 'system_config' && !dbBookings.some(dbB => dbB.id === localB.id)) {
+                  dbBookings.push(localB);
+                  hasMergedNew = true;
+                }
+              });
+              if (hasMergedNew) {
+                console.log("🛡️ Safely merged new local bookings into fetched database!");
+              }
+            }
+          } catch(e) {}
+        }
+
         localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
         bookings = dbBookings;
         dbBookingsLoaded = true;
@@ -1283,7 +1304,7 @@ function checkLoginStatus() {
     
     // Sidebar items visibility
     document.getElementById('nav-dashboard').closest('.nav-item').classList.add('hidden');
-    document.getElementById('nav-bookings').closest('.nav-item').classList.remove('hidden');
+    document.getElementById('nav-bookings').closest('.nav-item').classList.add('hidden');
     document.getElementById('nav-calendar').closest('.nav-item').classList.remove('hidden');
     const reportNavItem = document.getElementById('nav-item-driver-report');
     if (reportNavItem) reportNavItem.classList.add('hidden');
@@ -1300,10 +1321,9 @@ function checkLoginStatus() {
     // Populate dropdown and render views
     populateCarsDropdown();
     updateStats();
-    renderBookingsLists();
     renderMonthCalendar();
     
-    showView('bookings');
+    showView('calendar');
   }
 }
 
