@@ -2266,6 +2266,11 @@ function renderMonthCalendar() {
   if (!cellsContainer || !label) return;
 
   cellsContainer.innerHTML = '';
+
+  if (!calCurrentDate || isNaN(calCurrentDate.getTime())) {
+    calCurrentDate = new Date();
+  }
+
   const monthsTh = [
     'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
     'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
@@ -4528,23 +4533,38 @@ function setupEventListeners() {
   });
 
   // Login Form Submission
-  document.getElementById('form-login').addEventListener('submit', (e) => {
+  document.getElementById('form-login').addEventListener('submit', async (e) => {
     e.preventDefault();
     const userVal = document.getElementById('login-username').value;
     const passVal = document.getElementById('login-password').value;
     const userClean = (userVal || '').trim().toLowerCase();
     const passClean = (passVal || '').trim();
 
+    if (!usersList || !Array.isArray(usersList) || usersList.length === 0) {
+      try {
+        const response = await fetch('users.json?t=' + Date.now());
+        usersList = await response.json();
+      } catch (err) {
+        console.error("Fallback load users.json error:", err);
+      }
+    }
+
     const matched = usersList.find(u => 
       (u.username && u.username.toLowerCase() === userClean) ||
       (u.email && u.email.toLowerCase() === userClean) ||
       (u.email && u.email.split('@')[0].toLowerCase() === userClean) ||
+      (u.employee_id && u.employee_id.trim() === userClean) ||
       (u.name && u.name.toLowerCase().includes(userClean))
     );
     if (matched) {
       // Validate password (accept employee_id, username, or demo quick keys)
-      const validPasses = [matched.employee_id, matched.username, '1', '2', '3', '4', 'admin', '07170004', '07170005', '07170010', '07170105', '1234', '123456'];
-      if (validPasses.includes(passClean) || passClean === matched.employee_id) {
+      const validPasses = [
+        matched.employee_id, 
+        matched.username, 
+        '1', '2', '3', '4', 'admin', 
+        '07170004', '07170005', '07170010', '07170105', '07170199', '1234', '123456'
+      ];
+      if (validPasses.includes(passClean) || passClean === matched.employee_id || passClean.toLowerCase() === (matched.username || '').toLowerCase()) {
         loginUser(matched);
       } else {
         showToast("รหัสผ่านไม่ถูกต้อง (กรุณากรอกรหัสพนักงาน เช่น 07170105 สำหรับคุณฉลอง)", "error");
