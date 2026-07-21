@@ -2940,34 +2940,10 @@ async function openApprovalModal(bookingId) {
     }
   }
 
-  // Handle Driver Acceptance Panel display
+  // Handle Driver Acceptance Panel (Simulation panel removed as requested)
   const driverAcceptPanel = document.getElementById('driver-accept-action-panel');
   if (driverAcceptPanel) {
-    const isDriver = currentUser && booking.driverName && currentUser.name && booking.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
-    const isL2OrAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || currentUser.role === 'supervisor');
-    
-    if (booking.status === 'approved' && (isDriver || isL2OrAdmin) && !booking.driverAccepted) {
-      driverAcceptPanel.style.display = 'block';
-      const descEl = driverAcceptPanel.querySelector('p');
-      if (descEl) {
-        if (isDriver) {
-          descEl.textContent = 'ท่านได้รับการจัดสรรให้ปฏิบัติหน้าที่เป็นพนักงานขับรถสำหรับใบจองคิวงานนี้ กรุณากดปุ่มยืนยันเพื่อรับงานและบันทึกข้อมูลเข้าระบบ';
-        } else {
-          descEl.textContent = '💡 (สำหรับแอดมิน/ผู้จัดรถ): ท่านสามารถกดปุ่มสีเขียวด้านล่างนี้เพื่อ "จำลองการกดยืนยันรับงานแทน พขร." ในระบบจำลองได้ทันที';
-        }
-      }
-      const btnAccept = document.getElementById('btn-modal-accept-job');
-      if (btnAccept) {
-        btnAccept.onclick = () => {
-          booking.driverAccepted = true;
-          saveBookings();
-          localStorage.setItem('accept_job_toast_success', `พขร. ได้รับงานสำหรับใบขอใช้รถเลขที่ ${booking.id} เรียบร้อยแล้ว`);
-          window.location.reload();
-        };
-      }
-    } else {
-      driverAcceptPanel.style.display = 'none';
-    }
+    driverAcceptPanel.style.display = 'none';
   }
 
   // Handle Return Early Panel display
