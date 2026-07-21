@@ -26,8 +26,7 @@ export async function onRequestPost(context) {
         )
       `).run();
 
-      await db.prepare("DELETE FROM bookings").run();
-
+      // Insert or replace bookings atomically without wiping existing records
       const chunkSize = 5;
       for (let i = 0; i < bookings.length; i += chunkSize) {
         const chunk = bookings.slice(i, i + chunkSize);

@@ -59,9 +59,8 @@ function sqliteGetBookings() {
 
 function sqliteSaveBookings(bookingsList) {
   try {
-    db.exec("DELETE FROM bookings");
     const insertBooking = db.prepare(`
-      INSERT INTO bookings (
+      INSERT OR REPLACE INTO bookings (
         id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
         driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince,
         purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price,
