@@ -1646,7 +1646,7 @@ function updateStats() {
       const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
 
       if (isL2User) return true;
-      if (isL4User) return isCompleted || isMyRequest;
+      if (isL4User) return (b.status === 'approved' || isMyRequest);
       if (!isCompleted) return false;
       return (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || checkCanSeeAll(currentUser));
     }).length;
@@ -2185,7 +2185,7 @@ function renderBookingsLists() {
     if (isL2User) {
       allBookingsList.push({ booking: b, isPendingForMe });
     } else if (isL4User) {
-      if (isCompleted || isMyRequest) {
+      if (b.status === 'approved' || isMyRequest) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
     } else if (isCompleted) {
