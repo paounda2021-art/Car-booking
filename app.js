@@ -615,10 +615,9 @@ async function initDatabase() {
   if (!dbBookingsLoaded) {
     let bookingsData = localStorage.getItem('bookings_data');
     if (bookingsData) {
-      if (bookingsData.includes('ผักเจียมแว่น') || bookingsData.includes('à¸') || !bookingsData.includes('data:image/png;base64') || bookingsData.includes('เธ') || bookingsData.includes('เฏร') || bookingsData.includes('เน€') || bookingsData.includes('BKG-FMO-00')) {
+      if (bookingsData.includes('ผักเจียมแว่น') || bookingsData.includes('à¸') || bookingsData.includes('เธ') || bookingsData.includes('เฏร') || bookingsData.includes('เน€') || bookingsData.includes('BKG-FMO-00')) {
         localStorage.removeItem('bookings_data');
       }
->>>>>>> origin/main
     }
 
     if (!localStorage.getItem('bookings_data')) {
@@ -2060,7 +2059,6 @@ function renderBookingsLists() {
     if (isPendingForMe) {
       pendingBookingsList.push({ booking: b, isPendingForMe });
     }
-    const isMyRequest = checkIsMyRequest(b, currentUser);
     const canSeeAll = checkCanSeeAll(currentUser);
     const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
 
