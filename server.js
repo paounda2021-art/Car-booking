@@ -8,8 +8,13 @@ const { DatabaseSync } = require('node:sqlite');
 const PORT = 8080;
 const ROOT_DIR = __dirname;
 
-// Initialize SQLite database
-const db = new DatabaseSync(path.join(ROOT_DIR, 'database.db'));
+// Initialize SQLite database (supports C:\apps\car-booking\database.db if opened in DB Browser)
+const DB_PATH = fs.existsSync('C:\\apps\\car-booking\\database.db')
+  ? 'C:\\apps\\car-booking\\database.db'
+  : path.join(ROOT_DIR, 'database.db');
+
+console.log(`[SQLite] Using database path: ${DB_PATH}`);
+const db = new DatabaseSync(DB_PATH);
 
 // Ensure schema is updated with active column for system_config
 try {
@@ -241,12 +246,22 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/api/get-bookings' && req.method === 'GET') {
     const sqlData = sqliteGetBookings();
     if (sqlData) {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.writeHead(200, { 
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
       res.end(JSON.stringify(sqlData));
     } else {
       const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
       fs.readFile(bookingsFile, 'utf8', (err, data) => {
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.writeHead(200, { 
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        });
         res.end(err ? '[]' : data);
       });
     }

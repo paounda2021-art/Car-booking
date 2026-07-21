@@ -163,26 +163,23 @@ function compressImage(file, callback) {
 function resolveManagerEmail(booking) {
   if (!booking) return 'ranida.c@fishmarket.co.th';
   
-  // 1. If managerEmail is set and is NOT the fallback email 'ranida.c@fishmarket.co.th'
-  if (booking.managerEmail && booking.managerEmail.trim() !== '' && booking.managerEmail !== 'ranida.c@fishmarket.co.th') {
-    return booking.managerEmail;
-  }
-  
-  // 2. Look up the requester in the usersList loaded from users.json
+  // 1. Prioritize looking up requester in usersList (always accurate according to current user hierarchy!)
   if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
     const requesterName = booking.requester.trim();
+    const normalizeName = n => n ? n.replace(/\s+/g, '') : '';
+    const reqNorm = normalizeName(requesterName);
     const userObj = usersList.find(u => 
-      u.name.trim() === requesterName || 
+      normalizeName(u.name) === reqNorm || 
       (booking.requesterEmail && u.email && u.email.toLowerCase() === booking.requesterEmail.toLowerCase())
     );
     if (userObj && userObj.manager_email && userObj.manager_email.trim() !== '') {
-      return userObj.manager_email;
+      return userObj.manager_email.trim();
     }
   }
   
-  // 3. Fallback: if booking has managerEmail, use it even if it is the fallback email
+  // 2. Fallback to booking.managerEmail
   if (booking.managerEmail && booking.managerEmail.trim() !== '') {
-    return booking.managerEmail;
+    return booking.managerEmail.trim();
   }
   
   return 'ranida.c@fishmarket.co.th'; // Default fallback
@@ -585,7 +582,7 @@ async function initDatabase() {
   // Try to load bookings from Cloudflare KV database first
   let dbBookingsLoaded = false;
   try {
-    const dbResponse = await fetch('/api/get-bookings');
+    const dbResponse = await fetch('/api/get-bookings?t=' + Date.now(), { cache: 'no-store' });
     if (dbResponse.ok) {
       let dbBookings = await dbResponse.json();
       if (dbBookings && Array.isArray(dbBookings)) {
@@ -607,6 +604,7 @@ async function initDatabase() {
           dbBookings = [];
         }
         localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
+        bookings = dbBookings;
         dbBookingsLoaded = true;
       }
     }
@@ -614,22 +612,20 @@ async function initDatabase() {
     console.error("Failed to load bookings from Cloudflare KV database:", error);
   }
 
-  // Clear simulated email logs for production
-  // localStorage.removeItem('email_logs_data');
-  // emailLogs = [];
-
-  // Load default bookings mock data if empty or contains old spelling or Mojibake or JPEG signature format, or contains mock IDs
-  let bookingsData = localStorage.getItem('bookings_data');
-  if (bookingsData) {
-    if (bookingsData.includes('ผักเจียมแว่น') || bookingsData.includes('à¸') || bookingsData.includes('เธ') || bookingsData.includes('เฏร') || bookingsData.includes('เน€') || bookingsData.includes('BKG-FMO-00')) {
-      localStorage.removeItem('bookings_data');
+  if (!dbBookingsLoaded) {
+    let bookingsData = localStorage.getItem('bookings_data');
+    if (bookingsData) {
+      if (bookingsData.includes('ผักเจียมแว่น') || bookingsData.includes('à¸') || !bookingsData.includes('data:image/png;base64') || bookingsData.includes('เธ') || bookingsData.includes('เฏร') || bookingsData.includes('เน€') || bookingsData.includes('BKG-FMO-00')) {
+        localStorage.removeItem('bookings_data');
+      }
+>>>>>>> origin/main
     }
-  }
 
-  if (!localStorage.getItem('bookings_data')) {
-    localStorage.setItem('bookings_data', JSON.stringify([]));
+    if (!localStorage.getItem('bookings_data')) {
+      localStorage.setItem('bookings_data', JSON.stringify([]));
+    }
+    bookings = JSON.parse(localStorage.getItem('bookings_data') || '[]');
   }
-  bookings = JSON.parse(localStorage.getItem('bookings_data'));
 
   // Migration: Add missing destination fields to sample bookings
   let bookingsUpdated = false;
@@ -1543,11 +1539,12 @@ function updateStats() {
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
   if (tabAllHistoryBadge) {
     const historyCount = bookings.filter(b => {
-      if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
       const isMyRequest = checkIsMyRequest(b, currentUser);
       const canSeeAll = checkCanSeeAll(currentUser);
       const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
-      return (canSeeAll || isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover));
+      if (canSeeAll) return true;
+      if (b.status !== 'approved' && b.status !== 'rejected' && b.status !== 'cancelled') return false;
+      return (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover));
     }).length;
     tabAllHistoryBadge.textContent = historyCount;
   }
@@ -1930,6 +1927,11 @@ function renderBookingsLists() {
   const helperCreateCard = (b, isPendingForMe) => {
     let statusClass = 'warning';
     let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
+
+    const isL2User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
+    const l2Sig = (b.signatures && Array.isArray(b.signatures)) ? b.signatures.find(s => s.level === 2) : null;
+    const isApprovedByL2 = l2Sig && l2Sig.status === 'approved';
+
     if (b.status === 'cancelled') {
       statusClass = 'danger';
       const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
@@ -1951,6 +1953,9 @@ function renderBookingsLists() {
     } else if (b.status === 'rejected') {
       statusClass = 'danger';
       statusText = 'ปฏิเสธคำขอ';
+    } else if (isL2User && isApprovedByL2 && b.currentApprovalLevel > 2) {
+      statusClass = 'info';
+      statusText = `✅ L2 ผ่านแล้ว (รอ L${b.currentApprovalLevel})`;
     }
 
     const startDateStr = formatThaiDateTime(b.startDate);
@@ -2055,11 +2060,14 @@ function renderBookingsLists() {
     if (isPendingForMe) {
       pendingBookingsList.push({ booking: b, isPendingForMe });
     }
-    if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
-      const isMyRequest = checkIsMyRequest(b, currentUser);
-      const canSeeAll = checkCanSeeAll(currentUser);
-      const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
-      if (canSeeAll || isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
+    const isMyRequest = checkIsMyRequest(b, currentUser);
+    const canSeeAll = checkCanSeeAll(currentUser);
+    const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
+
+    if (canSeeAll) {
+      allBookingsList.push({ booking: b, isPendingForMe });
+    } else if (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled') {
+      if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
     }
@@ -2230,6 +2238,7 @@ function renderMonthCalendar() {
         else if (b.status === 'pending' || b.status.startsWith('pending')) badgeClass += ' pending';
 
         badge.className = badgeClass;
+        badge.setAttribute('data-booking-id', b.id);
         
         let icon = '🚗';
         if (b.travelType === 'public_car') icon = '🚐';
@@ -2247,7 +2256,16 @@ function renderMonthCalendar() {
           ? `${startD} (เวลา ${startT} - ${endT})` 
           : `${startD} (${startT}) ถึง ${endD} (${endT})`;
 
-        badge.title = `ผู้จอง: ${b.requester || '-'}\nเรื่อง: ${b.purpose || '-'}\nสถานที่: ${b.destination || '-'}\nเวลา: ${timeText}`;
+        badge.style.cursor = 'pointer';
+        badge.title = `📌 ใบขอเลขที่: ${b.id}\n👤 ผู้จอง: ${b.requester || '-'}\n📝 เรื่อง: ${b.purpose || '-'}\n📍 สถานที่: ${b.destination || '-'}\n⏰ เวลา: ${timeText}\n👉 คลิกเพื่อเปิดดูรายละเอียดการอนุมัติ`;
+        badge.setAttribute('onclick', `event.preventDefault(); event.stopPropagation(); openApprovalModal('${b.id}');`);
+        badge.onclick = (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          openApprovalModal(b.id);
+        };
         eventsContainer.appendChild(badge);
       });
 
@@ -2337,15 +2355,41 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
 }
 
 // Open Approval Details Modal
-function openApprovalModal(bookingId) {
-  const booking = bookings.find(b => b.id === bookingId);
-  if (!booking) return;
+async function openApprovalModal(bookingId) {
+  if (!bookingId) return;
+
+  let booking = bookings.find(b => b.id === bookingId || (b.id && b.id.trim() === bookingId.trim()));
+
+  if (!booking) {
+    try {
+      const dbResponse = await fetch('/api/get-bookings?t=' + Date.now(), { cache: 'no-store' });
+      if (dbResponse.ok) {
+        let dbBookings = await dbResponse.json();
+        if (dbBookings && Array.isArray(dbBookings)) {
+          bookings = dbBookings.filter(b => b.id !== 'system_config');
+          localStorage.setItem('bookings_data', JSON.stringify(bookings));
+          booking = bookings.find(b => b.id === bookingId || (b.id && b.id.trim() === bookingId.trim()));
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching booking details fallback:", e);
+    }
+  }
+
+  if (!booking) {
+    if (typeof showToast === 'function') {
+      showToast(`ไม่พบข้อมูลคำขอเลขที่ ${bookingId} ในระบบ`, "error");
+    }
+    return;
+  }
 
   activeBookingIdForApproval = booking.id;
 
   const modal = document.getElementById('modal-approval');
   if (!modal) return;
 
+  modal.style.display = 'flex';
+  modal.style.zIndex = '99999';
   modal.classList.add('active');
 
   // We will resize and load signature in setTimeout to ensure proper layout and avoid signature clear
@@ -4003,7 +4047,12 @@ function setupEventListeners() {
     if (btn) {
       e.preventDefault();
       const username = btn.getAttribute('data-user');
-      const matched = usersList.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
+      const uClean = username.trim().toLowerCase();
+      const matched = usersList.find(u => 
+        (u.username && u.username.toLowerCase() === uClean) ||
+        (u.email && u.email.toLowerCase() === uClean) ||
+        (u.email && u.email.split('@')[0].toLowerCase() === uClean)
+      );
       if (matched) {
         loginUser(matched);
       } else {
@@ -4132,7 +4181,11 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-close-approval').addEventListener('click', () => {
-    document.getElementById('modal-approval').classList.remove('active');
+    const modal = document.getElementById('modal-approval');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.style.display = 'none';
+    }
   });
 
 
@@ -4313,10 +4366,12 @@ function setupEventListeners() {
   // Login Form Submission
   document.getElementById('form-login').addEventListener('submit', (e) => {
     e.preventDefault();
-    const user = document.getElementById('login-username').value;
-    const pass = document.getElementById('login-password').value;
-
-    const matched = usersList.find(u => u.username.toLowerCase() === user.trim().toLowerCase());
+    const userClean = user.trim().toLowerCase();
+    const matched = usersList.find(u => 
+      (u.username && u.username.toLowerCase() === userClean) ||
+      (u.email && u.email.toLowerCase() === userClean) ||
+      (u.email && u.email.split('@')[0].toLowerCase() === userClean)
+    );
     if (matched) {
       // Validate password (accept employee_id or demo quick keys)
       if (pass === matched.employee_id || pass === '1' || pass === '2' || pass === '07170004' || pass === '07170005' || pass === '07170010' || pass === 'admin') {
@@ -5895,6 +5950,19 @@ function generateDriverReport() {
 window.openApprovalModal = openApprovalModal;
 window.openReportView = openReportView;
 window.renderMonthCalendar = renderMonthCalendar;
+
+// Global Capture-Phase Event Delegation for Calendar Event Badges & Booking Click Elements
+document.addEventListener('click', function(e) {
+  const targetBadge = e.target ? e.target.closest('.calendar-event-badge, [data-booking-id]') : null;
+  if (targetBadge) {
+    const bookingId = targetBadge.getAttribute('data-booking-id');
+    if (bookingId) {
+      e.preventDefault();
+      e.stopPropagation();
+      openApprovalModal(bookingId);
+    }
+  }
+}, true);
 window.openFillTaxiModal = openFillTaxiModal;
 window.generateDriverReport = generateDriverReport;
 window.populateDriversDropdown = populateDriversDropdown;
