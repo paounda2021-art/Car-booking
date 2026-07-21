@@ -85,14 +85,14 @@
           </a>
         </li>
         <li class="nav-item">
-          <a href="#" class="nav-link active" data-view="bookings" id="nav-bookings">
+          <a href="#" class="nav-link" data-view="bookings" id="nav-bookings">
             <span class="nav-icon">📋</span>
             <span class="nav-text">รายการจอง & อนุมัติ</span>
             <span id="pending-badge-count" class="menu-badge">0</span>
           </a>
         </li>
         <li class="nav-item">
-          <a href="#" class="nav-link" data-view="calendar" id="nav-calendar">
+          <a href="#" class="nav-link active" data-view="calendar" id="nav-calendar">
             <span class="nav-icon">📅</span>
             <span class="nav-text">ปฏิทินจองใช้รถ</span>
           </a>
@@ -280,7 +280,7 @@
       </section>
 
        <!-- VIEW 2: Bookings List and Approvals -->
-      <section id="view-bookings" class="view-section no-print">
+      <section id="view-bookings" class="view-section hidden no-print">
         <div class="tab-container">
           <div class="tab-nav" style="display: flex; gap: 2rem; border-bottom: 1px solid var(--border-color); width: 100%; margin-bottom: 1.5rem; align-items: center; flex-wrap: wrap;">
             <button class="tab-btn active" data-tab="tab-my-bookings">รายการที่ฉันขอ (<span id="tab-my-bookings-count">0</span>)</button>
@@ -404,7 +404,7 @@
       </section>
 
       <!-- VIEW 4: Full Month Calendar -->
-      <section id="view-calendar" class="view-section hidden no-print">
+      <section id="view-calendar" class="view-section no-print">
         <div class="calendar-view-container">
           <div class="calendar-top-controls">
             <div class="calendar-month-nav">
@@ -838,6 +838,7 @@
 
         <!-- Special Edit Panel for L2 (Fleet Admin) when booking is approved or pending L3/L4 -->
         <div id="fleet-admin-edit-panel" style="display:none; margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px;">
+          <div id="l2-schedule-review-container"></div>
           <h4 style="margin-bottom: 0.5rem; color: var(--warning); font-size: 1rem;">🔧 แก้ไขการจัดสรรยานพาหนะ (เฉพาะผู้จัดรถ L2)</h4>
           
           <div class="form-group" style="margin-top:0.5rem;">
@@ -852,8 +853,47 @@
             <input type="text" id="edit-assign-driver" class="form-control" placeholder="ระบุชื่อพนักงานขับรถ">
           </div>
 
-          <div style="display:flex; justify-content:flex-end; margin-top:1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem; flex-wrap:wrap; gap:0.5rem;">
+            <button class="btn btn-warning btn-sm" id="btn-return-to-l0-for-edit" style="background-color:#d97706; color:white; font-weight:600;">🔄 ส่งกลับให้ผู้ขอปรับปรุง วัน/เวลา</button>
             <button class="btn btn-warning btn-sm" id="btn-save-car-changes">💾 บันทึกการเปลี่ยนแปลงยานพาหนะ</button>
+          </div>
+        </div>
+
+        <!-- Modal for L0 Schedule Edit (Returned by L2) -->
+        <div id="modal-l0-schedule-edit" class="modal">
+          <div class="modal-content" style="max-width: 550px;">
+            <div class="modal-header">
+              <h3>✏️ แก้ไข วัน/เวลา เดินทาง (ส่งกลับจากผู้จัดรถ L2)</h3>
+              <button class="modal-close" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div id="l0-edit-reason-banner" style="background: rgba(217, 119, 6, 0.15); border-left: 4px solid #d97706; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+                <strong>📝 เหตุผลที่ L2 ส่งกลับ:</strong> <span id="l0-edit-reason-text">-</span>
+              </div>
+
+              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; border: 1px solid var(--border-color);">
+                <strong>⏰ วัน/เวลาเดิม:</strong> <span id="l0-edit-previous-schedule">-</span>
+              </div>
+
+              <div class="form-group">
+                <label for="l0-edit-start-date">วัน/เวลา เริ่มเดินทาง (ใหม่)</label>
+                <input type="text" id="l0-edit-start-date" class="form-control" placeholder="เลือกวันเวลาเริ่มเดินทาง">
+              </div>
+
+              <div class="form-group">
+                <label for="l0-edit-end-date">วัน/เวลา สิ้นสุดเดินทาง (ใหม่)</label>
+                <input type="text" id="l0-edit-end-date" class="form-control" placeholder="เลือกวันเวลาสิ้นสุดเดินทาง">
+              </div>
+
+              <div class="form-group">
+                <label for="l0-edit-purpose">เรื่อง/วัตถุประสงค์ (ถ้าต้องการแก้ไข)</label>
+                <input type="text" id="l0-edit-purpose" class="form-control" placeholder="ระบุเรื่อง/วัตถุประสงค์">
+              </div>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
+              <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">ยกเลิก</button>
+              <button type="button" class="btn btn-warning" id="btn-save-l0-schedule-edit" style="background-color:#d97706; color:white; font-weight:600;">💾 บันทึกและส่งกลับให้ L2</button>
+            </div>
           </div>
         </div>
 

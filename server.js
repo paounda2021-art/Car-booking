@@ -439,6 +439,147 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // API: notify-driver-schedule-change
+  if (urlPath === '/api/notify-driver-schedule-change' && req.method === 'POST') {
+    let chunks = [];
+    req.on('data', chunk => { chunks.push(chunk); });
+    req.on('end', () => {
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        const lineConfigPath = path.join(ROOT_DIR, 'line_config.json');
+
+        const flexMessage = {
+          type: "flex",
+          altText: `📢 แจ้งเตือนเปลี่ยนวัน/เวลาเดินทาง เลขที่ ${body.bookingId || '-'}`,
+          contents: {
+            type: "bubble",
+            header: {
+              type: "box",
+              layout: "vertical",
+              backgroundColor: "#d97706",
+              paddingAll: "lg",
+              contents: [
+                {
+                  type: "text",
+                  text: "📢 แจ้งเตือนการเปลี่ยนแปลงวัน/เวลาเดินทาง",
+                  weight: "bold",
+                  color: "#ffffff",
+                  size: "md",
+                  wrap: true
+                },
+                {
+                  type: "text",
+                  text: `📌 เลขที่ใบขอ: ${body.bookingId || '-'}`,
+                  color: "#fef3c7",
+                  size: "xs",
+                  margin: "xs"
+                }
+              ]
+            },
+            body: {
+              type: "box",
+              layout: "vertical",
+              spacing: "md",
+              contents: [
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    { type: "text", text: "👤 ผู้ขอใช้รถ:", size: "sm", color: "#64748b", flex: 4 },
+                    { type: "text", text: `${body.requester || '-'}${body.requesterPosition ? ' (' + body.requesterPosition + ')' : ''}`, size: "sm", color: "#1e293b", weight: "bold", flex: 6, wrap: true }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    { type: "text", text: "🚗 ยานพาหนะ:", size: "sm", color: "#64748b", flex: 4 },
+                    { type: "text", text: `${body.carName || '-'} (${body.plate || '-'})`, size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    { type: "text", text: "👤 พขร. ปฏิบัติหน้าที่:", size: "sm", color: "#64748b", flex: 4 },
+                    { type: "text", text: body.driverName || 'ไม่ระบุ', size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                  ]
+                },
+                { type: "separator", margin: "md", color: "#e2e8f0" },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    { type: "text", text: "⏰ วัน/เวลาเดิม:", size: "sm", color: "#ef4444", flex: 4 },
+                    { type: "text", text: `${body.previousStart || '-'} ถึง ${body.previousEnd || '-'}`, size: "sm", color: "#ef4444", flex: 6, wrap: true }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    { type: "text", text: "🆕 วัน/เวลาใหม่:", size: "sm", color: "#10b981", weight: "bold", flex: 4 },
+                    { type: "text", text: `${body.newStart || '-'} ถึง ${body.newEnd || '-'}`, size: "sm", color: "#10b981", weight: "bold", flex: 6, wrap: true }
+                  ]
+                },
+                {
+                  type: "box",
+                  layout: "horizontal",
+                  contents: [
+                    { type: "text", text: "📝 เหตุผล :", size: "sm", color: "#64748b", flex: 4 },
+                    { type: "text", text: body.reason || 'ปรับเปลี่ยนเวลา', size: "sm", color: "#d97706", weight: "bold", flex: 6, wrap: true }
+                  ]
+                }
+              ]
+            }
+          }
+        };
+
+        console.log("\n=========================================");
+        console.log("[LINE Driver Flex Card Notification Log]");
+        console.log(JSON.stringify(flexMessage, null, 2));
+        console.log("=========================================\n");
+
+        fs.readFile(lineConfigPath, 'utf8', (err, configData) => {
+          if (!err) {
+            try {
+              const cfg = JSON.parse(configData);
+              if (cfg.channelAccessToken && cfg.groupId) {
+                const postData = JSON.stringify({
+                  to: cfg.groupId,
+                  messages: [flexMessage]
+                });
+
+                const options = {
+                  hostname: 'api.line.me',
+                  port: 443,
+                  path: '/v2/bot/message/push',
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${cfg.channelAccessToken}`,
+                    'Content-Length': Buffer.byteLength(postData)
+                  }
+                };
+                const lineReq = https.request(options, () => {});
+                lineReq.on('error', (e) => console.error("LINE Flex Notify error:", e));
+                lineReq.write(postData);
+                lineReq.end();
+              }
+            } catch(e) {}
+          }
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ status: 'success', message: 'LINE Flex Card Notification dispatched', flexCard: flexMessage }));
+      } catch(e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ status: 'error', message: e.message }));
+      }
+    });
+    return;
+  }
+
   // API: notify-driver-group
   if (urlPath === '/api/notify-driver-group' && req.method === 'POST') {
     let chunks = [];

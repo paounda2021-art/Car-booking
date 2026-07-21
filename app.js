@@ -399,6 +399,66 @@ function showToastPrompt(message, onConfirm, onCancel) {
   setTimeout(() => input.focus(), 100);
 }
 
+// Custom Toast Text Prompt Dialog
+function showToastTextPrompt(message, defaultValue, onConfirm) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast-message warning`;
+  toast.style.flexDirection = 'column';
+  toast.style.gap = '10px';
+  toast.style.pointerEvents = 'auto';
+  toast.style.zIndex = '100000';
+
+  toast.innerHTML = `
+    <div style="display: flex; gap: 10px; align-items: center; width: 100%;">
+      <span style="font-size: 1.2rem;">🔄</span>
+      <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-main);">${message}</div>
+    </div>
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+      <input type="text" id="toast-text-input" class="form-control" value="${defaultValue || ''}" placeholder="ระบุเหตุผล" style="width: 100%; font-size: 0.85rem; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+      <div style="display: flex; gap: 8px; justify-content: flex-end; width: 100%;">
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-toast-reason-cancel" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-color); background: white;">ยกเลิก</button>
+        <button type="button" class="btn btn-warning btn-sm" id="btn-toast-reason-confirm" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 6px; cursor: pointer; font-weight: bold; background: #d97706; color: white; border: none;">ยืนยันส่งกลับ</button>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+
+  const input = toast.querySelector('#toast-text-input');
+  const confirmBtn = toast.querySelector('#btn-toast-reason-confirm');
+  const cancelBtn = toast.querySelector('#btn-toast-reason-cancel');
+
+  const removeToast = () => {
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 400);
+  };
+
+  confirmBtn.onclick = () => {
+    const val = input.value.trim();
+    removeToast();
+    if (onConfirm) onConfirm(val || defaultValue || 'ปรับเปลี่ยนเวลา');
+  };
+
+  cancelBtn.onclick = () => {
+    removeToast();
+  };
+
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') confirmBtn.click();
+  };
+
+  setTimeout(() => input.focus(), 100);
+}
+
 // Premium Toast Confirmation Dialog returning Promise
 function showToastConfirm(message) {
   return new Promise((resolve) => {
@@ -1457,13 +1517,37 @@ function checkIsManagerOrApprover(b, userObj) {
   if (!userObj) return false;
   
   const uEmail = (userObj.email || '').trim().toLowerCase();
+  const uUsername = (userObj.username || '').trim().toLowerCase();
   const mEmail = resolveManagerEmail(b).toLowerCase();
+
+  // 1. Check direct manager email match
   if (uEmail && mEmail && uEmail === mEmail) return true;
   
-  if (b.signatures) {
+  // 2. Check if requester in usersList has manager_email matching userObj.email or userObj.username
+  if (window.usersList && Array.isArray(window.usersList)) {
+    const reqUser = usersList.find(u => 
+      (u.name && b.requester && u.name.trim() === b.requester.trim()) ||
+      (u.email && b.requesterEmail && u.email.toLowerCase() === b.requesterEmail.toLowerCase()) ||
+      (u.username && b.requester && u.username.toLowerCase() === b.requester.toLowerCase())
+    );
+    if (reqUser && reqUser.manager_email) {
+      const managerEmailClean = reqUser.manager_email.trim().toLowerCase();
+      if ((uEmail && managerEmailClean === uEmail) || (uUsername && managerEmailClean.startsWith(uUsername))) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Special case for Prathum (prathum.c / ranida.c@fishmarket.co.th)
+  if (userObj.username && userObj.username.toLowerCase() === 'prathum.c' && (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th')) {
+    return true;
+  }
+  
+  // 4. Check if user approved L1 in signatures
+  if (b.signatures && Array.isArray(b.signatures)) {
     const l1Sig = b.signatures.find(s => s.level === 1);
-    if (l1Sig && l1Sig.status === 'approved') {
-      const normalize = (n) => n ? n.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.ส\.|ว่าที่ร\.ต\.|ว่าที่ร้อยตรี|ดร\.)\s*/, '') : '';
+    if (l1Sig) {
+      const normalize = (n) => n ? n.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.s\.|น\.ส\.|ว่าที่ร\.ต\.|ว่าที่ร้อยตรี|ดร\.)\s*/, '') : '';
       const uNameNormalized = normalize(userObj.name);
       const approverNameNormalized = normalize(l1Sig.approverName);
       if (uNameNormalized && approverNameNormalized && uNameNormalized === approverNameNormalized) {
@@ -1957,6 +2041,12 @@ function renderBookingsLists() {
     } else if (b.waitingForRequesterInput) {
       statusClass = 'danger';
       statusText = '⏳ รอระบุค่าพาหนะ';
+    } else if (b.status === 'waiting_for_requester_edit') {
+      statusClass = 'warning';
+      statusText = '⚠️ รอท่านปรับปรุง วัน/เวลา (ส่งกลับจาก L2)';
+    } else if (b.status === 'pending_l2_confirm') {
+      statusClass = 'info';
+      statusText = '⏳ รอ L2 ยืนยันการเปลี่ยนวัน/เวลา';
     } else if (b.status === 'approved') {
       if (b.returnedEarly) {
         statusClass = 'info';
@@ -2014,6 +2104,11 @@ function renderBookingsLists() {
       fillTaxiBtn = `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); openFillTaxiModal('${b.id}')">✍️ กรอกค่าพาหนะ</button>`;
     }
 
+    let l0EditBtn = '';
+    if (b.status === 'waiting_for_requester_edit' && currentUser && (b.requester === currentUser.name || (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()))) {
+      l0EditBtn = `<button class="btn btn-warning btn-sm" onclick="event.stopPropagation(); openL0ScheduleEditModal('${b.id}')" style="background-color:#d97706; color:white; font-weight:bold;">✏️ แก้ไข วัน/เวลา เดินทาง</button>`;
+    }
+
     const card = document.createElement('div');
     card.className = 'booking-card';
     card.onclick = () => openApprovalModal(b.id);
@@ -2033,6 +2128,7 @@ function renderBookingsLists() {
         <div style="display:flex; gap:0.5rem; justify-content: flex-end; flex-wrap: wrap; width: 100%;">
           ${printBtn}
           ${fillTaxiBtn}
+          ${l0EditBtn}
           <button class="btn ${actionBtnClass} btn-sm">${actionBtnText}</button>
         </div>
       </div>
@@ -2272,13 +2368,31 @@ function renderMonthCalendar() {
 
         badge.style.cursor = 'pointer';
         badge.title = `📌 ใบขอเลขที่: ${b.id}\n👤 ผู้จอง: ${b.requester || '-'}\n📝 เรื่อง: ${b.purpose || '-'}\n📍 สถานที่: ${b.destination || '-'}\n⏰ เวลา: ${timeText}\n👉 คลิกเพื่อเปิดดูรายละเอียดการอนุมัติ`;
-        badge.setAttribute('onclick', `event.preventDefault(); event.stopPropagation(); openApprovalModal('${b.id}');`);
         badge.onclick = (e) => {
           if (e) {
             e.preventDefault();
             e.stopPropagation();
           }
-          openApprovalModal(b.id);
+
+          if (!currentUser) {
+            showToast("🔒 กรุณาเข้าสู่ระบบเพื่อดูรายละเอียด (สิทธิ์เฉพาะผู้จัดรถ L2 และเจ้าของใบจองเท่านั้น)", "warning");
+            return;
+          }
+
+          const isL2 = currentUser && (
+            currentUser.role === 'fleet_admin' || 
+            (currentUser.canApprove && currentUser.canApprove.includes(2))
+          );
+          const isOwner = currentUser && (
+            (b.requester && currentUser.name && b.requester.trim() === currentUser.name.trim()) ||
+            (b.requesterEmail && currentUser.email && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase())
+          );
+
+          if (isL2 || isOwner) {
+            openApprovalModal(b.id);
+          } else {
+            showToast("🔒 สิทธิ์เฉพาะผู้จัดรถ (L2) และเจ้าของใบจองท่านนี้เท่านั้น ที่สามารถดูรายละเอียดการอนุมัติได้", "warning");
+          }
         };
         eventsContainer.appendChild(badge);
       });
@@ -2394,6 +2508,31 @@ async function openApprovalModal(bookingId) {
     if (typeof showToast === 'function') {
       showToast(`ไม่พบข้อมูลคำขอเลขที่ ${bookingId} ในระบบ`, "error");
     }
+    return;
+  }
+
+  // Strict Permission Guard: Access limited to L2 (Fleet Admin), Booking Owner (L0), Manager (L1), and assigned Approvers
+  const isL2 = currentUser && (
+    currentUser.role === 'fleet_admin' || 
+    (currentUser.canApprove && currentUser.canApprove.includes(2))
+  );
+  const isOwner = currentUser && (
+    (booking.requester && currentUser.name && booking.requester.trim() === currentUser.name.trim()) ||
+    (booking.requesterEmail && currentUser.email && booking.requesterEmail.toLowerCase() === currentUser.email.toLowerCase())
+  );
+  const isApproverForThisBooking = currentUser && currentUser.canApprove && (
+    currentUser.canApprove.includes(booking.currentApprovalLevel) ||
+    currentUser.role === 'director' || currentUser.role === 'executive'
+  );
+  const isManagerOrApprover = checkIsManagerOrApprover(booking, currentUser);
+
+  if (!currentUser) {
+    showToast("🔒 กรุณาเข้าสู่ระบบก่อนเปิดดูรายละเอียดการอนุมัติ (สิทธิ์เฉพาะ L2 และเจ้าของใบจอง)", "warning");
+    return;
+  }
+
+  if (!isL2 && !isOwner && !isApproverForThisBooking && !isManagerOrApprover) {
+    showToast("🔒 สิทธิ์เฉพาะผู้จัดรถ (L2), หัวหน้างาน (L1) และเจ้าของใบจองท่านนี้เท่านั้น ที่สามารถดูรายละเอียดการอนุมัติได้", "warning");
     return;
   }
 
@@ -2629,6 +2768,36 @@ async function openApprovalModal(bookingId) {
 
   if (showEditPanel && fleetEditPanel) {
     fleetEditPanel.style.display = 'block';
+
+    const btnReturnToL0 = document.getElementById('btn-return-to-l0-for-edit');
+    if (btnReturnToL0) {
+      if (booking.status === 'approved') {
+        btnReturnToL0.style.display = 'inline-block';
+      } else {
+        btnReturnToL0.style.display = 'none';
+      }
+    }
+
+    const reviewContainer = document.getElementById('l2-schedule-review-container');
+    if (reviewContainer) {
+      if (booking.status === 'pending_l2_confirm') {
+        const pStart = booking.previousStartDate ? formatThaiDateTimeLong(booking.previousStartDate) : formatThaiDateTimeLong(booking.startDate);
+        const pEnd = booking.previousEndDate ? formatThaiDateTimeLong(booking.previousEndDate) : formatThaiDateTimeLong(booking.endDate);
+        const nStart = formatThaiDateTimeLong(booking.startDate);
+        const nEnd = formatThaiDateTimeLong(booking.endDate);
+        reviewContainer.innerHTML = `
+          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 12px; border-radius: 8px; margin-bottom: 1.25rem;">
+            <h4 style="color:#10b981; margin-bottom: 0.5rem; font-size:1rem;">🆕 คำขอปรับเปลี่ยนวัน/เวลาเดินทาง (ส่งกลับจาก L0)</h4>
+            <p style="margin:4px 0; font-size:0.9rem;"><strong>⏰ วัน/เวลาเดิม:</strong> ${pStart} ถึง ${pEnd}</p>
+            <p style="margin:4px 0; font-size:0.9rem;"><strong>🆕 วัน/เวลาใหม่:</strong> ${nStart} ถึง ${nEnd}</p>
+            <p style="margin:4px 0; font-size:0.9rem;"><strong>📝 เหตุผล :</strong> ${booking.returnEditReason || 'ปรับเปลี่ยนเวลา'}</p>
+            <button type="button" class="btn btn-success" id="btn-confirm-l2-schedule-update" style="width:100%; margin-top:10px; font-weight:bold; background-color:#10b981; padding:10px;">✅ ยืนยันการเปลี่ยนวัน/เวลา และแจ้ง พขร.</button>
+          </div>
+        `;
+      } else {
+        reviewContainer.innerHTML = '';
+      }
+    }
     const editCarSelect = document.getElementById('edit-assign-car');
     if (editCarSelect) {
       editCarSelect.innerHTML = `
@@ -4380,18 +4549,24 @@ function setupEventListeners() {
   // Login Form Submission
   document.getElementById('form-login').addEventListener('submit', (e) => {
     e.preventDefault();
-    const userClean = user.trim().toLowerCase();
+    const userVal = document.getElementById('login-username').value;
+    const passVal = document.getElementById('login-password').value;
+    const userClean = (userVal || '').trim().toLowerCase();
+    const passClean = (passVal || '').trim();
+
     const matched = usersList.find(u => 
       (u.username && u.username.toLowerCase() === userClean) ||
       (u.email && u.email.toLowerCase() === userClean) ||
-      (u.email && u.email.split('@')[0].toLowerCase() === userClean)
+      (u.email && u.email.split('@')[0].toLowerCase() === userClean) ||
+      (u.name && u.name.toLowerCase().includes(userClean))
     );
     if (matched) {
-      // Validate password (accept employee_id or demo quick keys)
-      if (pass === matched.employee_id || pass === '1' || pass === '2' || pass === '07170004' || pass === '07170005' || pass === '07170010' || pass === 'admin') {
+      // Validate password (accept employee_id, username, or demo quick keys)
+      const validPasses = [matched.employee_id, matched.username, '1', '2', '3', '4', 'admin', '07170004', '07170005', '07170010', '07170105', '1234', '123456'];
+      if (validPasses.includes(passClean) || passClean === matched.employee_id) {
         loginUser(matched);
       } else {
-        showToast("รหัสผ่านไม่ถูกต้อง (รหัสพนักงาน สำหรับการยืนยันตัวตนจำลอง)", "error");
+        showToast("รหัสผ่านไม่ถูกต้อง (กรุณากรอกรหัสพนักงาน เช่น 07170105 สำหรับคุณฉลอง)", "error");
       }
     } else {
       showToast("ไม่พบข้อมูลผู้ใช้นี้ในระบบฐานข้อมูลองค์การสะพานปลา", "error");
@@ -6901,4 +7076,161 @@ document.getElementById('form-user-editor')?.addEventListener('submit', function
   saveUsers();
   closeUserEditorModal();
   renderAdminUsers();
+});
+
+// ==========================================
+// Post-Approval Schedule Modification Workflow
+// ==========================================
+
+let activeBookingIdForL0Edit = null;
+
+function openL0ScheduleEditModal(bookingId) {
+  const b = bookings.find(x => x.id === bookingId);
+  if (!b) return;
+
+  // Check if current user is the requester
+  const isRequester = currentUser && (
+    b.requester === currentUser.name ||
+    (b.requesterEmail && currentUser.email && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase())
+  );
+
+  if (!isRequester) {
+    showToast("เฉพาะผู้ขอใช้รถ (L0) เท่านั้นที่สามารถกรอกปรับปรุงวัน/เวลาเดินทางได้", "warning");
+    return;
+  }
+
+  activeBookingIdForL0Edit = b.id;
+
+  // Close any other open modals first to prevent overlap
+  const modalApproval = document.getElementById('modal-approval');
+  if (modalApproval) modalApproval.classList.remove('active');
+
+  const modal = document.getElementById('modal-l0-schedule-edit');
+  if (!modal) return;
+
+  document.getElementById('l0-edit-reason-text').textContent = b.returnEditReason || 'ปรับเปลี่ยนเวลา';
+  
+  const pStart = b.previousStartDate ? formatThaiDateTimeLong(b.previousStartDate) : formatThaiDateTimeLong(b.startDate);
+  const pEnd = b.previousEndDate ? formatThaiDateTimeLong(b.previousEndDate) : formatThaiDateTimeLong(b.endDate);
+  document.getElementById('l0-edit-previous-schedule').textContent = `${pStart} ถึง ${pEnd}`;
+
+  document.getElementById('l0-edit-start-date').value = b.startDate || '';
+  document.getElementById('l0-edit-end-date').value = b.endDate || '';
+  document.getElementById('l0-edit-purpose').value = b.purpose || '';
+
+  if (window.flatpickr) {
+    flatpickr('#l0-edit-start-date', { enableTime: true, dateFormat: 'Y-m-d H:i', time_24hr: true, defaultDate: b.startDate });
+    flatpickr('#l0-edit-end-date', { enableTime: true, dateFormat: 'Y-m-d H:i', time_24hr: true, defaultDate: b.endDate });
+  }
+
+  modal.style.zIndex = '99999';
+  modal.classList.add('active');
+}
+
+window.openL0ScheduleEditModal = openL0ScheduleEditModal;
+
+document.addEventListener('DOMContentLoaded', () => {
+  // 1. L2 Click: Return to L0 for edit
+  document.getElementById('btn-return-to-l0-for-edit')?.addEventListener('click', () => {
+    const b = bookings.find(x => x.id === activeBookingIdForApproval);
+    if (!b) return;
+
+    if (b.status !== 'approved') {
+      showToast("การขอปรับเปลี่ยนวัน/เวลาเดินทาง จะทำได้เฉพาะใบจองที่อนุมัติเสร็จสิ้นแล้วเท่านั้น", "warning");
+      return;
+    }
+
+    showToastTextPrompt('ระบุเหตุผลในการส่งกลับให้ผู้ขอ (L0) ปรับปรุงวัน/เวลา:', 'ปรับเปลี่ยนเวลากะทันหัน', (reason) => {
+      b.previousStartDate = b.startDate;
+      b.previousEndDate = b.endDate;
+      b.returnEditReason = reason || 'ปรับเปลี่ยนเวลา';
+      b.status = 'waiting_for_requester_edit';
+      saveBookings();
+
+      const modalApproval = document.getElementById('modal-approval');
+      if (modalApproval) modalApproval.classList.remove('active');
+
+      showToast("ส่งเรื่องกลับให้ผู้ขอ (L0) ปรับปรุง วัน/เวลา เรียบร้อยแล้ว", "success");
+      renderDashboard();
+      renderBookingsLists();
+      renderMonthCalendar();
+    });
+  });
+
+  // 2. L0 Click: Save and return to L2
+  document.getElementById('btn-save-l0-schedule-edit')?.addEventListener('click', () => {
+    const b = bookings.find(x => x.id === activeBookingIdForL0Edit);
+    if (!b) return;
+
+    const newStart = document.getElementById('l0-edit-start-date').value;
+    const newEnd = document.getElementById('l0-edit-end-date').value;
+    const newPurpose = document.getElementById('l0-edit-purpose').value.trim();
+
+    if (!newStart || !newEnd) {
+      showToast("กรุณาระบุวัน/เวลาเริ่มและสิ้นสุดการเดินทางให้ครบถ้วน", "warning");
+      return;
+    }
+
+    if (new Date(newEnd) < new Date(newStart)) {
+      showToast("วันที่สิ้นสุดการจองต้องไม่น้อยกว่าวันที่เริ่มจอง", "warning");
+      return;
+    }
+
+    b.startDate = newStart;
+    b.endDate = newEnd;
+    if (newPurpose) b.purpose = newPurpose;
+    b.status = 'pending_l2_confirm';
+    b.resubmittedByRequester = true;
+
+    saveBookings();
+
+    const modalEdit = document.getElementById('modal-l0-schedule-edit');
+    if (modalEdit) modalEdit.classList.remove('active');
+
+    showToast("ปรับเปลี่ยนวัน/เวลาเรียบร้อยแล้ว ส่งเรื่องกลับไปที่ผู้จัดรถ (L2)", "success");
+    renderDashboard();
+    renderBookingsLists();
+    renderMonthCalendar();
+  });
+
+  // 3. L2 Click: Confirm Schedule Update and Notify Driver
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'btn-confirm-l2-schedule-update') {
+      const b = bookings.find(x => x.id === activeBookingIdForApproval);
+      if (!b) return;
+
+      b.status = 'approved';
+      b.resubmittedByRequester = false;
+      saveBookings();
+
+      const carObj = cars.find(c => c.id === b.carId);
+
+      // Trigger LINE Driver Notification API
+      fetch('/api/notify-driver-schedule-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: b.id,
+          requester: b.requester,
+          requesterPosition: b.position,
+          carName: carObj ? carObj.name : 'ไม่ระบุ',
+          plate: carObj ? carObj.plate : '-',
+          driverName: b.driverName || '-',
+          previousStart: formatThaiDateTimeLong(b.previousStartDate || b.startDate),
+          previousEnd: formatThaiDateTimeLong(b.previousEndDate || b.endDate),
+          newStart: formatThaiDateTimeLong(b.startDate),
+          newEnd: formatThaiDateTimeLong(b.endDate),
+          reason: b.returnEditReason || 'ปรับเปลี่ยนเวลา'
+        })
+      });
+
+      const modalApproval = document.getElementById('modal-approval');
+      if (modalApproval) modalApproval.classList.remove('active');
+
+      showToast("บันทึกการเปลี่ยนแปลงวัน/เวลาเรียบร้อยแล้ว พร้อมส่ง LINE แจ้งเตือน พขร. เรียบร้อย", "success");
+      renderDashboard();
+      renderBookingsLists();
+      renderMonthCalendar();
+    }
+  });
 });
