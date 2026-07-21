@@ -118,12 +118,26 @@ function sqliteSaveBookings(bookingsList) {
         b.active ? 1 : 0
       );
     });
-    console.log("SQLite: Saved all bookings successfully");
-    return true;
+    console.log("SQLite Save completed (bookings count:", bookingsList.length + ")");
   } catch (e) {
     console.error("SQLite Write error (bookings):", e);
-    return false;
   }
+}
+
+// Automatic startup sync: load bookings.json into SQLite if SQLite has fewer records or missing records
+try {
+  const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
+  if (fs.existsSync(bookingsJsonPath)) {
+    const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
+    const fileBookings = JSON.parse(rawJson);
+    const sqlBookings = sqliteGetBookings();
+    if (!sqlBookings || sqlBookings.length < fileBookings.length) {
+      console.log(`[Startup Auto-Sync] Syncing ${fileBookings.length} records from bookings.json to SQLite database...`);
+      sqliteSaveBookings(fileBookings);
+    }
+  }
+} catch(e) {
+  console.error("[Startup Auto-Sync] Error during database sync:", e);
 }
 
 function sqliteGetCars() {
