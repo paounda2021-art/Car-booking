@@ -7131,6 +7131,7 @@ function openL0ScheduleEditModal(bookingId) {
   }
 
   modal.style.zIndex = '99999';
+  modal.style.display = 'flex';
   modal.classList.add('active');
 }
 
@@ -7192,7 +7193,10 @@ document.addEventListener('DOMContentLoaded', () => {
     saveBookings();
 
     const modalEdit = document.getElementById('modal-l0-schedule-edit');
-    if (modalEdit) modalEdit.classList.remove('active');
+    if (modalEdit) {
+      modalEdit.classList.remove('active');
+      modalEdit.style.display = 'none';
+    }
 
     showToast("ปรับเปลี่ยนวัน/เวลาเรียบร้อยแล้ว ส่งเรื่องกลับไปที่ผู้จัดรถ (L2)", "success");
     renderDashboard();

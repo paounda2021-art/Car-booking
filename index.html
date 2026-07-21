@@ -923,11 +923,11 @@
   </div>
 
   <!-- Standalone Modal for L0 Schedule Edit (Returned by L2) -->
-  <div id="modal-l0-schedule-edit" class="modal">
-    <div class="modal-content" style="max-width: 550px;">
+  <div id="modal-l0-schedule-edit" class="modal-overlay">
+    <div class="modal-box" style="max-width: 550px;">
       <div class="modal-header">
         <h3>✏️ แก้ไข วัน/เวลา เดินทาง (ส่งกลับจากผู้จัดรถ L2)</h3>
-        <button class="modal-close" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">&times;</button>
+        <button class="modal-close" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active'); document.getElementById('modal-l0-schedule-edit').style.display='none';">&times;</button>
       </div>
       <div class="modal-body">
         <div id="l0-edit-reason-banner" style="background: rgba(217, 119, 6, 0.15); border-left: 4px solid #d97706; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
@@ -954,7 +954,7 @@
         </div>
       </div>
       <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">ยกเลิก</button>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active'); document.getElementById('modal-l0-schedule-edit').style.display='none';">ยกเลิก</button>
         <button type="button" class="btn btn-warning" id="btn-save-l0-schedule-edit" style="background-color:#d97706; color:white; font-weight:600;">💾 บันทึกและส่งกลับให้ L2</button>
       </div>
     </div>
@@ -1150,6 +1150,6 @@
 
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=9.4_modal_fix"></script>
+  <script src="app.js?v=9.5_modal_overlay_fix"></script>
 </body>
 </html>
