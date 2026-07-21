@@ -2366,34 +2366,36 @@ function renderMonthCalendar() {
           ? `${startD} (เวลา ${startT} - ${endT})` 
           : `${startD} (${startT}) ถึง ${endD} (${endT})`;
 
-        badge.style.cursor = 'pointer';
-        badge.title = `📌 ใบขอเลขที่: ${b.id}\n👤 ผู้จอง: ${b.requester || '-'}\n📝 เรื่อง: ${b.purpose || '-'}\n📍 สถานที่: ${b.destination || '-'}\n⏰ เวลา: ${timeText}\n👉 คลิกเพื่อเปิดดูรายละเอียดการอนุมัติ`;
-        badge.onclick = (e) => {
-          if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-          }
+        const isL2 = currentUser && (
+          currentUser.role === 'fleet_admin' || 
+          (currentUser.canApprove && currentUser.canApprove.includes(2))
+        );
+        const isOwner = currentUser && (
+          (b.requester && currentUser.name && b.requester.trim() === currentUser.name.trim()) ||
+          (b.requesterEmail && currentUser.email && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase())
+        );
 
-          if (!currentUser) {
-            showToast("🔒 กรุณาเข้าสู่ระบบเพื่อดูรายละเอียด (สิทธิ์เฉพาะผู้จัดรถ L2 และเจ้าของใบจองเท่านั้น)", "warning");
-            return;
-          }
-
-          const isL2 = currentUser && (
-            currentUser.role === 'fleet_admin' || 
-            (currentUser.canApprove && currentUser.canApprove.includes(2))
-          );
-          const isOwner = currentUser && (
-            (b.requester && currentUser.name && b.requester.trim() === currentUser.name.trim()) ||
-            (b.requesterEmail && currentUser.email && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase())
-          );
-
-          if (isL2 || isOwner) {
+        if (isL2 || isOwner) {
+          badge.style.cursor = 'pointer';
+          badge.title = `📌 ใบขอเลขที่: ${b.id}\n👤 ผู้จอง: ${b.requester || '-'}\n📝 เรื่อง: ${b.purpose || '-'}\n📍 สถานที่: ${b.destination || '-'}\n⏰ เวลา: ${timeText}\n👉 คลิกเพื่อเปิดดูรายละเอียดการอนุมัติ`;
+          badge.onclick = (e) => {
+            if (e) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
             openApprovalModal(b.id);
-          } else {
-            showToast("🔒 สิทธิ์เฉพาะผู้จัดรถ (L2) และเจ้าของใบจองท่านนี้เท่านั้น ที่สามารถดูรายละเอียดการอนุมัติได้", "warning");
-          }
-        };
+          };
+        } else {
+          badge.style.cursor = 'not-allowed';
+          badge.title = `📌 ใบขอเลขที่: ${b.id}\n👤 ผู้จอง: ${b.requester || '-'}\n📝 เรื่อง: ${b.purpose || '-'}\n📍 สถานที่: ${b.destination || '-'}\n⏰ เวลา: ${timeText}\n🔒 สิทธิ์เฉพาะผู้จัดรถ (L2) และเจ้าของใบจองท่านนี้เท่านั้น`;
+          badge.onclick = (e) => {
+            if (e) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
+            showToast("🔒 สิทธิ์เฉพาะผู้จัดรถ (L2) และเจ้าของใบจองท่านนี้เท่านั้น ที่สามารถเปิดดูรายละเอียดการอนุมัติได้", "warning");
+          };
+        }
         eventsContainer.appendChild(badge);
       });
 
