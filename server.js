@@ -319,6 +319,25 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const urlPath = url.pathname;
 
+  // API: force-resync (Force sync bookings.json to SQLite DB)
+  if (urlPath === '/api/force-resync') {
+    try {
+      const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
+      if (fs.existsSync(bookingsFile)) {
+        const rawJson = fs.readFileSync(bookingsFile, 'utf8').replace(/^\uFEFF/, '');
+        const fileBookings = JSON.parse(rawJson);
+        sqliteSaveBookings(fileBookings);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ status: 'success', message: 'Database resynced successfully', count: fileBookings.length }));
+        return;
+      }
+    } catch(e) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ status: 'error', message: e.message }));
+      return;
+    }
+  }
+
   // API: get-bookings
   if (urlPath === '/api/get-bookings' && req.method === 'GET') {
     const sqlData = sqliteGetBookings();
