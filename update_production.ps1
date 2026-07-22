@@ -1,40 +1,31 @@
 # update_production.ps1
-# Script to safely update production server without touching live bookings.json
+# Script to safely update production server to match 8080 100%
 
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (-not $rootDir) { $rootDir = Get-Location }
 
-Write-Host "Updating production server safely in $rootDir..." -ForegroundColor Green
+Write-Host "Updating production server to match 8080 100% in $rootDir..." -ForegroundColor Green
 
-# 1. Backup live bookings.json
-$bookingsFile = Join-Path $rootDir "bookings.json"
-$backupFile = Join-Path $rootDir "bookings_live_backup.json"
-
-if (Test-Path $bookingsFile) {
-    Copy-Item -Path $bookingsFile -Destination $backupFile -Force
-    Write-Host "[1/4] Live bookings database backed up to bookings_live_backup.json" -ForegroundColor Yellow
-}
-
-# 2. Tell git never to overwrite local bookings.json
+# 1. Allow git to update bookings.json
 try {
-    git update-index --assume-unchanged bookings.json
-    Write-Host "[2/4] Git configured to preserve live bookings.json" -ForegroundColor Yellow
-} catch {
-    Write-Warning "Could not set assume-unchanged on git"
+    git update-index --no-assume-unchanged bookings.json
+} catch {}
+
+# 2. Remove old sqlite db so it auto-rebuilds cleanly
+$dbFile = Join-Path $rootDir "database.db"
+if (Test-Path $dbFile) {
+    Remove-Item -Path $dbFile -Force -ErrorAction SilentlyContinue
 }
 
-# 3. Pull updated code (app.js, index.html, style.css, etc.)
-Write-Host "[3/4] Pulling latest codebase updates from GitHub..." -ForegroundColor Yellow
-git pull origin main
+# 3. Pull updated code and 29-record database from GitHub
+Write-Host "Pulling latest codebase and 29-item database from GitHub..." -ForegroundColor Yellow
+git config user.email "admin@fishmarket.co.th"
+git config user.name "Administrator"
+git fetch origin
+git reset --hard origin/main
 
-# Ensure live database was not overwritten
-if (Test-Path $backupFile) {
-    Copy-Item -Path $backupFile -Destination $bookingsFile -Force
-    Write-Host "Live bookings database verified and protected 100%." -ForegroundColor Green
-}
-
-# 4. Restart server
-Write-Host "[4/4] Restarting car-booking server in PM2..." -ForegroundColor Yellow
+# 4. Restart server in PM2
+Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Yellow
 pm2 restart car-booking
 
-Write-Host "Production server updated successfully! All live approval history preserved 100%." -ForegroundColor Green
+Write-Host "Production server updated successfully! 100% matched with 8080." -ForegroundColor Green
