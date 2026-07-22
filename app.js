@@ -1010,6 +1010,70 @@ function hasBookingConflict(carId, startDateStr, endDateStr, excludeId = null) {
     return (start < bEnd && end > bStart);
   });
 }
+// Central helper to update all sidebar menu items and panels based on exact user permissions
+function updateSidebarPermissions() {
+  const itemDashboard = document.getElementById('nav-item-dashboard') || document.getElementById('nav-dashboard')?.closest('.nav-item');
+  const itemBookings = document.getElementById('nav-item-bookings') || document.getElementById('nav-bookings')?.closest('.nav-item');
+  const itemCalendar = document.getElementById('nav-item-calendar') || document.getElementById('nav-calendar')?.closest('.nav-item');
+  const itemDriverReport = document.getElementById('nav-item-driver-report');
+  const itemAdminSettings = document.getElementById('nav-item-admin-settings');
+  const panelActingSetup = document.getElementById('sidebar-acting-setup');
+
+  if (!currentUser) {
+    // 🔴 1. หน้าแรกก่อนเข้าระบบ: ซ่อน แดชบอร์ดภาพรวม และ รายการจอง & อนุมัติ (แสดงเฉพาะ ปฏิทินจองใช้รถ)
+    if (itemDashboard) itemDashboard.classList.add('hidden');
+    if (itemBookings) itemBookings.classList.add('hidden');
+    if (itemCalendar) itemCalendar.classList.remove('hidden');
+    if (itemDriverReport) itemDriverReport.classList.add('hidden');
+    if (itemAdminSettings) itemAdminSettings.classList.add('hidden');
+    if (panelActingSetup) panelActingSetup.classList.add('hidden');
+    return;
+  }
+
+  // 🟢 2. เมื่อผู้ใช้งานเข้าสู่ระบบแล้ว: แสดงเมนูตามสิทธิ์ของผู้ใช้แต่ละระดับ (L0, L1, L2, L3, L4)
+  const canApproveList = Array.isArray(currentUser.canApprove) ? currentUser.canApprove : [];
+  const usernameLower = (currentUser.username || '').toLowerCase();
+  
+  const isL2 = canApproveList.includes(2) || canApproveList.includes('2') || currentUser.role === 'fleet_admin' || ['chalong.c', 'sakda.a'].includes(usernameLower);
+  const isL3 = canApproveList.includes(3) || canApproveList.includes('3') || currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes(usernameLower);
+  const isL4 = canApproveList.includes(4) || canApproveList.includes('4') || currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes(usernameLower);
+  const isL1 = canApproveList.includes(1) || canApproveList.includes('1') || currentUser.role === 'supervisor';
+  const isApproverL234 = isL2 || isL3 || isL4;
+
+  // แดชบอร์ดภาพรวม: แสดงสำหรับผู้อนุมัติ L2, L3, L4 หรือผู้ได้รับสิทธิ์
+  if (itemDashboard) {
+    if (isApproverL234) itemDashboard.classList.remove('hidden');
+    else itemDashboard.classList.add('hidden');
+  }
+
+  // รายการจอง & อนุมัติ และ ปฏิทิน: แสดงสำหรับผู้ใช้ทุกคนที่ล็อกอินแล้ว
+  if (itemBookings) itemBookings.classList.remove('hidden');
+  if (itemCalendar) itemCalendar.classList.remove('hidden');
+
+  // รายงานการใช้งาน พขร.: แสดงเฉพาะ L2 (ผู้จัดรถ)
+  if (itemDriverReport) {
+    if (isL2) {
+      itemDriverReport.classList.remove('hidden');
+      if (typeof populateDriversDropdown === 'function') populateDriversDropdown();
+    } else {
+      itemDriverReport.classList.add('hidden');
+    }
+  }
+
+  // ตั้งค่าระบบ & รถยนต์: แสดงเฉพาะ L2, คุณรณิดา, คุณณัฐอนงค์
+  if (itemAdminSettings) {
+    const isRanida = usernameLower === 'ranida.c';
+    const isNattanong = usernameLower === 'natanong.s';
+    if (isL2 || isRanida || isNattanong) itemAdminSettings.classList.remove('hidden');
+    else itemAdminSettings.classList.add('hidden');
+  }
+
+  // กล่องตั้งค่ารักษาการแทน: แสดงเฉพาะ L2 (งานยานพาหนะ)
+  if (panelActingSetup) {
+    if (isL2) panelActingSetup.classList.remove('hidden');
+    else panelActingSetup.classList.add('hidden');
+  }
+}
 
 function loginUser(userObj) {
   if (!userObj) return;
@@ -1200,63 +1264,32 @@ function loginUser(userObj) {
     }
   }
 
-  // แสดงเมนูตั้งค่าระบบเฉพาะ L2, คุณรณิดา หรือ คุณณัฐอนงค์
-  const navItemAdminSettings = document.getElementById('nav-item-admin-settings');
-  if (navItemAdminSettings) {
-    const isFleetAdmin = currentUser.canApprove && currentUser.canApprove.includes(2);
-    const isRanida = usernameLower === 'ranida.c';
-    const isNattanong = usernameLower === 'natanong.s';
-    if (isFleetAdmin || isRanida || isNattanong) {
-      navItemAdminSettings.classList.remove('hidden');
-    } else {
-      navItemAdminSettings.classList.add('hidden');
-    }
-  }
+  // 9. จัดการสิทธิ์การมองเห็นเมนูด้านซ้ายทันทีสำหรับผู้ใช้ระดับต่างๆ
+  updateSidebarPermissions();
 
-  // 9. รันฟังก์ชันคำนวณสถิติและโหลดตารางหน้าจอต่างๆ
+  // 10. รันฟังก์ชันคำนวณสถิติและโหลดตารางหน้าจอต่างๆ
   populateCarsDropdown();
   updateStats();
   renderDashboard();
-  renderBookingsLists();
   renderMonthCalendar();
 
-  // 10. จัดการสิทธิ์การมองเห็นเมนูด้านซ้าย (Sidebar Redirection)
-  const isRequesterOrSupervisor = (currentUser.role === 'requester' || currentUser.role === 'supervisor');
-  const reportNavItem = document.getElementById('nav-item-driver-report');
-  
-  if (isRequesterOrSupervisor && !currentUser.canApprove.includes(4)) { 
-    // หากเป็นคนขอทั่วไป หรือหัวหน้างาน L1 (แต่ต้องไม่ใช่รักษาการ L4 แบบคุณซารีนา) ให้ซ่อนแดชบอร์ดวิ่งไปหน้าประวัติแทน
-    document.getElementById('nav-dashboard').closest('.nav-item').classList.add('hidden');
-    document.getElementById('nav-bookings').closest('.nav-item').classList.remove('hidden');
-    document.getElementById('nav-calendar').closest('.nav-item').classList.remove('hidden');
-    if (reportNavItem) reportNavItem.classList.add('hidden');
-    showView('bookings');
-  } else {
-    // ผู้จัดรถ (L2), ผอ.พัสดุ (L3), ผู้บริหาร (L4) ให้เข้าถึงหน้าแดชบอร์ดภาพรวมได้
-    document.getElementById('nav-dashboard').closest('.nav-item').classList.remove('hidden');
-    document.getElementById('nav-bookings').closest('.nav-item').classList.remove('hidden');
-    document.getElementById('nav-calendar').closest('.nav-item').classList.remove('hidden');
-    if (reportNavItem) {
-      if (currentUser.role === 'fleet_admin') {
-        reportNavItem.classList.remove('hidden');
-        populateDriversDropdown(); // โหลดข้อมูลพนักงานขับรถเฉพาะ L2
-      } else {
-        reportNavItem.classList.add('hidden');
-      }
-    }
+  // 11. ดึงหน้าที่เคยสลับไว้ หรือเข้าสู่หน้ารายการจอง & อนุมัติ เป็นค่าเริ่มต้น
+  let activeView = localStorage.getItem('current_active_view');
+  if (!activeView || activeView === 'null' || activeView === 'undefined' || !views.includes(activeView)) {
+  activeView = 'bookings';
+}
 
-    const actingSetupPanel = document.getElementById('sidebar-acting-setup');
-    if (actingSetupPanel) {
-      if (currentUser.role === 'fleet_admin') {
-        actingSetupPanel.classList.remove('hidden');
-      } else {
-        actingSetupPanel.classList.add('hidden');
-      }
-    }
-    
-    // 10. เมื่อผู้ใช้งานเข้าระบบ ให้เข้าสู่หน้ารายการจอง & อนุมัติ (bookings) ทันที เพื่อพร้อมเขียนใบจองหรือพิจารณาอนุมัติ
-    showView('bookings');
+  // 🟢 เพิ่มเงื่อนไข: บังคับให้ทุกคนกลับมาหน้า "รายการจอง" และแท็บ "รออนุมัติ" เสมอเมื่อเปิดระบบใหม่/เพิ่งล็อกอิน
+  if (!sessionStorage.getItem('is_fresh_login')) {
+    sessionStorage.setItem('is_fresh_login', 'true');
+    activeView = 'bookings'; 
+    localStorage.setItem('current_active_view', 'bookings');
+    sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals'); // ล็อกเป้าแท็บรออนุมัติ
   }
+
+  // 🟢 ย้ายคำสั่งวาดตารางมาไว้ตรงนี้ เพื่อให้มันอ่านค่าแท็บ "รออนุมัติ" ที่เราเพิ่งล็อกเป้าไว้ด้านบน
+  renderBookingsLists(); 
+  showView(activeView);
 }
 
 // ==========================================
@@ -1270,7 +1303,10 @@ if (logoutBtn) {
     
     // 1. ล้างข้อมูลผู้ใช้ออกจากหน่วยความจำเบราว์เซอร์
     localStorage.removeItem('current_user');
+    localStorage.removeItem('current_active_view');
     sessionStorage.removeItem('activeApprovalLevel');
+    sessionStorage.removeItem('is_fresh_login');
+    sessionStorage.removeItem('user_selected_booking_tab');
     currentUser = null;
 
     // 2. สั่งซ่อนโปรไฟล์และกล่อง Dropdown ทันที (ให้หน้าจอสะอาดที่สุด)
@@ -1337,6 +1373,7 @@ async function clearDatabase() {
 }
 
 function checkLoginStatus() {
+  calCurrentDate = new Date(); // Reset calendar view date to real current month always
   const cached = localStorage.getItem('current_user');
   if (cached) {
     if (cached.includes('à¸') || cached.includes('ผักเจียมแว่น')) {
@@ -1350,26 +1387,18 @@ function checkLoginStatus() {
       const dbUser = usersList.find(u => u.username.toLowerCase() === parsed.username.toLowerCase());
       if (dbUser) {
         loginUser(dbUser);
-        showView('bookings');
         return;
       }
     }
     loginUser(parsed);
-    showView('bookings');
   } else {
     // Guest mode: land on calendar, hide dashboard and bookings, show login button
     currentUser = null;
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app-wrapper').classList.remove('hidden');
     
-    // Sidebar items visibility
-    document.getElementById('nav-dashboard').closest('.nav-item').classList.add('hidden');
-    document.getElementById('nav-bookings').closest('.nav-item').classList.add('hidden');
-    document.getElementById('nav-calendar').closest('.nav-item').classList.remove('hidden');
-    const reportNavItem = document.getElementById('nav-item-driver-report');
-    if (reportNavItem) reportNavItem.classList.add('hidden');
-    const actingSetupPanel = document.getElementById('sidebar-acting-setup');
-    if (actingSetupPanel) actingSetupPanel.classList.add('hidden');
+    // Update sidebar items for guest mode
+    updateSidebarPermissions();
     
     // Header actions
     document.getElementById('btn-top-login').classList.remove('hidden');
@@ -1377,13 +1406,16 @@ function checkLoginStatus() {
     document.getElementById('btn-logout')?.classList.add('hidden');
     document.getElementById('btn-open-booking').classList.add('hidden');
 
-    
     // Populate dropdown and render views
     populateCarsDropdown();
     updateStats();
     renderMonthCalendar();
     
     showView('calendar');
+    const title = document.getElementById('view-title');
+    const subtitle = document.getElementById('view-subtitle');
+    if (title) title.textContent = 'ปฏิทินปฏิบัติงานใช้รถ';
+    if (subtitle) subtitle.textContent = 'ตารางเวลาปฏิบัติงานและการจองใช้ยานพาหนะของ อสป.';
   }
 }
 
@@ -1409,18 +1441,27 @@ function populateCarsDropdown() {
 // Navigation / View management
 const views = ['dashboard', 'bookings', 'calendar', 'report', 'driver-report', 'admin-settings'];
 function showView(viewName) {
-  // Protect dashboard view from unauthorized roles and guests
-  if (!currentUser && viewName === 'dashboard') {
-    viewName = 'calendar';
-  } else if (currentUser && (currentUser.role === 'requester' || (currentUser.role === 'supervisor' && !currentUser.canApprove.includes(4))) && viewName === 'dashboard') {
+  if (!viewName || viewName === 'null' || viewName === 'undefined' || !views.includes(viewName)) {
     viewName = 'bookings';
   }
+
+  if (currentUser) {
+    localStorage.setItem('current_active_view', viewName);
+  }
+
+  updateSidebarPermissions();
 
   views.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     if (el) {
-      if (v === viewName) el.classList.remove('hidden');
-      else el.classList.add('hidden');
+      if (v === viewName) {
+        el.classList.remove('hidden');
+        // 🟢 แก้ไข: ใช้ removeProperty แทนการบังคับเป็น block
+        el.style.removeProperty('display'); 
+      } else {
+        el.classList.add('hidden');
+        el.style.display = 'none';
+      }
     }
   });
 
@@ -1429,8 +1470,11 @@ function showView(viewName) {
   navItems.forEach(n => {
     const link = document.getElementById(`nav-${n}`);
     if (link) {
-      if (n === viewName) link.classList.add('active');
-      else link.classList.remove('active');
+      if (n === viewName) {
+        link.classList.add('active');
+      } else {
+        link.classList.remove('active');
+      }
     }
   });
 
@@ -2009,35 +2053,43 @@ function renderBookingsLists() {
   // Force card view layout
   bookingViewLayout = 'card';
 
+  // 🎯 Tab activation logic for renderBookingsLists
   const pendingTabBtn = document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
   const myBkgTabBtn = document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
   const allHistoryTabBtn = document.querySelector('.tab-btn[data-tab="tab-all-history"]');
-  const isViewingHistory = allHistoryTabBtn && allHistoryTabBtn.classList.contains('active');
+  const pendingTab = document.getElementById('tab-pending-approvals');
+  const myBkgTab = document.getElementById('tab-my-bookings');
+  const allHistoryTab = document.getElementById('tab-all-history');
 
-  if (pendingTabBtn) {
-    if (currentUser && currentUser.role === 'requester') {
-      pendingTabBtn.classList.add('hidden');
-      if (pendingTabBtn.classList.contains('active')) {
-        pendingTabBtn.classList.remove('active');
-        if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
-        document.getElementById('tab-pending-approvals')?.classList.remove('active');
-        const myBkgTab = document.getElementById('tab-my-bookings');
-        if (myBkgTab) myBkgTab.classList.add('active');
-      }
+  const isRequester = currentUser && currentUser.role === 'requester' && (!currentUser.canApprove || currentUser.canApprove.length === 0);
+
+  if (isRequester) {
+    if (pendingTabBtn) pendingTabBtn.classList.add('hidden');
+    if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
+    if (pendingTabBtn) pendingTabBtn.classList.remove('active');
+    if (allHistoryTabBtn) allHistoryTabBtn.classList.remove('active');
+
+    if (myBkgTab) { myBkgTab.classList.add('active'); myBkgTab.style.display = 'block'; }
+    if (pendingTab) { pendingTab.classList.remove('active'); pendingTab.style.display = 'none'; }
+    if (allHistoryTab) { allHistoryTab.classList.remove('active'); allHistoryTab.style.display = 'none'; }
+  } else {
+    if (pendingTabBtn) pendingTabBtn.classList.remove('hidden');
+
+    // For Approvers (L1, L2, L3, L4): Default to Tab 2 "งานรออนุมัติจากคุณ" unless user clicked Tab 3 "ประวัติทั้งหมด" or Tab 1 "รายการที่ฉันขอ"
+    const userActiveTab = sessionStorage.getItem('user_selected_booking_tab') || 'tab-pending-approvals';
+    
+    [myBkgTabBtn, pendingTabBtn, allHistoryTabBtn].forEach(b => b?.classList.remove('active'));
+    [myBkgTab, pendingTab, allHistoryTab].forEach(t => { if (t) { t.classList.remove('active'); t.style.display = 'none'; } });
+
+    if (userActiveTab === 'tab-my-bookings') {
+      if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
+      if (myBkgTab) { myBkgTab.classList.add('active'); myBkgTab.style.removeProperty('display'); }
+    } else if (userActiveTab === 'tab-all-history') {
+      if (allHistoryTabBtn) allHistoryTabBtn.classList.add('active');
+      if (allHistoryTab) { allHistoryTab.classList.add('active'); allHistoryTab.style.removeProperty('display'); }
     } else {
-      pendingTabBtn.classList.remove('hidden');
-      // Do NOT auto-switch tab if user is currently viewing All History tab!
-      if (!isViewingHistory) {
-        const pendingBadgeVal = document.getElementById('tab-pending-count');
-        if (pendingBadgeVal && parseInt(pendingBadgeVal.textContent) > 0 && myBkgTabBtn && myBkgTabBtn.classList.contains('active')) {
-          if (myBkgTabBtn) myBkgTabBtn.classList.remove('active');
-          pendingTabBtn.classList.add('active');
-          const myBkgTab = document.getElementById('tab-my-bookings');
-          if (myBkgTab) myBkgTab.classList.remove('active');
-          const pendingTab = document.getElementById('tab-pending-approvals');
-          if (pendingTab) pendingTab.classList.add('active');
-        }
-      }
+      if (pendingTabBtn) pendingTabBtn.classList.add('active');
+      if (pendingTab) { pendingTab.classList.add('active'); pendingTab.style.removeProperty('display'); }
     }
   }
 
@@ -2384,8 +2436,8 @@ function renderMonthCalendar() {
     cellDiv.innerHTML = `<span class="calendar-day-number">${cell.day}</span>`;
 
     // Render event badges inside date cell
-    const dateStr = cell.date.toDateString();
-    const cellBkg = bookings.filter(b => {
+    const cellBkg = (Array.isArray(bookings) ? bookings : []).filter(b => {
+      if (!b || !b.id || b.id === 'system_config' || !b.startDate || !b.endDate) return false;
       if (b.status === 'rejected' || b.status === 'cancelled') return false;
       
       // Calendar filter implementation
@@ -2399,6 +2451,7 @@ function renderMonthCalendar() {
 
       const bStart = new Date(b.startDate);
       const bEnd = new Date(b.endDate);
+      if (isNaN(bStart.getTime()) || isNaN(bEnd.getTime())) return false;
       
       const checkDate = new Date(cell.date);
       checkDate.setHours(0,0,0,0);
@@ -2419,8 +2472,9 @@ function renderMonthCalendar() {
       cellBkg.forEach(b => {
         const badge = document.createElement('div');
         let badgeClass = 'calendar-event-badge';
-        if (b.status === 'approved') badgeClass += ' approved';
-        else if (b.status === 'pending' || b.status.startsWith('pending')) badgeClass += ' pending';
+        const statusStr = String(b.status || '');
+        if (statusStr === 'approved') badgeClass += ' approved';
+        else if (statusStr === 'pending' || statusStr.startsWith('pending')) badgeClass += ' pending';
 
         badge.className = badgeClass;
         badge.setAttribute('data-booking-id', b.id);
@@ -4616,6 +4670,7 @@ function setupEventListeners() {
         '07170004', '07170005', '07170010', '07170105', '07170199', '1234', '123456'
       ];
       if (validPasses.includes(passClean) || passClean === matched.employee_id || passClean.toLowerCase() === (matched.username || '').toLowerCase()) {
+        localStorage.setItem('current_active_view', 'bookings'); // 🎯 Fresh login always lands on bookings
         loginUser(matched);
       } else {
         showToast("รหัสผ่านไม่ถูกต้อง (กรุณากรอกรหัสพนักงาน เช่น 07170105 สำหรับคุณฉลอง)", "error");
@@ -4909,9 +4964,23 @@ function setupEventListeners() {
       btn.classList.add('active');
 
       const target = btn.getAttribute('data-tab');
+      
+      // 🟢 เพิ่ม: บันทึกแท็บที่เลือกลง SessionStorage กันรีเฟรชแล้วหาย
+      sessionStorage.setItem('user_selected_booking_tab', target); 
+
       const parent = btn.parentNode.parentNode;
-      parent.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-      document.getElementById(target).classList.add('active');
+      parent.querySelectorAll('.tab-content').forEach(tc => {
+        tc.classList.remove('active');
+        // 🟢 เพิ่ม: บังคับซ่อนเนื้อหา Tab อื่นที่ไม่ได้เลือก
+        tc.style.display = 'none'; 
+      });
+      
+      const targetEl = document.getElementById(target);
+      if (targetEl) {
+        targetEl.classList.add('active');
+        // 🟢 เพิ่ม: ลบคำสั่งซ่อนออก เพื่อโชว์ Tab ที่เลือก
+        targetEl.style.removeProperty('display'); 
+      }
     });
   });
 
@@ -5761,19 +5830,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   checkLoginStatus();
-
-  // Show return early success toast if set
- // ตัวอย่างโค้ดตอนที่ระบบดึงข้อมูลผู้ใช้เก่ากลับมาตอนโหลดเว็บ
-const storedUser = localStorage.getItem('current_user');
-if (storedUser) {
-  currentUser = JSON.parse(storedUser);
-  
-  // 🚨 ต้องแน่ใจว่ามีการเรียก 3 คำสั่งนี้เสมอ เพื่อให้ระบบแจกสิทธิ์และโชว์ปุ่มถูกต้อง 🚨
-  assignUserPermissions(currentUser); 
-  initApprovalSwitcher(); 
-  updateStats();
-  // ...
-}
 
   // Simulated Email Inbox event listeners
   const trigger = document.getElementById('email-inbox-trigger');

@@ -5,7 +5,7 @@ const path = require('path');
 const { exec } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 const ROOT_DIR = __dirname;
 
 // Initialize SQLite database (supports C:\apps\car-booking\database.db if opened in DB Browser)
@@ -16,20 +16,69 @@ const DB_PATH = fs.existsSync('C:\\apps\\car-booking\\database.db')
 console.log(`[SQLite] Using database path: ${DB_PATH}`);
 const db = new DatabaseSync(DB_PATH);
 
-// Ensure schema is updated with active column for system_config
-try {
-  db.exec("ALTER TABLE bookings ADD COLUMN active INTEGER DEFAULT 0;");
-} catch(e) {
-  // Ignore if column already exists
-}
+// Ensure tables exist
+db.exec(`
+  CREATE TABLE IF NOT EXISTS bookings (
+    id TEXT PRIMARY KEY,
+    requester TEXT,
+    office TEXT,
+    position TEXT,
+    purpose TEXT,
+    startDate TEXT,
+    endDate TEXT,
+    trips INTEGER,
+    travelType TEXT,
+    carId TEXT,
+    distance REAL,
+    price REAL,
+    goCheck INTEGER,
+    backCheck INTEGER,
+    status TEXT,
+    currentApprovalLevel INTEGER,
+    driverName TEXT,
+    returnedEarly INTEGER,
+    driverAccepted INTEGER,
+    signatures TEXT,
+    waitingForRequesterInput INTEGER,
+    taxiInfo TEXT,
+    active INTEGER DEFAULT 0
+  );
 
-// Ensure schema is updated with missing cars columns from cars.json
+  CREATE TABLE IF NOT EXISTS cars (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    type TEXT,
+    plate TEXT,
+    status TEXT,
+    icon TEXT,
+    driverName TEXT,
+    phone TEXT,
+    brand TEXT,
+    driver TEXT,
+    controlUnit TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS users (
+    employee_id TEXT PRIMARY KEY,
+    username TEXT,
+    name TEXT,
+    position TEXT,
+    department1 TEXT,
+    department2 TEXT,
+    email TEXT,
+    manager_email TEXT,
+    role TEXT,
+    canApprove TEXT,
+    customApprovalLevels TEXT
+  );
+`);
+
+// Ensure schema is updated with active column for system_config
+try { db.exec("ALTER TABLE bookings ADD COLUMN active INTEGER DEFAULT 0;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN name TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN icon TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN driverName TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN phone TEXT;"); } catch(e) {}
-
-// Ensure schema is updated with customApprovalLevels for users
 try { db.exec("ALTER TABLE users ADD COLUMN customApprovalLevels TEXT;"); } catch(e) {}
 
 // SQLite Helper Functions

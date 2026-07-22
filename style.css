@@ -1427,25 +1427,26 @@ body {
 }
 
 .calendar-grid-wrapper {
-  border: 1px solid var(--border-color);
+  border: 1.5px solid #cbd5e1;
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(15, 23, 42, 0.4);
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
 }
 
 .calendar-days-header {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border-color);
+  background: #f1f5f9;
+  border-bottom: 1.5px solid #cbd5e1;
   text-align: center;
 }
 
 .calendar-header-day {
   padding: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: #334155;
 }
 
 .calendar-header-day.sun { color: var(--danger); }
@@ -1458,14 +1459,14 @@ body {
 
 .calendar-day-cell {
   min-height: 110px;
-  border-right: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   transition: var(--transition-smooth);
-  background: rgba(30, 41, 59, 0.2);
+  background: #ffffff;
 }
 
 .calendar-day-cell:nth-child(7n) {
@@ -1473,22 +1474,23 @@ body {
 }
 
 .calendar-day-cell:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: #f8fafc;
 }
 
 .calendar-day-cell.other-month {
-  opacity: 0.25;
-  background: rgba(15, 23, 42, 0.2);
+  opacity: 0.55;
+  background: #f8fafc;
 }
 
 .calendar-day-cell.today {
-  background: var(--primary-light);
-  box-shadow: inset 0 0 0 1px var(--primary);
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 2px #3b82f6;
 }
 
 .calendar-day-number {
-  font-weight: 600;
-  font-size: 0.85rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #1e293b;
   margin-bottom: 0.25rem;
 }
 
