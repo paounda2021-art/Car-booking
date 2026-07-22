@@ -123,6 +123,7 @@ function sqliteGetBookings() {
 
 function sqliteSaveBookings(bookingsList) {
   try {
+    db.exec("DELETE FROM bookings");
     const insertBooking = db.prepare(`
       INSERT OR REPLACE INTO bookings (
         id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
