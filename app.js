@@ -1292,11 +1292,10 @@ function loginUser(userObj) {
   updateStats();
   renderDashboard();
   renderMonthCalendar();
-
-  // 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ (แท็บงานรออนุมัติจากคุณ) เสมอเมื่อเข้าสู่ระบบ
-  activeView = 'bookings';
-  localStorage.setItem('current_active_view', 'bookings');
-  sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
+  
+// 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ (แท็บงานรออนุมัติจากคุณ) เสมอเมื่อเข้าสู่ระบบ
+localStorage.setItem('current_active_view', 'bookings');
+sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
 
   // 🎯 บังคับปรับปุ่มและเนื้อหาแท็บ 'งานรออนุมัติจากคุณ' ให้ Active ทันที
   document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
@@ -2082,9 +2081,9 @@ function renderBookingsLists() {
   bookingViewLayout = 'card';
 
   // 🎯 Tab activation logic for renderBookingsLists
-  const pendingTabBtn = document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
-  const myBkgTabBtn = document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
-  const allHistoryTabBtn = document.querySelector('.tab-btn[data-tab="tab-all-history"]');
+  const pendingTabBtn = document.getElementById('btn-tab-pending-approvals') || document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
+  const myBkgTabBtn = document.getElementById('btn-tab-my-bookings') || document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
+  const allHistoryTabBtn = document.getElementById('btn-tab-all-history') || document.querySelector('.tab-btn[data-tab="tab-all-history"]');
   const pendingTab = document.getElementById('tab-pending-approvals');
   const myBkgTab = document.getElementById('tab-my-bookings');
   const allHistoryTab = document.getElementById('tab-all-history');
@@ -2103,11 +2102,16 @@ function renderBookingsLists() {
   } else {
     if (pendingTabBtn) pendingTabBtn.classList.remove('hidden');
 
-    // For Approvers (L1, L2, L3, L4): Default to Tab 2 "งานรออนุมัติจากคุณ" unless user clicked Tab 3 "ประวัติทั้งหมด" or Tab 1 "รายการที่ฉันขอ"
+    // For Approvers (L1, L2, L3, L4): Default to Tab 2 "งานรออนุมัติจากคุณ"
     const userActiveTab = sessionStorage.getItem('user_selected_booking_tab') || 'tab-pending-approvals';
     
-    [myBkgTabBtn, pendingTabBtn, allHistoryTabBtn].forEach(b => b?.classList.remove('active'));
-    [myBkgTab, pendingTab, allHistoryTab].forEach(t => { if (t) { t.classList.remove('active'); t.style.display = 'none'; } });
+    if (myBkgTabBtn) myBkgTabBtn.classList.remove('active');
+    if (pendingTabBtn) pendingTabBtn.classList.remove('active');
+    if (allHistoryTabBtn) allHistoryTabBtn.classList.remove('active');
+
+    if (myBkgTab) { myBkgTab.classList.remove('active'); myBkgTab.style.display = 'none'; }
+    if (pendingTab) { pendingTab.classList.remove('active'); pendingTab.style.display = 'none'; }
+    if (allHistoryTab) { allHistoryTab.classList.remove('active'); allHistoryTab.style.display = 'none'; }
 
     if (userActiveTab === 'tab-my-bookings') {
       if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
