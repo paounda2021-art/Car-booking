@@ -6,19 +6,19 @@ if (-not $rootDir) { $rootDir = Get-Location }
 
 Write-Host "Updating production server to match 8080 100% in $rootDir..." -ForegroundColor Green
 
-# 1. Allow git to update bookings.json
+# 1. Stop PM2 server first so database.db file lock is released
+Write-Host "Stopping PM2 car-booking server to release database file lock..." -ForegroundColor Yellow
+try {
+    pm2 stop car-booking
+} catch {}
+
+# 2. Allow git to update bookings.json
 try {
     git update-index --no-assume-unchanged bookings.json
 } catch {}
 
-# 2. Remove old sqlite db so it auto-rebuilds cleanly
-$dbFile = Join-Path $rootDir "database.db"
-if (Test-Path $dbFile) {
-    Remove-Item -Path $dbFile -Force -ErrorAction SilentlyContinue
-}
-
-# 3. Pull updated code and 29-record database from GitHub
-Write-Host "Pulling latest codebase and 29-item database from GitHub..." -ForegroundColor Yellow
+# 3. Pull updated code and database from GitHub
+Write-Host "Pulling latest codebase and database from GitHub..." -ForegroundColor Yellow
 git config user.email "admin@fishmarket.co.th"
 git config user.name "Administrator"
 git fetch origin
@@ -26,6 +26,6 @@ git reset --hard origin/main
 
 # 4. Restart server in PM2
 Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Yellow
-pm2 restart car-booking
+pm2 start car-booking
 
 Write-Host "Production server updated successfully! 100% matched with 8080." -ForegroundColor Green
