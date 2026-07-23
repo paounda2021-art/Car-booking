@@ -1492,16 +1492,25 @@ function showView(viewName) {
     }
   });
 
-  // Nav menu class toggling
+  // Nav menu class toggling with inline style fallback
   const navItems = ['dashboard', 'bookings', 'calendar', 'driver-report', 'admin-settings'];
   navItems.forEach(n => {
     const link = document.getElementById(`nav-${n}`);
-    if (link) {
-      if (n === viewName) {
+    const item = document.getElementById(`nav-item-${n}`);
+    if (n === viewName) {
+      if (link) {
         link.classList.add('active');
-      } else {
-        link.classList.remove('active');
+        link.style.setProperty('background-color', 'var(--primary)', 'important');
+        link.style.setProperty('color', '#ffffff', 'important');
       }
+      if (item) item.classList.add('active');
+    } else {
+      if (link) {
+        link.classList.remove('active');
+        link.style.removeProperty('background-color');
+        link.style.removeProperty('color');
+      }
+      if (item) item.classList.remove('active');
     }
   });
 
@@ -2105,22 +2114,36 @@ function renderBookingsLists() {
     // For Approvers (L1, L2, L3, L4): Default to Tab 2 "งานรออนุมัติจากคุณ"
     const userActiveTab = sessionStorage.getItem('user_selected_booking_tab') || 'tab-pending-approvals';
     
-    if (myBkgTabBtn) myBkgTabBtn.classList.remove('active');
-    if (pendingTabBtn) pendingTabBtn.classList.remove('active');
-    if (allHistoryTabBtn) allHistoryTabBtn.classList.remove('active');
-
-    if (myBkgTab) { myBkgTab.classList.remove('active'); myBkgTab.style.display = 'none'; }
-    if (pendingTab) { pendingTab.classList.remove('active'); pendingTab.style.display = 'none'; }
-    if (allHistoryTab) { allHistoryTab.classList.remove('active'); allHistoryTab.style.display = 'none'; }
+    // Reset tab button inline styles
+    [myBkgTabBtn, pendingTabBtn, allHistoryTabBtn].forEach(b => {
+      if (b) {
+        b.classList.remove('active');
+        b.style.removeProperty('color');
+        b.style.removeProperty('border-bottom');
+      }
+    });
+    [myBkgTab, pendingTab, allHistoryTab].forEach(t => { if (t) { t.classList.remove('active'); t.style.display = 'none'; } });
 
     if (userActiveTab === 'tab-my-bookings') {
-      if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
+      if (myBkgTabBtn) {
+        myBkgTabBtn.classList.add('active');
+        myBkgTabBtn.style.color = 'var(--primary)';
+        myBkgTabBtn.style.borderBottom = '2px solid var(--primary)';
+      }
       if (myBkgTab) { myBkgTab.classList.add('active'); myBkgTab.style.removeProperty('display'); }
     } else if (userActiveTab === 'tab-all-history') {
-      if (allHistoryTabBtn) allHistoryTabBtn.classList.add('active');
+      if (allHistoryTabBtn) {
+        allHistoryTabBtn.classList.add('active');
+        allHistoryTabBtn.style.color = 'var(--primary)';
+        allHistoryTabBtn.style.borderBottom = '2px solid var(--primary)';
+      }
       if (allHistoryTab) { allHistoryTab.classList.add('active'); allHistoryTab.style.removeProperty('display'); }
     } else {
-      if (pendingTabBtn) pendingTabBtn.classList.add('active');
+      if (pendingTabBtn) {
+        pendingTabBtn.classList.add('active');
+        pendingTabBtn.style.color = 'var(--primary)';
+        pendingTabBtn.style.borderBottom = '2px solid var(--primary)';
+      }
       if (pendingTab) { pendingTab.classList.add('active'); pendingTab.style.removeProperty('display'); }
     }
   }
