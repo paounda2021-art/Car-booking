@@ -4,31 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบขออนุมัติใช้รถยนต์และเบิกจ่าย - องค์การสะพานปลา</title>
-  <meta name="description" content="ระบบจองใช้ยานพาหนะและขออนุมัติเบิกจ่ายค่าพาหนะ องค์การสะพานปลา (FMO)">
-  <meta property="og:title" content="ระบบขออนุมัติใช้รถยนต์และเบิกจ่าย - องค์การสะพานปลา">
-  <meta property="og:description" content="ระบบจองใช้ยานพาหนะและขออนุมัติเบิกจ่ายค่าพาหนะ องค์การสะพานปลา (FMO)">
-  <meta property="og:image" content="https://car-booking.fishmarket.co.th/logoFMO.png">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="องค์การสะพานปลา">
   <link rel="stylesheet" href="flatpickr.min.css?v=1.0">
   <link rel="stylesheet" href="style.css?v=6.2">
 </head>
 <body>
   <!-- MAINTENANCE SCREEN (Overlay) -->
-  <div id="system-maintenance-overlay" class="maintenance-overlay hidden" style="display: none;">
+  <div id="system-maintenance-overlay" class="maintenance-overlay">
     <script>
-      if (localStorage.getItem('system_active') !== 'false') {
-        const overlay = document.getElementById('system-maintenance-overlay');
-        if (overlay) {
-          overlay.classList.add('hidden');
-          overlay.style.display = 'none';
-        }
+      if (localStorage.getItem('system_active') === 'true') {
+        document.getElementById('system-maintenance-overlay').classList.add('hidden');
       }
     </script>
     <div class="maintenance-card">
-      <div class="maintenance-icon">🚗</div>
-      <h2>ระบบขออนุญาตใช้รถยนต์</h2>
-      <p>ระบบจองใช้ยานพาหนะและเบิกจ่ายค่าพาหนะ องค์การสะพานปลา (FMO)</p>
+      <div class="maintenance-icon">🔒</div>
+      <h2>ระบบยังไม่เปิดใช้งาน</h2>
+      <p>ระบบจองใช้ยานพาหนะและเบิกจ่ายค่าพาหนะ องค์การสะพานปลา (FMO)<br>ขณะนี้ยังไม่เปิดให้บริการอย่างเป็นทางการ</p>
       
       <!-- Activation Form (hidden by default) -->
       <div id="activation-login-box" class="hidden" style="width: 100%; display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
@@ -41,7 +31,7 @@
       </div>
 
       <button class="btn btn-primary" id="btn-activate-system" style="background: #f59e0b; border-color: #f59e0b; margin-top: 1rem; font-weight: bold; width: 100%; padding: 0.75rem;">
-        🔑 ตั้งค่าสถานะระบบ
+        🔑 เปิดใช้งานระบบ
       </button>
     </div>
   </div>
@@ -88,21 +78,21 @@
       </div>
       
       <nav class="nav-menu">
-        <li class="nav-item hidden" id="nav-item-dashboard">
+        <li class="nav-item">
           <a href="#" class="nav-link" data-view="dashboard" id="nav-dashboard">
             <span class="nav-icon">📊</span>
             <span class="nav-text">แดชบอร์ดภาพรวม</span>
           </a>
         </li>
-        <li class="nav-item hidden" id="nav-item-bookings">
+        <li class="nav-item">
           <a href="#" class="nav-link" data-view="bookings" id="nav-bookings">
             <span class="nav-icon">📋</span>
             <span class="nav-text">รายการจอง & อนุมัติ</span>
             <span id="pending-badge-count" class="menu-badge">0</span>
           </a>
         </li>
-        <li class="nav-item" id="nav-item-calendar">
-          <a href="#" class="nav-link" data-view="calendar" id="nav-calendar">
+        <li class="nav-item">
+          <a href="#" class="nav-link active" data-view="calendar" id="nav-calendar">
             <span class="nav-icon">📅</span>
             <span class="nav-text">ปฏิทินจองใช้รถ</span>
           </a>
@@ -290,26 +280,26 @@
       </section>
 
        <!-- VIEW 2: Bookings List and Approvals -->
-      <section id="view-bookings" class="view-section no-print">
+      <section id="view-bookings" class="view-section hidden no-print">
         <div class="tab-container">
           <div class="tab-nav" style="display: flex; gap: 2rem; border-bottom: 1px solid var(--border-color); width: 100%; margin-bottom: 1.5rem; align-items: center; flex-wrap: wrap;">
-            <button class="tab-btn" data-tab="tab-my-bookings" id="btn-tab-my-bookings">รายการที่ฉันขอ (<span id="tab-my-bookings-count">0</span>)</button>
-            <button class="tab-btn active" data-tab="tab-pending-approvals" id="btn-tab-pending-approvals">งานรออนุมัติจากคุณ (<span id="tab-pending-count">0</span>)</button>
-            <button class="tab-btn" data-tab="tab-all-history" id="btn-tab-all-history">ประวัติทั้งหมด (<span id="tab-all-history-count">0</span>)</button>
+            <button class="tab-btn active" data-tab="tab-my-bookings">รายการที่ฉันขอ (<span id="tab-my-bookings-count">0</span>)</button>
+            <button class="tab-btn" data-tab="tab-pending-approvals">งานรออนุมัติจากคุณ (<span id="tab-pending-count">0</span>)</button>
+            <button class="tab-btn" data-tab="tab-all-history">ประวัติทั้งหมด (<span id="tab-all-history-count">0</span>)</button>
             <button class="btn btn-secondary btn-sm" id="btn-export-csv" onclick="openExportModal()" style="margin-left: auto; height: 32px; padding: 0 0.75rem; display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; background: #10b981; color: white; border-color: #10b981; margin-bottom: 0.5rem; cursor: pointer; border-radius: 6px; font-weight: bold; border-style: solid; border-width: 1px;">
               📥 ส่งออก Excel (CSV)
             </button>
           </div>
 
           <!-- Tab 1: My Bookings -->
-          <div id="tab-my-bookings" class="tab-content">
+          <div id="tab-my-bookings" class="tab-content active">
             <div class="booking-list" id="my-bookings-container">
               <!-- Injected dynamically -->
             </div>
           </div>
 
           <!-- Tab 2: Pending Approvals (For managers/admin) -->
-          <div id="tab-pending-approvals" class="tab-content active">
+          <div id="tab-pending-approvals" class="tab-content">
             <div class="booking-list" id="pending-approvals-container">
               <!-- Injected dynamically -->
             </div>
@@ -317,20 +307,6 @@
 
           <!-- Tab 3: All History -->
           <div id="tab-all-history" class="tab-content">
-            <div id="history-filter-bar" style="margin-bottom: 1rem; display: none; gap: 0.75rem; align-items: center; flex-wrap: wrap; background: var(--bg-card); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
-              <label for="history-status-filter" style="font-weight: 600; font-size: 0.85rem; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
-                🔍 กรองตามสถานะใบจอง:
-              </label>
-              <select id="history-status-filter" class="form-control" style="max-width: 240px; padding: 0.35rem 0.65rem; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
-                <option value="all">-- แสดงทุกสถานะ --</option>
-                <option value="approved">🟢 อนุมัติเสร็จสิ้น</option>
-                <option value="pending">🟡 อยู่ระหว่างรออนุมัติ</option>
-                <option value="rejected">🔴 ปฏิเสธคำขอ</option>
-                <option value="cancelled">🚫 ยกเลิกคำขอ</option>
-                <option value="waiting_for_requester_edit">✏️ รอผู้ขอปรับปรุง วัน/เวลา</option>
-              </select>
-              <input type="text" id="history-search-input" placeholder="🔍 ค้นหาเลขคำขอ / ชื่อ / เรื่อง..." class="form-control" style="max-width: 240px; padding: 0.35rem 0.65rem; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);" />
-            </div>
             <div class="booking-list" id="all-history-container">
               <!-- Injected dynamically -->
             </div>
@@ -428,12 +404,12 @@
       </section>
 
       <!-- VIEW 4: Full Month Calendar -->
-      <section id="view-calendar" class="view-section hidden no-print">
+      <section id="view-calendar" class="view-section no-print">
         <div class="calendar-view-container">
           <div class="calendar-top-controls">
             <div class="calendar-month-nav">
               <button class="btn btn-secondary" id="btn-cal-prev" style="padding:0.4rem 0.8rem;">← เดือนก่อนหน้า</button>
-              <h3 class="calendar-month-title" id="calendar-month-year-label">กรกฎาคม 2569</h3>
+              <h3 class="calendar-month-title" id="calendar-month-year-label">มิถุนายน 2569</h3>
               <button class="btn btn-secondary" id="btn-cal-next" style="padding:0.4rem 0.8rem;">เดือนถัดไป →</button>
             </div>
             
@@ -883,6 +859,44 @@
           </div>
         </div>
 
+        <!-- Modal for L0 Schedule Edit (Returned by L2) -->
+        <div id="modal-l0-schedule-edit" class="modal">
+          <div class="modal-content" style="max-width: 550px;">
+            <div class="modal-header">
+              <h3>✏️ แก้ไข วัน/เวลา เดินทาง (ส่งกลับจากผู้จัดรถ L2)</h3>
+              <button class="modal-close" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div id="l0-edit-reason-banner" style="background: rgba(217, 119, 6, 0.15); border-left: 4px solid #d97706; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+                <strong>📝 เหตุผลที่ L2 ส่งกลับ:</strong> <span id="l0-edit-reason-text">-</span>
+              </div>
+
+              <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; border: 1px solid var(--border-color);">
+                <strong>⏰ วัน/เวลาเดิม:</strong> <span id="l0-edit-previous-schedule">-</span>
+              </div>
+
+              <div class="form-group">
+                <label for="l0-edit-start-date">วัน/เวลา เริ่มเดินทาง (ใหม่)</label>
+                <input type="text" id="l0-edit-start-date" class="form-control" placeholder="เลือกวันเวลาเริ่มเดินทาง">
+              </div>
+
+              <div class="form-group">
+                <label for="l0-edit-end-date">วัน/เวลา สิ้นสุดเดินทาง (ใหม่)</label>
+                <input type="text" id="l0-edit-end-date" class="form-control" placeholder="เลือกวันเวลาสิ้นสุดเดินทาง">
+              </div>
+
+              <div class="form-group">
+                <label for="l0-edit-purpose">เรื่อง/วัตถุประสงค์ (ถ้าต้องการแก้ไข)</label>
+                <input type="text" id="l0-edit-purpose" class="form-control" placeholder="ระบุเรื่อง/วัตถุประสงค์">
+              </div>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
+              <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active')">ยกเลิก</button>
+              <button type="button" class="btn btn-warning" id="btn-save-l0-schedule-edit" style="background-color:#d97706; color:white; font-weight:600;">💾 บันทึกและส่งกลับให้ L2</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Cancellation Action Panel -->
         <div id="cancellation-action-panel" style="display:none; margin-top: 1.5rem; border-top: 1px dashed var(--border-color); padding-top: 1.5rem; background: rgba(220, 38, 38, 0.05); border: 1px solid rgba(220, 38, 38, 0.2); padding: 1rem; border-radius: 8px;">
           <h4 style="margin-bottom: 0.5rem; color: #f87171; font-size: 1rem;">🚫 ดำเนินการยกเลิกใบเสนอขออนุญาต</h4>
@@ -897,12 +911,21 @@
           </div>
         </div>
 
+        <!-- Driver Acceptance Panel -->
+        <div id="driver-accept-action-panel" style="display:none; margin-top: 1.5rem; border-top: 1px dashed var(--border-color); padding-top: 1.5rem; background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 1rem; border-radius: 8px;">
+          <h4 style="margin-bottom: 0.5rem; color: #34d399; font-size: 1rem;">📋 ยืนยันการรับงาน (สำหรับ พขร.)</h4>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">ท่านได้รับการจัดสรรให้ปฏิบัติหน้าที่เป็นพนักงานขับรถสำหรับใบจองคิวงานนี้ กรุณากดปุ่มยืนยันเพื่อรับงานและบันทึกข้อมูลเข้าระบบ</p>
+          <div style="display:flex; justify-content:flex-end;">
+            <button type="button" class="btn btn-success btn-sm" id="btn-modal-accept-job">✅ กดรับงาน</button>
+          </div>
+        </div>
+
         <!-- Return Early Panel -->
         <div id="return-early-action-panel" style="display:none; margin-top: 1.5rem; border-top: 1px dashed var(--border-color); padding-top: 1.5rem; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); padding: 1rem; border-radius: 8px;">
           <h4 style="margin-bottom: 0.5rem; color: #fbbf24; font-size: 1rem;">🔄 คืนรถยนต์ก่อนเวลา</h4>
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">เสร็จสิ้นการเดินทางก่อนเวลาสิ้นสุดที่กำหนด? ท่านสามารถกดคืนรถยนต์ก่อนเวลาเพื่อให้รถยนต์คันนี้เปลี่ยนสถานะเป็น "ว่าง" และสามารถจัดสรรให้งานจองคิวอื่น ๆ ได้ทันที</p>
           <div style="display:flex; justify-content:flex-end;">
-            <button type="button" class="btn btn-warning btn-sm" id="btn-modal-return-early">🏁 ยืนยันจบงาน คืนรถ</button>
+            <button type="button" class="btn btn-warning btn-sm" id="btn-modal-return-early">🔄 ยืนยันคืนรถก่อนเวลา</button>
           </div>
         </div>
 
@@ -933,44 +956,6 @@
             <button type="submit" class="btn btn-primary">💾 บันทึกเสนอหัวหน้างาน</button>
           </div>
         </form>
-      </div>
-    </div>
-  </div>
-
-  <!-- Standalone Modal for L0 Schedule Edit (Returned by L2) -->
-  <div id="modal-l0-schedule-edit" class="modal-overlay">
-    <div class="modal-box" style="max-width: 550px;">
-      <div class="modal-header">
-        <h3>✏️ แก้ไข วัน/เวลา เดินทาง (ส่งกลับจากผู้จัดรถ L2)</h3>
-        <button class="modal-close" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active'); document.getElementById('modal-l0-schedule-edit').style.display='none';">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div id="l0-edit-reason-banner" style="background: rgba(217, 119, 6, 0.15); border-left: 4px solid #d97706; padding: 10px 14px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
-          <strong>📝 เหตุผลที่ L2 ส่งกลับ:</strong> <span id="l0-edit-reason-text">-</span>
-        </div>
-
-        <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; margin-bottom: 1rem; font-size: 0.85rem; border: 1px solid var(--border-color);">
-          <strong>⏰ วัน/เวลาเดิม:</strong> <span id="l0-edit-previous-schedule">-</span>
-        </div>
-
-        <div class="form-group">
-          <label for="l0-edit-start-date">วัน/เวลา เริ่มเดินทาง (ใหม่)</label>
-          <input type="text" id="l0-edit-start-date" class="form-control" placeholder="เลือกวันเวลาเริ่มเดินทาง">
-        </div>
-
-        <div class="form-group">
-          <label for="l0-edit-end-date">วัน/เวลา สิ้นสุดเดินทาง (ใหม่)</label>
-          <input type="text" id="l0-edit-end-date" class="form-control" placeholder="เลือกวันเวลาสิ้นสุดเดินทาง">
-        </div>
-
-        <div class="form-group">
-          <label for="l0-edit-purpose">เรื่อง/วัตถุประสงค์ (ถ้าต้องการแก้ไข)</label>
-          <input type="text" id="l0-edit-purpose" class="form-control" placeholder="ระบุเรื่อง/วัตถุประสงค์">
-        </div>
-      </div>
-      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:0.75rem;">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-l0-schedule-edit').classList.remove('active'); document.getElementById('modal-l0-schedule-edit').style.display='none';">ยกเลิก</button>
-        <button type="button" class="btn btn-warning" id="btn-save-l0-schedule-edit" style="background-color:#d97706; color:white; font-weight:600;">💾 บันทึกและส่งกลับให้ L2</button>
       </div>
     </div>
   </div>
@@ -1165,6 +1150,6 @@
 
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=36.0_guarantee_active_nav_and_tab_colors"></script>
+  <script src="app.js?v=9.1_fix"></script>
 </body>
 </html>
