@@ -1296,9 +1296,25 @@ function loginUser(userObj) {
   // 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ (แท็บงานรออนุมัติจากคุณ) เสมอเมื่อเข้าสู่ระบบ
   activeView = 'bookings';
   localStorage.setItem('current_active_view', 'bookings');
-  if (!sessionStorage.getItem('user_selected_booking_tab')) {
-    sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
-  }
+  sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
+
+  // 🎯 บังคับปรับปุ่มและเนื้อหาแท็บ 'งานรออนุมัติจากคุณ' ให้ Active ทันที
+  document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
+    if (btn.getAttribute('data-tab') === 'tab-pending-approvals') {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  document.querySelectorAll('#view-bookings .tab-content').forEach(tab => {
+    if (tab.id === 'tab-pending-approvals') {
+      tab.classList.add('active');
+      tab.style.removeProperty('display');
+    } else {
+      tab.classList.remove('active');
+      tab.style.display = 'none';
+    }
+  });
 
   renderBookingsLists(); 
   showView('bookings');
