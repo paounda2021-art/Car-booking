@@ -1292,10 +1292,10 @@ function loginUser(userObj) {
   updateStats();
   renderDashboard();
   renderMonthCalendar();
-  
-// 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ (แท็บงานรออนุมัติจากคุณ) เสมอเมื่อเข้าสู่ระบบ
-localStorage.setItem('current_active_view', 'bookings');
-sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
+
+  // 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ (แท็บงานรออนุมัติจากคุณ) เสมอเมื่อเข้าสู่ระบบ
+  localStorage.setItem('current_active_view', 'bookings');
+  sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
 
   // 🎯 บังคับปรับปุ่มและเนื้อหาแท็บ 'งานรออนุมัติจากคุณ' ให้ Active ทันที
   document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
@@ -1492,25 +1492,16 @@ function showView(viewName) {
     }
   });
 
-  // Nav menu class toggling with inline style fallback
+  // Nav menu class toggling
   const navItems = ['dashboard', 'bookings', 'calendar', 'driver-report', 'admin-settings'];
   navItems.forEach(n => {
     const link = document.getElementById(`nav-${n}`);
-    const item = document.getElementById(`nav-item-${n}`);
-    if (n === viewName) {
-      if (link) {
+    if (link) {
+      if (n === viewName) {
         link.classList.add('active');
-        link.style.setProperty('background-color', 'var(--primary)', 'important');
-        link.style.setProperty('color', '#ffffff', 'important');
-      }
-      if (item) item.classList.add('active');
-    } else {
-      if (link) {
+      } else {
         link.classList.remove('active');
-        link.style.removeProperty('background-color');
-        link.style.removeProperty('color');
       }
-      if (item) item.classList.remove('active');
     }
   });
 
@@ -2090,9 +2081,9 @@ function renderBookingsLists() {
   bookingViewLayout = 'card';
 
   // 🎯 Tab activation logic for renderBookingsLists
-  const pendingTabBtn = document.getElementById('btn-tab-pending-approvals') || document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
-  const myBkgTabBtn = document.getElementById('btn-tab-my-bookings') || document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
-  const allHistoryTabBtn = document.getElementById('btn-tab-all-history') || document.querySelector('.tab-btn[data-tab="tab-all-history"]');
+  const pendingTabBtn = document.querySelector('.tab-btn[data-tab="tab-pending-approvals"]');
+  const myBkgTabBtn = document.querySelector('.tab-btn[data-tab="tab-my-bookings"]');
+  const allHistoryTabBtn = document.querySelector('.tab-btn[data-tab="tab-all-history"]');
   const pendingTab = document.getElementById('tab-pending-approvals');
   const myBkgTab = document.getElementById('tab-my-bookings');
   const allHistoryTab = document.getElementById('tab-all-history');
@@ -2111,39 +2102,20 @@ function renderBookingsLists() {
   } else {
     if (pendingTabBtn) pendingTabBtn.classList.remove('hidden');
 
-    // For Approvers (L1, L2, L3, L4): Default to Tab 2 "งานรออนุมัติจากคุณ"
+    // For Approvers (L1, L2, L3, L4): Default to Tab 2 "งานรออนุมัติจากคุณ" unless user clicked Tab 3 "ประวัติทั้งหมด" or Tab 1 "รายการที่ฉันขอ"
     const userActiveTab = sessionStorage.getItem('user_selected_booking_tab') || 'tab-pending-approvals';
     
-    // Reset tab button inline styles
-    [myBkgTabBtn, pendingTabBtn, allHistoryTabBtn].forEach(b => {
-      if (b) {
-        b.classList.remove('active');
-        b.style.removeProperty('color');
-        b.style.removeProperty('border-bottom');
-      }
-    });
+    [myBkgTabBtn, pendingTabBtn, allHistoryTabBtn].forEach(b => b?.classList.remove('active'));
     [myBkgTab, pendingTab, allHistoryTab].forEach(t => { if (t) { t.classList.remove('active'); t.style.display = 'none'; } });
 
     if (userActiveTab === 'tab-my-bookings') {
-      if (myBkgTabBtn) {
-        myBkgTabBtn.classList.add('active');
-        myBkgTabBtn.style.color = 'var(--primary)';
-        myBkgTabBtn.style.borderBottom = '2px solid var(--primary)';
-      }
+      if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
       if (myBkgTab) { myBkgTab.classList.add('active'); myBkgTab.style.removeProperty('display'); }
     } else if (userActiveTab === 'tab-all-history') {
-      if (allHistoryTabBtn) {
-        allHistoryTabBtn.classList.add('active');
-        allHistoryTabBtn.style.color = 'var(--primary)';
-        allHistoryTabBtn.style.borderBottom = '2px solid var(--primary)';
-      }
+      if (allHistoryTabBtn) allHistoryTabBtn.classList.add('active');
       if (allHistoryTab) { allHistoryTab.classList.add('active'); allHistoryTab.style.removeProperty('display'); }
     } else {
-      if (pendingTabBtn) {
-        pendingTabBtn.classList.add('active');
-        pendingTabBtn.style.color = 'var(--primary)';
-        pendingTabBtn.style.borderBottom = '2px solid var(--primary)';
-      }
+      if (pendingTabBtn) pendingTabBtn.classList.add('active');
       if (pendingTab) { pendingTab.classList.add('active'); pendingTab.style.removeProperty('display'); }
     }
   }
@@ -2244,6 +2216,10 @@ function renderBookingsLists() {
 
     let welfareBtn = '';
     const isWelfare = (b.controlUnit === 'รถสวัสดิการ');
+    
+    // 🟢 เพิ่มบรรทัดนี้เข้าไป เพื่อให้ระบบเช็คว่าเป็นคำขอของตัวเองหรือไม่
+    const isMyRequest = checkIsMyRequest(b, currentUser); 
+
     if (isWelfare && b.status === 'approved' && isMyRequest) {
       if (!b.carPickedUp) {
         welfareBtn = `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); pickupWelfareCar('${b.id}')" style="background-color: #0284c7; border-color: #0284c7; color: white; font-weight: bold;">🔑 รับรถ</button>`;
