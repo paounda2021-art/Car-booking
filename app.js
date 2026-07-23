@@ -1293,23 +1293,15 @@ function loginUser(userObj) {
   renderDashboard();
   renderMonthCalendar();
 
-  // 11. ดึงหน้าที่เคยสลับไว้ หรือเข้าสู่หน้ารายการจอง & อนุมัติ เป็นค่าเริ่มต้น
-  let activeView = localStorage.getItem('current_active_view');
-  if (!activeView || activeView === 'null' || activeView === 'undefined' || !views.includes(activeView)) {
+  // 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ (แท็บงานรออนุมัติจากคุณ) เสมอเมื่อเข้าสู่ระบบ
   activeView = 'bookings';
-}
-
-  // 🟢 เพิ่มเงื่อนไข: บังคับให้ทุกคนกลับมาหน้า "รายการจอง" และแท็บ "รออนุมัติ" เสมอเมื่อเปิดระบบใหม่/เพิ่งล็อกอิน
-  if (!sessionStorage.getItem('is_fresh_login')) {
-    sessionStorage.setItem('is_fresh_login', 'true');
-    activeView = 'bookings'; 
-    localStorage.setItem('current_active_view', 'bookings');
-    sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals'); // ล็อกเป้าแท็บรออนุมัติ
+  localStorage.setItem('current_active_view', 'bookings');
+  if (!sessionStorage.getItem('user_selected_booking_tab')) {
+    sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
   }
 
-  // 🟢 ย้ายคำสั่งวาดตารางมาไว้ตรงนี้ เพื่อให้มันอ่านค่าแท็บ "รออนุมัติ" ที่เราเพิ่งล็อกเป้าไว้ด้านบน
   renderBookingsLists(); 
-  showView(activeView);
+  showView('bookings');
 }
 
 // ==========================================
@@ -2287,8 +2279,13 @@ function renderBookingsLists() {
     const isL3User = userHasApproveLevel(currentUser, 3);
     const isL4User = userHasApproveLevel(currentUser, 4);
 
+    // 🎯 เงื่อนไข: ใบจองที่จะมาแสดงที่ L2/L3/L4 ในประวัติ ต้องผ่าน L1 เรียบร้อยแล้ว (currentApprovalLevel >= 2 หรือ อนุมัติ/ปฏิเสธ/ยกเลิกแล้ว)
+    const hasPassedL1 = b.currentApprovalLevel >= 2 || b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled' || b.status === 'cancellation_requested';
+
     if (isL2User || isL3User || isL4User || canSeeAll) {
-      allBookingsList.push({ booking: b, isPendingForMe });
+      if (hasPassedL1 || isMyRequest || isManagerOrApprover) {
+        allBookingsList.push({ booking: b, isPendingForMe });
+      }
     } else if (isCompleted) {
       if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
         allBookingsList.push({ booking: b, isPendingForMe });
