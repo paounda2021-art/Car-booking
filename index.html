@@ -311,7 +311,7 @@
               <label for="history-status-filter" style="font-weight: 600; font-size: 0.85rem; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
                 🔍 กรองตามสถานะใบจอง:
               </label>
-              <select id="history-status-filter" class="form-control" style="max-width: 260px; padding: 0.35rem 0.65rem; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+              <select id="history-status-filter" class="form-control" style="max-width: 240px; padding: 0.35rem 0.65rem; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
                 <option value="all">-- แสดงทุกสถานะ --</option>
                 <option value="approved">🟢 อนุมัติเสร็จสิ้น</option>
                 <option value="pending">🟡 อยู่ระหว่างรออนุมัติ</option>
@@ -319,6 +319,7 @@
                 <option value="cancelled">🚫 ยกเลิกคำขอ</option>
                 <option value="waiting_for_requester_edit">✏️ รอผู้ขอปรับปรุง วัน/เวลา</option>
               </select>
+              <input type="text" id="history-search-input" placeholder="🔍 ค้นหาเลขคำขอ / ชื่อ / เรื่อง..." class="form-control" style="max-width: 240px; padding: 0.35rem 0.65rem; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);" />
             </div>
             <div class="booking-list" id="all-history-container">
               <!-- Injected dynamically -->
@@ -1154,6 +1155,6 @@
 
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="app.js?v=31.0_fix_l4_history_line_notification_car_availability_fixed"></script>
+  <script src="app.js?v=32.0_fix_descending_sort_and_search"></script>
 </body>
 </html>

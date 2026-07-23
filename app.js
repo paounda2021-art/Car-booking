@@ -2296,9 +2296,17 @@ function renderBookingsLists() {
     }
   });
 
+  // 🎯 Sort history list by Booking ID descending (newest requests at the top)
+  allBookingsList.sort((a, b) => {
+    const numA = parseInt((a.booking.id || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt((b.booking.id || '').replace(/\D/g, ''), 10) || 0;
+    return numB - numA;
+  });
+
   // Handle Status Filter Bar Visibility and Filtering for L2/L3/L4
   const historyFilterBar = document.getElementById('history-filter-bar');
   const statusFilterSelect = document.getElementById('history-status-filter');
+  const historySearchInput = document.getElementById('history-search-input');
   
   let filteredAllBookingsList = allBookingsList;
 
@@ -2308,16 +2316,30 @@ function renderBookingsLists() {
     historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
   }
 
-  if (isL2OrL3OrL4 && statusFilterSelect && statusFilterSelect.value !== 'all') {
-    const filterVal = statusFilterSelect.value;
+  const filterVal = statusFilterSelect ? statusFilterSelect.value : 'all';
+  const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
+
+  if (isL2OrL3OrL4) {
     filteredAllBookingsList = allBookingsList.filter(item => {
-      const st = item.booking.status;
-      if (filterVal === 'approved') return st === 'approved';
-      if (filterVal === 'pending') return st.startsWith('pending');
-      if (filterVal === 'rejected') return st === 'rejected';
-      if (filterVal === 'cancelled') return st === 'cancelled' || st === 'cancellation_requested';
-      if (filterVal === 'waiting_for_requester_edit') return st === 'waiting_for_requester_edit';
-      return true;
+      const b = item.booking;
+      const st = b.status;
+      let matchStatus = true;
+      if (filterVal === 'approved') matchStatus = (st === 'approved');
+      else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
+      else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
+      else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
+      else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
+
+      let matchSearch = true;
+      if (searchVal) {
+        const idStr = (b.id || '').toLowerCase();
+        const reqStr = (b.requester || '').toLowerCase();
+        const purpStr = (b.purpose || '').toLowerCase();
+        const destStr = (b.destination || '').toLowerCase();
+        matchSearch = idStr.includes(searchVal) || reqStr.includes(searchVal) || purpStr.includes(searchVal) || destStr.includes(searchVal);
+      }
+
+      return matchStatus && matchSearch;
     });
   }
 
@@ -4698,6 +4720,10 @@ function setupEventListeners() {
 
   document.getElementById('history-status-filter')?.addEventListener('change', () => {
     updateStats();
+    renderBookingsLists();
+  });
+
+  document.getElementById('history-search-input')?.addEventListener('input', () => {
     renderBookingsLists();
   });
 
