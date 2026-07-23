@@ -998,13 +998,33 @@ function fetchBookings() {
     renderMonthCalendar();
   }
 }
+// Helper to check if user has specific approval level (supports integer, string, role, or username)
+function userHasApproveLevel(userObj, levelNum) {
+  if (!userObj) return false;
+  const list = Array.isArray(userObj.canApprove) ? userObj.canApprove : [];
+  const levelStr = String(levelNum);
+  const levelInt = parseInt(levelNum, 10);
+  
+  if (list.includes(levelInt) || list.includes(levelStr)) return true;
+  
+  const usernameLower = (userObj.username || '').toLowerCase();
+  const role = userObj.role || '';
+  
+  if (levelInt === 1 && (role === 'supervisor' || ['sarena.m'].includes(usernameLower))) return true;
+  if (levelInt === 2 && (role === 'fleet_admin' || ['chalong.c', 'sakda.a'].includes(usernameLower))) return true;
+  if (levelInt === 3 && (role === 'director' || ['panadon.p', 'saisunee.p'].includes(usernameLower))) return true;
+  if (levelInt === 4 && (role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes(usernameLower))) return true;
+  
+  return false;
+}
+
 // Check for conflicting bookings for FMO cars
 function hasBookingConflict(carId, startDateStr, endDateStr, excludeId = null) {
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
   
   return bookings.some(b => {
-    if (b.id === excludeId || b.status === 'rejected' || b.status === 'cancelled' || b.travelType !== 'fmo_car' || b.carId !== carId) return false;
+    if (b.id === excludeId || b.status === 'rejected' || b.status === 'cancelled' || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== carId) return false;
     const bStart = new Date(b.startDate);
     const bEnd = new Date(b.endDate);
     return (start < bEnd && end > bStart);
@@ -1615,7 +1635,7 @@ function updateStats() {
   
   const now = new Date();
   const busyCarIds = bookings
-    .filter(b => (b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3)) && b.travelType === 'fmo_car' && new Date(b.startDate) <= now && new Date(b.endDate) >= now)
+    .filter(b => (b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3)) && !b.returnedEarly && b.travelType === 'fmo_car' && new Date(b.startDate) <= now && new Date(b.endDate) >= now)
     .map(b => b.carId);
   const availCount = cars.filter(c => !busyCarIds.includes(c.id)).length;
   if (statAvailCars) statAvailCars.textContent = `${availCount} คัน`;
@@ -2263,36 +2283,32 @@ function renderBookingsLists() {
     const canSeeAll = checkCanSeeAll(currentUser);
     const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
     const isCompleted = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
-    const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
-    const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
-    const isL3User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(3);
+    const isL2User = userHasApproveLevel(currentUser, 2);
+    const isL3User = userHasApproveLevel(currentUser, 3);
+    const isL4User = userHasApproveLevel(currentUser, 4);
 
-    if (isL2User || isL3User) {
+    if (isL2User || isL3User || isL4User || canSeeAll) {
       allBookingsList.push({ booking: b, isPendingForMe });
-    } else if (isL4User) {
-      if (b.status === 'approved' || isMyRequest) {
-        allBookingsList.push({ booking: b, isPendingForMe });
-      }
     } else if (isCompleted) {
-      if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || canSeeAll) {
+      if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
     }
   });
 
-  // Handle Status Filter Bar Visibility and Filtering for L2/L3
+  // Handle Status Filter Bar Visibility and Filtering for L2/L3/L4
   const historyFilterBar = document.getElementById('history-filter-bar');
   const statusFilterSelect = document.getElementById('history-status-filter');
   
   let filteredAllBookingsList = allBookingsList;
 
-  const isL2OrL3 = currentUser && currentUser.canApprove && (currentUser.canApprove.includes(2) || currentUser.canApprove.includes(3) || currentUser.role === 'fleet_admin');
+  const isL2OrL3OrL4 = currentUser && (userHasApproveLevel(currentUser, 2) || userHasApproveLevel(currentUser, 3) || userHasApproveLevel(currentUser, 4) || checkCanSeeAll(currentUser));
 
   if (historyFilterBar) {
-    historyFilterBar.style.display = isL2OrL3 ? 'flex' : 'none';
+    historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
   }
 
-  if (isL2OrL3 && statusFilterSelect && statusFilterSelect.value !== 'all') {
+  if (isL2OrL3OrL4 && statusFilterSelect && statusFilterSelect.value !== 'all') {
     const filterVal = statusFilterSelect.value;
     filteredAllBookingsList = allBookingsList.filter(item => {
       const st = item.booking.status;
@@ -2818,8 +2834,8 @@ async function openApprovalModal(bookingId) {
           const hasConflict = hasBookingConflict(car.id, booking.startDate, booking.endDate, booking.id);
           const now = new Date();
           const isBusyNow = bookings.some(b => {
-            const isAssigned = b.status === 'approved' || (b.status === 'pending' && b.currentApprovalLevel >= 3);
-            if (b.id === booking.id || !isAssigned || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+            const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+            if (b.id === booking.id || !isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
             return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
           });
 
@@ -2918,8 +2934,8 @@ async function openApprovalModal(bookingId) {
         const hasConflict = hasBookingConflict(car.id, booking.startDate, booking.endDate, booking.id);
         const now = new Date();
         const isBusyNow = bookings.some(b => {
-          const isAssigned = b.status === 'approved' || (b.status === 'pending' && b.currentApprovalLevel >= 3);
-          if (b.id === booking.id || !isAssigned || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+          const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+          if (b.id === booking.id || !isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
           return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
         });
 
@@ -3302,8 +3318,8 @@ function handleApprovalAction(isApproved) {
       `;
       sendEmailNotification(reqEmail, subject, body);
 
-      // Trigger LINE Notification to Driver Group (Option 1)
-      if (booking.travelType === 'fmo_car' && booking.driverName && booking.driverName !== '-') {
+      // Trigger LINE Notification to Driver Group
+      if (booking.travelType === 'fmo_car' || booking.controlUnit === 'รถสวัสดิการ') {
         triggerLineNotification(booking, carPlate);
       }
     } else {
