@@ -1157,7 +1157,11 @@ const server = http.createServer((req, res) => {
                         updated = true;
                       } else if (action === 'return-early' && !booking.returnedEarly) {
                         booking.returnedEarly = true;
-                        booking.endDate = new Date().toISOString();
+                        const tzOffset = 7 * 60 * 60 * 1000;
+                        const nowTh = new Date(Date.now() + tzOffset);
+                        const localNowStr = nowTh.toISOString().slice(0, 16);
+                        booking.endDate = localNowStr;
+                        booking.actualReturnTime = localNowStr;
                         updated = true;
                       }
                       

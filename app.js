@@ -5973,7 +5973,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const booking = bookings.find(b => b.id === actionBookingId);
     if (booking) {
       booking.returnedEarly = true;
-      booking.endDate = new Date().toISOString();
+      const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+      const localNowStr = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 16);
+      booking.endDate = localNowStr;
+      booking.actualReturnTime = localNowStr;
       saveBookings();
 
       // Trigger LINE status update (finish)
