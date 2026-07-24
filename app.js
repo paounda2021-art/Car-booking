@@ -2025,7 +2025,7 @@ function helperCreateTableRow(b, isPendingForMe) {
   let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
   if (b.status === 'cancelled') {
     statusClass = 'danger';
-    const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
+    const byL = b.cancelledBy || ((b.cancelReason && (b.cancelReason.includes('ผู้จัด') || b.cancelReason.includes('L2'))) ? 'L2' : 'L0');
     statusText = `🚫 ยกเลิกโดย: ${byL}`;
   } else if (b.status === 'cancellation_requested') {
     statusClass = 'warning';
@@ -2199,7 +2199,7 @@ function renderBookingsLists() {
 
     if (b.status === 'cancelled') {
       statusClass = 'danger';
-      const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
+      const byL = b.cancelledBy || ((b.cancelReason && (b.cancelReason.includes('ผู้จัด') || b.cancelReason.includes('L2'))) ? 'L2' : 'L0');
       statusText = `🚫 ยกเลิกโดย: ${byL}`;
     } else if (b.status === 'cancellation_requested') {
       statusClass = 'warning';
@@ -4817,7 +4817,7 @@ function setupEventListeners() {
 
       booking.status = 'cancelled';
       booking.cancelReason = 'ผู้ใช้ถอนคำขอ';
-      booking.cancelledBy = isFleetAdmin ? 'L2' : 'L0';
+      booking.cancelledBy = isRequester ? 'L0' : (isFleetAdmin ? 'L2' : 'L0');
       saveBookings();
       showToast("ถอนคำขอและยกเลิกใบจองเรียบร้อยแล้ว", "success");
       document.getElementById('modal-approval').classList.remove('active');
@@ -6524,7 +6524,7 @@ window.performExportToCSV = function(list, startVal, endVal) {
     
     let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
     if (b.status === 'cancelled') {
-      const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
+      const byL = b.cancelledBy || ((b.cancelReason && (b.cancelReason.includes('ผู้จัด') || b.cancelReason.includes('L2'))) ? 'L2' : 'L0');
       statusText = `ยกเลิกโดย: ${byL}`;
     } else if (b.status === 'cancellation_requested') {
       statusText = 'ร้องขอยกเลิก';

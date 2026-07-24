@@ -3514,7 +3514,7 @@
     "price": 0,
     "goCheck": true,
     "backCheck": true,
-    "status": "pending",
+    "status": "cancelled",
     "currentApprovalLevel": 1,
     "driverName": "",
     "returnedEarly": false,
@@ -3567,7 +3567,9 @@
     ],
     "waitingForRequesterInput": false,
     "taxiInfo": {},
-    "active": false
+    "active": false,
+    "cancelReason": "ผู้ใช้ถอนคำขอ",
+    "cancelledBy": "L0"
   },
   {
     "id": "system_config",
