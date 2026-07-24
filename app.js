@@ -1019,15 +1019,21 @@ function userHasApproveLevel(userObj, levelNum) {
 }
 
 // Check for conflicting bookings for FMO cars
+// แทนที่ฟังก์ชันเดิมใน app.js
 function hasBookingConflict(carId, startDateStr, endDateStr, excludeId = null) {
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
-  
+
   return bookings.some(b => {
-    if (b.id === excludeId || b.status === 'rejected' || b.status === 'cancelled' || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== carId) return false;
+    // กำหนดให้เช็คเฉพาะรายการที่ "ถูกจัดสรร/อนุมัติแล้วจริงๆ" (L3 ขึ้นไป)
+    const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+    
+    // หากไม่ใช่รายการที่จัดสรรแล้ว, ถูกยกเลิก/คืนแล้ว หรือไม่ใช่รถ fmo_car ให้ข้ามไป ไม่ถือว่าทับซ้อน
+    if (b.id === excludeId || !isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== carId) return false;
+    
     const bStart = new Date(b.startDate);
     const bEnd = new Date(b.endDate);
-    return (start < bEnd && end > bStart);
+    return (start < bEnd && end > bStart); // ตรวจสอบเวลาทับซ้อน
   });
 }
 // Central helper to update all sidebar menu items and panels based on exact user permissions
@@ -1641,9 +1647,19 @@ function updateStats() {
   if (statTotalCars) statTotalCars.textContent = `${cars.length} คัน`;
   
   const now = new Date();
-  const busyCarIds = bookings
-    .filter(b => (b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3)) && !b.returnedEarly && b.travelType === 'fmo_car' && new Date(b.startDate) <= now && new Date(b.endDate) >= now)
-    .map(b => b.carId);
+  // ค้นหาในฟังก์ชัน updateStats() และแก้ตัวแปร busyCarIds
+const busyCarIds = bookings
+  .filter(b => {
+    const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+    if (!isAssigned || b.returnedEarly || b.travelType !== 'fmo_car') return false;
+    
+    // 🟢 เพิ่มเงื่อนไขให้เหมือนกับ renderDashboard
+    if (b.controlUnit === 'รถสวัสดิการ' && b.carPickedUp && !b.returnedEarly) {
+      return true;
+    }
+        return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
+  })
+  .map(b => b.carId);
   const availCount = cars.filter(c => !busyCarIds.includes(c.id)).length;
   if (statAvailCars) statAvailCars.textContent = `${availCount} คัน`;
 
@@ -1752,36 +1768,40 @@ function renderDashboard() {
 
   cars.forEach(car => {
     // Find if car has an active booking right now (approved OR pending-assigned by L2)
-    const activeBkg = bookings.find(b => {
-      const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
-      if (!isAssigned || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
-      return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
-    });
+    // ค้นหาในฟังก์ชัน renderDashboard() และแก้ตัวแปร activeBkg
+const activeBkg = bookings.find(b => {
+  const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+  if (!isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+  
+  // 🟢 เพิ่มเงื่อนไข: ถ้ารถสวัสดิการถูก "รับรถ" ไปแล้วแต่ยังไม่ "คืนรถ" ให้สถานะเป็น "ไม่ว่าง" ทันทีแม้จะเลยเวลา endDate
+  if (b.controlUnit === 'รถสวัสดิการ' && b.carPickedUp && !b.returnedEarly) {
+    return true;
+  }
+  return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
+});
 
     const isAvailable = !activeBkg;
     let cardClass = 'car-card available';
     let badgeText = '🟢 ว่าง';
     let badgeClass = 'car-status-badge status-avail';
     let statusDesc = 'ว่างพร้อมปฏิบัติหน้าที่';
-    let actionBtnHtml = '';
 
     if (activeBkg) {
       const isApproved = activeBkg.status === 'approved';
       cardClass = isApproved ? 'car-card occupied' : 'car-card occupied pending-res';
       badgeText = isApproved ? '🔴 ปฏิบัติงาน' : '🟡 จองแล้ว (รออนุมัติ)';
       badgeClass = isApproved ? 'car-status-badge status-busy' : 'car-status-badge status-pending';
-      statusDesc = isApproved ? `ไม่ว่าง (เรื่อง: ${activeBkg.purpose})` : `จองล่วงหน้า (เรื่อง: ${activeBkg.purpose})`;
-
-      const isL2 = currentUser && currentUser.role === 'fleet_admin';
-      const isRequester = currentUser && activeBkg.requester === currentUser.name;
-      const isDriver = currentUser && activeBkg.driverName && currentUser.name && activeBkg.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
-      if ((isL2 || isRequester || isDriver) && isApproved) {
-        actionBtnHtml = `
-          <button class="btn btn-warning btn-sm btn-return-early" data-booking-id="${activeBkg.id}" style="width: 100%; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.25rem 0.5rem;">
-            เปลี่ยนเป็นว่าง (คืนรถก่อนเวลา)
-          </button>
-        `;
+      let dept2Val = (activeBkg.office && activeBkg.office !== '-') ? activeBkg.office : '';
+      if (!dept2Val && activeBkg.requester && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+        const uObj = usersList.find(u => u.name && u.name.trim() === activeBkg.requester.trim());
+        if (uObj) dept2Val = uObj.department2 || uObj.department1 || '';
       }
+      if (!dept2Val) {
+        dept2Val = [activeBkg.office, activeBkg.division, activeBkg.department, activeBkg.position]
+          .find(d => d && d.trim() !== '' && d.trim() !== '-') || '';
+      }
+      const deptStr = dept2Val ? ` / ${dept2Val}` : '';
+      statusDesc = isApproved ? `ไม่ว่าง (เรื่อง: ${activeBkg.purpose}${deptStr})` : `จองล่วงหน้า (เรื่อง: ${activeBkg.purpose}${deptStr})`;
     }
 
     const card = document.createElement('div');
@@ -1800,7 +1820,6 @@ function renderDashboard() {
           ${car.phone ? `<p class="car-phone">เบอร์โทร: <strong>${car.phone}</strong></p>` : ''}
         ` : ''}
         <p class="car-status-desc">${statusDesc}</p>
-        ${actionBtnHtml}
       </div>
     `;
     carListContainer.appendChild(card);
@@ -3054,39 +3073,10 @@ async function openApprovalModal(bookingId) {
     driverAcceptPanel.style.display = 'none';
   }
 
-  // Handle Return Early Panel display
+  // Handle Return Early Panel display (Disabled: Return action handled via LINE notification button)
   const returnEarlyPanel = document.getElementById('return-early-action-panel');
   if (returnEarlyPanel) {
-    const now = new Date();
-    const startD = new Date(booking.startDate);
-    const endD = new Date(booking.endDate);
-    const isActive = booking.status === 'approved' && startD <= now && endD >= now;
-    
-    const isL2 = currentUser && currentUser.role === 'fleet_admin';
-    const isRequester = currentUser && (booking.requester === currentUser.name || booking.username === currentUser.username);
-    const isDriver = currentUser && booking.driverName && currentUser.name && booking.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
-    
-    if ((isActive && (isRequester || isDriver)) || (booking.status === 'approved' && isL2)) {
-      returnEarlyPanel.style.display = 'block';
-      const btnReturnEarly = document.getElementById('btn-modal-return-early');
-      if (btnReturnEarly) {
-        btnReturnEarly.onclick = () => {
-          booking.endDate = new Date().toISOString();
-          booking.returnedEarly = true;
-          saveBookings();
-
-          // Trigger LINE status update (finish)
-          let carObj = cars.find(c => c.id === booking.carId);
-          const carPlate = carObj ? carObj.plate : '-';
-          triggerLineNotification(booking, carPlate, 'finish');
-
-          localStorage.setItem('return_early_toast_success', `ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบคำขอ ${booking.id} เรียบร้อยแล้ว`);
-          window.location.reload();
-        };
-      }
-    } else {
-      returnEarlyPanel.style.display = 'none';
-    }
+    returnEarlyPanel.style.display = 'none';
   }
 }
 
