@@ -2359,10 +2359,27 @@ function renderBookingsLists() {
     const isL3User = userHasApproveLevel(currentUser, 3);
     const isL4User = userHasApproveLevel(currentUser, 4);
 
-    // 🎯 เงื่อนไข: ใบจองที่จะมาแสดงที่ L2/L3/L4 ในประวัติ ต้องผ่าน L1 เรียบร้อยแล้ว (currentApprovalLevel >= 2 หรือ อนุมัติ/ปฏิเสธ/ยกเลิกแล้ว)
     const hasPassedL1 = b.currentApprovalLevel >= 2 || b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled' || b.status === 'cancellation_requested';
 
-    if (isL2User || isL3User || isL4User || canSeeAll) {
+    // 🎯 สำหรับ L2: แสดงเฉพาะรายการที่ L2 ได้ดำเนินการแล้ว (อนุมัติ/จัดรถ/ปฏิเสธ/ยกเลิกโดย L2) หรือรายการที่ L2 ขอเองเท่านั้น
+    const hasL2Processed = (booking) => {
+      if (isMyRequest) return true;
+      const isCancelledByL0 = (booking.status === 'cancelled' && (booking.cancelledBy === 'L0' || (booking.cancelReason && (booking.cancelReason.includes('ผู้ใช้ถอนคำขอ') || booking.cancelReason.includes('ผู้ใช้')))));
+      const hasL2Sig = Array.isArray(booking.signatures) && booking.signatures.some(s => s.level === 2 && (s.status === 'approved' || s.status === 'rejected' || (s.approverName && s.approverName.trim() !== '')));
+      const isL2ActionStatus = booking.status === 'approved' || booking.status === 'rejected' || booking.status === 'waiting_for_requester_edit' || booking.status === 'pending_l2_confirm' || booking.cancelledBy === 'L2';
+      const hasPassedL2 = booking.currentApprovalLevel > 2;
+
+      if (isCancelledByL0) {
+        return hasL2Sig || hasPassedL2;
+      }
+      return hasL2Sig || isL2ActionStatus || hasPassedL2;
+    };
+
+    if (isL2User && !canSeeAll) {
+      if (hasL2Processed(b)) {
+        allBookingsList.push({ booking: b, isPendingForMe });
+      }
+    } else if (isL2User || isL3User || isL4User || canSeeAll) {
       if (hasPassedL1 || isMyRequest || isManagerOrApprover) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
