@@ -1464,7 +1464,7 @@
     "ref": "",
     "passengers": "ผฝ.ยศ.,หส.ยศ.,น.ส.สุพรรณษา,น.ส.เพ็ญพิชญ์",
     "startDate": "2026-07-23T09:30",
-    "endDate": "2026-07-23T16:30",
+    "endDate": "2026-07-24T12:42",
     "trips": 2,
     "travelType": "fmo_car",
     "carId": "A",
@@ -1475,7 +1475,7 @@
     "status": "approved",
     "currentApprovalLevel": 5,
     "driverName": "นายชลาดล  ทองคำ",
-    "returnedEarly": false,
+    "returnedEarly": true,
     "driverAccepted": true,
     "signatures": [
       {
@@ -1525,7 +1525,8 @@
     ],
     "waitingForRequesterInput": false,
     "taxiInfo": {},
-    "active": false
+    "active": false,
+    "actualReturnTime": "2026-07-24T12:42"
   },
   {
     "id": "BGK-6907-018",

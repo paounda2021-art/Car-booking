@@ -951,6 +951,7 @@ const server = http.createServer((req, res) => {
                       return undefined;
                     }
                     const isLocal = !payload.origin || payload.origin.includes('localhost') || payload.origin.includes('127.0.0.1') || payload.origin.startsWith('http://');
+                    const baseOrigin = (payload.origin && payload.origin.startsWith('http')) ? payload.origin : 'https://car-booking.fishmarket.co.th';
                     const list = [];
                     
                     if (isFinish) {
@@ -959,90 +960,47 @@ const server = http.createServer((req, res) => {
                         action: {
                           type: "uri",
                           label: "🏁 จบงาน คืนรถ เรียบร้อยแล้ว",
-                          uri: `${payload.origin || 'https://car-booking.fishmarket.co.th'}`
+                          uri: `${baseOrigin}`
                         },
                         style: "secondary",
                         color: "#9ca3af"
                       });
                     } else if (isAccept) {
-                      if (isLocal) {
-                        list.push(
-                          {
-                            type: "button",
-                            action: {
-                              type: "uri",
-                              label: "✅ รับงานแล้ว (เรียบร้อย)",
-                              uri: `${payload.origin || 'http://localhost:8080'}`
-                            },
-                            style: "secondary",
-                            color: "#9ca3af",
-                            margin: "xs"
-                          },
-                          {
-                            type: "button",
-                            action: {
-                              type: "uri",
-                              label: "🔴 จบงาน (คืนรถ)",
-                              uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=return-early&id=${payload.bookingId}`
-                            },
-                            style: "primary",
-                            color: "#ef4444",
-                            margin: "sm"
-                          }
-                        );
-                      } else {
-                        list.push(
-                          {
-                            type: "button",
-                            action: {
-                              type: "postback",
-                              label: "✅ รับงานแล้ว (เรียบร้อย)",
-                              data: `action=none`,
-                              displayText: "✅ รับงานแล้ว"
-                            },
-                            style: "secondary",
-                            color: "#9ca3af",
-                            margin: "xs"
-                          },
-                          {
-                            type: "button",
-                            action: {
-                              type: "postback",
-                              label: "🔴 จบงาน (คืนรถ)",
-                              data: `action=return-early&id=${payload.bookingId}`,
-                              displayText: "🔴 จบงาน คืนรถ"
-                            },
-                            style: "primary",
-                            color: "#ef4444",
-                            margin: "sm"
-                          }
-                        );
-                      }
-                    } else if (!isCancel) {
-                      if (isLocal) {
-                        list.push({
+                      list.push(
+                        {
                           type: "button",
                           action: {
                             type: "uri",
-                            label: "✅ กดรับงาน",
-                            uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`
+                            label: "✅ รับงานแล้ว (เรียบร้อย)",
+                            uri: `${baseOrigin}`
                           },
-                          style: "primary",
-                          color: "#10b981"
-                        });
-                      } else {
-                        list.push({
+                          style: "secondary",
+                          color: "#9ca3af",
+                          margin: "xs"
+                        },
+                        {
                           type: "button",
                           action: {
-                            type: "postback",
-                            label: "✅ กดรับงาน",
-                            data: `action=accept-job&id=${payload.bookingId}`,
-                            displayText: "✅ กดรับงาน"
+                            type: "uri",
+                            label: "🔴 จบงาน (คืนรถ)",
+                            uri: `${baseOrigin}/index.html?action=return-early&id=${payload.bookingId}`
                           },
                           style: "primary",
-                          color: "#10b981"
-                        });
-                      }
+                          color: "#ef4444",
+                          margin: "sm"
+                        }
+                      );
+                    } else if (!isCancel) {
+                      list.push({
+                        type: "button",
+                        action: {
+                          type: "uri",
+                          label: "✅ กดรับงาน",
+                          uri: `${baseOrigin}/index.html?action=accept-job&id=${payload.bookingId}`
+                        },
+                        style: "primary",
+                        color: "#10b981"
+                      });
                     }
 
                     if (list.length === 0) return undefined;
