@@ -644,7 +644,7 @@
     "position": "หัวหน้าสำนักงาน",
     "department1": "ฝยศ.",
     "department2": "สตป.",
-    "role": "user",
+    "role": "supervisor",
     "manager_email": "peerawat.p@fishmarket.co.th",
     "sign": "",
     "customApprovalLevels": null
@@ -801,7 +801,7 @@
     "department1": "ฝยศ.",
     "department2": "สตป.",
     "role": "user",
-    "manager_email": "peerawat.p@fishmarket.co.th",
+    "manager_email": "patchareeya.s@fishmarket.co.th",
     "sign": "",
     "customApprovalLevels": null
   },
