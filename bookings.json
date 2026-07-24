@@ -19,7 +19,7 @@
     "startTime": "14.26",
     "endTime": "17.25",
     "passengerCount": "2",
-    "destination": "ประชุม",
+    "destination": "กรมบัญชีกลาง",
     "status": "pending",
     "currentApprovalLevel": 1,
     "managerEmail": "patchareeya.s@fishmarket.co.th",
@@ -74,7 +74,9 @@
     ],
     "waitingForRequesterInput": false,
     "taxiInfo": {},
-    "active": false
+    "active": false,
+    "passengers": "น.ส. พัชรียา สุตา, น.ส. กลิ่นเสลา บุญส่ง",
+    "tripType": "round_trip"
   },
   {
     "id": "BGK-6907-027",
