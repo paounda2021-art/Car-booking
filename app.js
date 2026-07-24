@@ -1769,18 +1769,33 @@ function renderDashboard() {
   cars.forEach(car => {
     // Find if car has an active booking right now (approved OR pending-assigned by L2)
     // ค้นหาในฟังก์ชัน renderDashboard() และแก้ตัวแปร activeBkg
-const activeBkg = bookings.find(b => {
-  const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
-  if (!isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
-  
-  // 🟢 เพิ่มเงื่อนไข: ถ้ารถสวัสดิการถูก "รับรถ" ไปแล้วแต่ยังไม่ "คืนรถ" ให้สถานะเป็น "ไม่ว่าง" ทันทีแม้จะเลยเวลา endDate
-  if (b.controlUnit === 'รถสวัสดิการ' && b.carPickedUp && !b.returnedEarly) {
-    return true;
-  }
-  return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
-});
+    const activeBkg = bookings.find(b => {
+      const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+      if (!isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+      
+      if (b.controlUnit === 'รถสวัสดิการ' && b.carPickedUp && !b.returnedEarly) {
+        return true;
+      }
+      const bStart = new Date(b.startDate);
+      const bEnd = (b.returnedEarly && b.actualReturnTime) ? new Date(b.actualReturnTime) : new Date(b.endDate);
+      return bStart <= now && bEnd >= now;
+    });
 
-    const isAvailable = !activeBkg;
+    let upcomingBkg = null;
+    if (!activeBkg) {
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(now);
+      todayEnd.setHours(23, 59, 59, 999);
+
+      upcomingBkg = bookings.find(b => {
+        const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+        if (!isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+        const bStart = new Date(b.startDate);
+        return bStart > now && bStart >= todayStart && bStart <= todayEnd;
+      });
+    }
+
     let cardClass = 'car-card available';
     let badgeText = '🟢 ว่าง';
     let badgeClass = 'car-status-badge status-avail';
@@ -1802,6 +1817,25 @@ const activeBkg = bookings.find(b => {
       }
       const deptStr = dept2Val ? ` / ${dept2Val}` : '';
       statusDesc = isApproved ? `ไม่ว่าง (เรื่อง: ${activeBkg.purpose}${deptStr})` : `จองล่วงหน้า (เรื่อง: ${activeBkg.purpose}${deptStr})`;
+    } else if (upcomingBkg) {
+      const isApproved = upcomingBkg.status === 'approved';
+      cardClass = 'car-card occupied pending-res';
+      const timeStartStr = formatThaiTimeOnlyNoSuffix(upcomingBkg.startDate);
+      const timeEndStr = formatThaiTimeOnlyNoSuffix(upcomingBkg.endDate);
+      badgeText = isApproved ? `🟡 มีคิววันนี้ (${timeStartStr} น.)` : `🟡 จองวันนี้ (${timeStartStr} น.)`;
+      badgeClass = 'car-status-badge status-pending';
+
+      let dept2Val = (upcomingBkg.office && upcomingBkg.office !== '-') ? upcomingBkg.office : '';
+      if (!dept2Val && upcomingBkg.requester && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+        const uObj = usersList.find(u => u.name && u.name.trim() === upcomingBkg.requester.trim());
+        if (uObj) dept2Val = uObj.department2 || uObj.department1 || '';
+      }
+      if (!dept2Val) {
+        dept2Val = [upcomingBkg.office, upcomingBkg.division, upcomingBkg.department, upcomingBkg.position]
+          .find(d => d && d.trim() !== '' && d.trim() !== '-') || '';
+      }
+      const deptStr = dept2Val ? ` / ${dept2Val}` : '';
+      statusDesc = `ว่างขณะนี้ (มีคิววันนี้ ${timeStartStr}-${timeEndStr} น. เรื่อง: ${upcomingBkg.purpose}${deptStr})`;
     }
 
     const card = document.createElement('div');
