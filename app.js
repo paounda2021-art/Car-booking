@@ -1726,21 +1726,34 @@ const busyCarIds = bookings
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
   if (tabAllHistoryBadge) {
     const statusFilterSelect = document.getElementById('history-status-filter');
-    const isL2OrL3 = currentUser && currentUser.canApprove && (currentUser.canApprove.includes(2) || currentUser.canApprove.includes(3) || currentUser.role === 'fleet_admin');
-    const filterVal = (statusFilterSelect && isL2OrL3) ? statusFilterSelect.value : 'all';
+    const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
+    const isL3User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(3);
+    const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
+    const filterVal = (statusFilterSelect && (isL2User || isL3User)) ? statusFilterSelect.value : 'all';
 
     const historyCount = bookings.filter(b => {
       const isMyRequest = checkIsMyRequest(b, currentUser);
       const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
       const isCompleted = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
-      const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
-      const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
-      const isL3User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(3);
 
       let isMatchRole = false;
-      if (isL2User || isL3User) isMatchRole = true;
-      else if (isL4User) isMatchRole = (b.status === 'approved' || isMyRequest);
-      else if (isCompleted) isMatchRole = (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || checkCanSeeAll(currentUser));
+      if (isL2User) {
+        if (isMyRequest) isMatchRole = true;
+        else if (b.status === 'cancelled') isMatchRole = (b.cancelledBy === 'L2');
+        else if (b.status === 'pending' || b.status.startsWith('pending')) isMatchRole = false;
+        else {
+          const hasL2Sig = Array.isArray(b.signatures) && b.signatures.some(s => s.level === 2 && (s.status === 'approved' || s.status === 'rejected' || (s.approverName && s.approverName.trim() !== '')));
+          const isL2ActionStatus = b.status === 'approved' || b.status === 'rejected' || b.status === 'waiting_for_requester_edit' || b.status === 'pending_l2_confirm';
+          const hasPassedL2 = b.currentApprovalLevel > 2;
+          isMatchRole = hasL2Sig || isL2ActionStatus || hasPassedL2;
+        }
+      } else if (isL3User) {
+        isMatchRole = true;
+      } else if (isL4User) {
+        isMatchRole = (b.status === 'approved' || isMyRequest);
+      } else if (isCompleted) {
+        isMatchRole = (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || checkCanSeeAll(currentUser));
+      }
 
       if (!isMatchRole) return false;
 
@@ -2364,14 +2377,16 @@ function renderBookingsLists() {
     // 🎯 สำหรับ L2: แสดงเฉพาะรายการที่ L2 ได้ดำเนินการแล้ว (อนุมัติ/จัดรถ/ปฏิเสธ/ยกเลิกโดย L2) หรือรายการที่ L2 ขอเองเท่านั้น
     const hasL2Processed = (booking) => {
       if (isMyRequest) return true;
-      const isCancelledByL0 = (booking.status === 'cancelled' && (booking.cancelledBy === 'L0' || (booking.cancelReason && (booking.cancelReason.includes('ผู้ใช้ถอนคำขอ') || booking.cancelReason.includes('ผู้ใช้')))));
+      if (booking.status === 'cancelled') {
+        return booking.cancelledBy === 'L2';
+      }
+      if (booking.status === 'pending' || booking.status.startsWith('pending')) {
+        return false;
+      }
       const hasL2Sig = Array.isArray(booking.signatures) && booking.signatures.some(s => s.level === 2 && (s.status === 'approved' || s.status === 'rejected' || (s.approverName && s.approverName.trim() !== '')));
-      const isL2ActionStatus = booking.status === 'approved' || booking.status === 'rejected' || booking.status === 'waiting_for_requester_edit' || booking.status === 'pending_l2_confirm' || booking.cancelledBy === 'L2';
+      const isL2ActionStatus = booking.status === 'approved' || booking.status === 'rejected' || booking.status === 'waiting_for_requester_edit' || booking.status === 'pending_l2_confirm';
       const hasPassedL2 = booking.currentApprovalLevel > 2;
 
-      if (isCancelledByL0) {
-        return hasL2Sig || hasPassedL2;
-      }
       return hasL2Sig || isL2ActionStatus || hasPassedL2;
     };
 
@@ -2509,6 +2524,11 @@ function renderBookingsLists() {
       </div>
     `
   );
+
+  const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
+  if (tabAllHistoryBadge) {
+    tabAllHistoryBadge.textContent = filteredAllBookingsList.length;
+  }
 
   updateStats();
 }
