@@ -3251,7 +3251,7 @@
     "ref": "-",
     "passengers": "1. นายวีระ ศรีชัย (หัวหน้าสำนักงานบริหารสะพานปลาและท่าเทียบเรือประมง 2) 2. ว่าที่ ร.ต.ขจรโรจน์ แก้วเจริญกานต์ (เจ้าหน้าที่บริหารงานทั่วไป 7) 3. นางสาวลักษ์ลาวัลย์ หมื่นทิ (เจ้าหน้าที่บริหารงานทั่วไป 6)",
     "startDate": "2026-07-24T06:00",
-    "endDate": "2026-07-24T12:00",
+    "endDate": "2026-07-24T07:00",
     "trips": 2,
     "travelType": "fmo_car",
     "carId": "",
@@ -3259,10 +3259,10 @@
     "price": 0,
     "goCheck": true,
     "backCheck": true,
-    "status": "pending",
-    "currentApprovalLevel": 2,
+    "status": "approved",
+    "currentApprovalLevel": 5,
     "driverName": "",
-    "returnedEarly": false,
+    "returnedEarly": true,
     "driverAccepted": false,
     "signatures": [
       {
@@ -3312,7 +3312,8 @@
     ],
     "waitingForRequesterInput": false,
     "taxiInfo": {},
-    "active": false
+    "active": false,
+    "actualReturnTime": "2026-07-24T07:00"
   },
   {
     "id": "BGK-6907-039",
