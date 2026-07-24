@@ -1873,16 +1873,18 @@ function renderTimelineScheduler() {
     });
 
     const todayBookings = carBookings.filter(b => {
+      const effEnd = (b.returnedEarly && b.actualReturnTime) ? b.actualReturnTime : b.endDate;
       const bStart = new Date(b.startDate);
-      const bEnd = new Date(b.endDate);
+      const bEnd = new Date(effEnd);
       return bStart <= timelineEnd && bEnd >= timelineStart;
     });
 
     let bookingBarsHtml = '';
 
     todayBookings.forEach(b => {
+      const effEnd = (b.returnedEarly && b.actualReturnTime) ? b.actualReturnTime : b.endDate;
       const bStart = new Date(b.startDate);
-      const bEnd = new Date(b.endDate);
+      const bEnd = new Date(effEnd);
 
       const barStart = bStart < timelineStart ? timelineStart : bStart;
       const barEnd = bEnd > timelineEnd ? timelineEnd : bEnd;
@@ -1895,15 +1897,21 @@ function renderTimelineScheduler() {
         const widthPercent = (durationMin / 1440) * 100;
 
         let badgeClass = 'timeline-badge';
-        if (b.status === 'approved') badgeClass += ' approved';
+        if (b.returnedEarly) badgeClass += ' returned';
+        else if (b.status === 'approved') badgeClass += ' approved';
         else if (b.status === 'pending' || b.status.startsWith('pending')) badgeClass += ' pending';
 
         const sh = formatThaiTimeOnlyNoSuffix(b.startDate);
-        const eh = formatThaiTimeOnlyNoSuffix(b.endDate);
+        const eh = formatThaiTimeOnlyNoSuffix(effEnd);
 
-        const checkPrefix = b.driverAccepted ? '✅ ' : '';
+        let checkPrefix = '';
+        if (b.returnedEarly) checkPrefix = '🏁 ';
+        else if (b.driverAccepted) checkPrefix = '✅ ';
+
+        const returnSuffix = b.returnedEarly ? ' (คืนรถแล้ว)' : '';
+
         bookingBarsHtml += `
-          <div class="${badgeClass}" title="${b.purpose} (${sh} - ${eh}) ผู้จอง: ${b.requester}" style="position: absolute; left: ${leftPercent}%; width: ${widthPercent}%; top: 50%; transform: translateY(-50%); height: 38px; border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: default; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-sm); z-index: 2;">
+          <div class="${badgeClass}" title="${b.purpose} (${sh} - ${eh}) ผู้จอง: ${b.requester}${returnSuffix}" style="position: absolute; left: ${leftPercent}%; width: ${widthPercent}%; top: 50%; transform: translateY(-50%); height: 38px; border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: default; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-sm); z-index: 2;">
             <strong style="color: var(--text-main); text-overflow: ellipsis; overflow: hidden; display: block;">${checkPrefix}${b.purpose}</strong>
             <span style="color: var(--text-muted); font-size: 0.65rem;">${sh}-${eh} (${b.requester})</span>
           </div>
