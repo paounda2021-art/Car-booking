@@ -2375,11 +2375,11 @@ function renderBookingsLists() {
       return hasL2Sig || isL2ActionStatus || hasPassedL2;
     };
 
-    if (isL2User && !canSeeAll) {
+    if (isL2User) {
       if (hasL2Processed(b)) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
-    } else if (isL2User || isL3User || isL4User || canSeeAll) {
+    } else if (isL3User || isL4User || canSeeAll) {
       if (hasPassedL1 || isMyRequest || isManagerOrApprover) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
