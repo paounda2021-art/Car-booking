@@ -188,13 +188,37 @@ function sqliteSaveBookings(bookingsList) {
   }
 }
 
-// Automatic startup sync: load bookings.json into SQLite on server startup
+// Automatic startup sync: load bookings.json and users.json into SQLite on server startup
 try {
+  const usersJsonPath = path.join(ROOT_DIR, 'users.json');
+  if (fs.existsSync(usersJsonPath)) {
+    const rawUsers = fs.readFileSync(usersJsonPath, 'utf8').replace(/^\uFEFF/, '');
+    const fileUsers = JSON.parse(rawUsers);
+    if (fileUsers && fileUsers.length > 0) {
+      console.log(`[Startup Auto-Sync] Syncing ${fileUsers.length} user records from users.json to SQLite database...`);
+      sqliteSaveUsers(fileUsers);
+    }
+  }
+
+  try {
+    db.exec("UPDATE bookings SET managerEmail = 'patchareeya.s@fishmarket.co.th' WHERE requester LIKE '%วิชญาพร%' AND currentApprovalLevel = 1;");
+  } catch(dbErr) {}
+
   const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
   if (fs.existsSync(bookingsJsonPath)) {
     const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
-    const fileBookings = JSON.parse(rawJson);
+    let fileBookings = JSON.parse(rawJson);
     if (fileBookings && fileBookings.length > 0) {
+      let modified = false;
+      fileBookings.forEach(b => {
+        if (b.requester && b.requester.includes('วิชญาพร')) {
+          b.managerEmail = 'patchareeya.s@fishmarket.co.th';
+          modified = true;
+        }
+      });
+      if (modified) {
+        fs.writeFileSync(bookingsJsonPath, JSON.stringify(fileBookings, null, 2), 'utf8');
+      }
       console.log(`[Startup Auto-Sync] Syncing ${fileBookings.length} records from bookings.json to SQLite database...`);
       sqliteSaveBookings(fileBookings);
     }
@@ -319,13 +343,30 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const urlPath = url.pathname;
 
-  // API: force-resync (Force sync bookings.json to SQLite DB)
+  // API: force-resync (Force sync bookings.json & users.json to SQLite DB)
   if (urlPath === '/api/force-resync') {
     try {
+      const usersFile = path.join(ROOT_DIR, 'users.json');
+      if (fs.existsSync(usersFile)) {
+        const rawUsers = fs.readFileSync(usersFile, 'utf8').replace(/^\uFEFF/, '');
+        const fileUsers = JSON.parse(rawUsers);
+        sqliteSaveUsers(fileUsers);
+      }
+
+      try {
+        db.exec("UPDATE bookings SET managerEmail = 'patchareeya.s@fishmarket.co.th' WHERE requester LIKE '%วิชญาพร%' AND currentApprovalLevel = 1;");
+      } catch(dbErr) {}
+
       const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
       if (fs.existsSync(bookingsFile)) {
         const rawJson = fs.readFileSync(bookingsFile, 'utf8').replace(/^\uFEFF/, '');
-        const fileBookings = JSON.parse(rawJson);
+        let fileBookings = JSON.parse(rawJson);
+        fileBookings.forEach(b => {
+          if (b.requester && b.requester.includes('วิชญาพร')) {
+            b.managerEmail = 'patchareeya.s@fishmarket.co.th';
+          }
+        });
+        fs.writeFileSync(bookingsFile, JSON.stringify(fileBookings, null, 2), 'utf8');
         sqliteSaveBookings(fileBookings);
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ status: 'success', message: 'Database resynced successfully', count: fileBookings.length }));
