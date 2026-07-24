@@ -163,10 +163,11 @@ function compressImage(file, callback) {
 function resolveManagerEmail(booking) {
   if (!booking) return 'ranida.c@fishmarket.co.th';
   
+  const normalizeName = n => n ? n.replace(/\(.*?\)/g, '').replace(/\s+/g, '').toLowerCase() : '';
+
   // 1. Prioritize looking up requester in usersList (always accurate according to current user hierarchy!)
   if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
     const requesterName = booking.requester.trim();
-    const normalizeName = n => n ? n.replace(/\s+/g, '') : '';
     const reqNorm = normalizeName(requesterName);
     const userObj = usersList.find(u => 
       normalizeName(u.name) === reqNorm || 
@@ -192,8 +193,9 @@ function resolveRequesterEmail(booking) {
     return booking.requesterEmail;
   }
   if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
-    const requesterName = booking.requester.trim();
-    const userObj = usersList.find(u => u.name.trim() === requesterName);
+    const normalizeName = n => n ? n.replace(/\(.*?\)/g, '').replace(/\s+/g, '').toLowerCase() : '';
+    const reqNorm = normalizeName(booking.requester);
+    const userObj = usersList.find(u => normalizeName(u.name) === reqNorm);
     if (userObj && userObj.email && userObj.email.trim() !== '') {
       return userObj.email;
     }
