@@ -163,10 +163,17 @@ function compressImage(file, callback) {
 function resolveManagerEmail(booking) {
   if (!booking) return 'ranida.c@fishmarket.co.th';
   
+  // Fail-safe priority override for Vichayaporn (L0) -> Patcharee (L1)
+  const reqStr = (booking.requester || '').toLowerCase();
+  const reqEmail = (booking.requesterEmail || '').toLowerCase();
+  if (reqStr.includes('วิชญาพร') || reqEmail.includes('witchayaphon')) {
+    return 'patchareeya.s@fishmarket.co.th';
+  }
+
   const normalizeName = n => n ? n.replace(/\(.*?\)/g, '').replace(/\s+/g, '').toLowerCase() : '';
 
   // 1. Prioritize looking up requester in usersList (always accurate according to current user hierarchy!)
-  if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
+  if (typeof usersList !== 'undefined' && Array.isArray(usersList) && usersList.length > 0 && booking.requester) {
     const requesterName = booking.requester.trim();
     const reqNorm = normalizeName(requesterName);
     const userObj = usersList.find(u => 

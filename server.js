@@ -383,6 +383,11 @@ const server = http.createServer((req, res) => {
   if (urlPath === '/api/get-bookings' && req.method === 'GET') {
     const sqlData = sqliteGetBookings();
     if (sqlData) {
+      sqlData.forEach(b => {
+        if (b.requester && (b.requester.includes('วิชญาพร') || (b.requesterEmail && b.requesterEmail.includes('witchayaphon')))) {
+          b.managerEmail = 'patchareeya.s@fishmarket.co.th';
+        }
+      });
       res.writeHead(200, { 
         'Content-Type': 'application/json; charset=utf-8',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -393,13 +398,22 @@ const server = http.createServer((req, res) => {
     } else {
       const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
       fs.readFile(bookingsFile, 'utf8', (err, data) => {
+        let parsed = [];
+        try {
+          parsed = JSON.parse(data.replace(/^\uFEFF/, ''));
+          parsed.forEach(b => {
+            if (b.requester && (b.requester.includes('วิชญาพร') || (b.requesterEmail && b.requesterEmail.includes('witchayaphon')))) {
+              b.managerEmail = 'patchareeya.s@fishmarket.co.th';
+            }
+          });
+        } catch(e) {}
         res.writeHead(200, { 
           'Content-Type': 'application/json; charset=utf-8',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
         });
-        res.end(err ? '[]' : data);
+        res.end(JSON.stringify(parsed));
       });
     }
     return;
