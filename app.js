@@ -956,17 +956,36 @@ async function initDatabase() {
 // 1. ฟังก์ชันบันทึกข้อมูล (เซฟลงเครื่องเพียวๆ 100%)
 // ==========================================
 async function saveBookings() {
-  // 🛡️ เกราะป้องกันขั้นสุดยอด: ห้ามเอา 0 รายการไปเซฟทับข้อมูลเดิมเด็ดขาด!
-  if (bookings.length === 0) {
+  if (!bookings || bookings.length === 0) {
     console.warn("🛑 บล็อกการทำงาน: ป้องกันการเซฟ 0 รายการทับข้อมูลเดิม!");
     return;
   }
 
-  // 🚀 บันทึก localStorage ทันที (UI โต้ตอบได้เลย ไม่รอ Network)
-  localStorage.setItem('bookings_data', JSON.stringify(bookings));
-  console.log("💾 บันทึกข้อมูลสำเร็จ! จำนวนทั้งหมด:", bookings.length, "รายการ");
+  // 🚀 บันทึก localStorage ทันที (พร้อมระบบป้องกัน QuotaExceededError)
+  try {
+    localStorage.setItem('bookings_data', JSON.stringify(bookings));
+    console.log("💾 บันทึกข้อมูลลง localStorage สำเร็จ! จำนวนทั้งหมด:", bookings.length, "รายการ");
+  } catch (err) {
+    console.warn("⚠️ LocalStorage quota exceeded. Saving optimized version locally...", err);
+    try {
+      // ย่อภาพลายเซ็นเฉพาะใน localStorage เพื่อประหยัดพื้นที่ (ข้อมูลเต็มส่งไป Server)
+      const optimizedBookings = bookings.map(b => {
+        if (!b.signatures || !Array.isArray(b.signatures)) return b;
+        const cleanSigs = b.signatures.map(s => {
+          if (s.signature && s.signature.length > 500) {
+            return { ...s, signature: 'db_ref' };
+          }
+          return s;
+        });
+        return { ...b, signatures: cleanSigs };
+      });
+      localStorage.setItem('bookings_data', JSON.stringify(optimizedBookings));
+    } catch (e2) {
+      console.error("⚠️ Could not write to localStorage even after optimization:", e2);
+    }
+  }
 
-  // 🔄 ส่งข้อมูลไปบันทึกที่ Server ในพื้นหลัง (Fire-and-forget ไม่ block UI)
+  // 🔄 ส่งข้อมูลฉบับเต็มไปบันทึกที่ Server (SQLite) ในพื้นหลังเสมอ
   const payload = [...bookings];
   payload.push({
     id: 'system_config',
@@ -983,7 +1002,7 @@ async function saveBookings() {
     body: JSON.stringify(payload)
   })
   .then(() => console.log("☁️ บันทึกข้อมูลลง Server (SQLite) สำเร็จในพื้นหลัง!"))
-  .catch(err => console.warn("⚠️ Server sync failed (ข้อมูล localStorage ยังคงปลอดภัย):", err));
+  .catch(err => console.warn("⚠️ Server sync failed:", err));
 }
 
 // Function to save cars to localStorage and server API
