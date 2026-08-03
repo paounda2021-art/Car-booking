@@ -1825,7 +1825,7 @@ function renderDashboard() {
     if (activeBkg) {
       const isApproved = activeBkg.status === 'approved';
       cardClass = isApproved ? 'car-card occupied' : 'car-card occupied pending-res';
-      badgeText = isApproved ? '🔴 ปฏิบัติงาน' : '🟡 จองแล้ว (รออนุมัติ)';
+      badgeText = isApproved ? '🔴 ปฏิบัติงาน' : '🟠 จองแล้ว (รออนุมัติ)';
       badgeClass = isApproved ? 'car-status-badge status-busy' : 'car-status-badge status-pending';
       statusDesc = isApproved ? `ไม่ว่าง (เรื่อง: ${activeBkg.purpose})` : `จองล่วงหน้า (เรื่อง: ${activeBkg.purpose})`;
 
@@ -3177,7 +3177,7 @@ async function openApprovalModal(bookingId) {
           cancellationPanel.style.display = 'block';
           document.getElementById('cancel-reason-group').style.display = 'block'; // Reason required
           document.getElementById('cancel-reason-label').textContent = 'ระบุเหตุผลในการขอร้องเรียนยกเลิกใบขอจองรถยนต์ (ส่งแอดมินพิจารณา)';
-          document.getElementById('btn-confirm-cancel-booking').textContent = '🟡 ส่งคำขอร้องเรียนยกเลิก';
+          document.getElementById('btn-confirm-cancel-booking').textContent = '🟠 ส่งคำขอร้องเรียนยกเลิก';
         } else if (isFleetAdmin) {
           cancellationPanel.style.display = 'block';
           document.getElementById('cancel-reason-group').style.display = 'block'; // Reason optional/recommended
