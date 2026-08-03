@@ -2811,47 +2811,32 @@ async function autoDrawApproverSignature() {
   // Hide placeholder immediately
   if (placeholder) placeholder.style.display = 'none';
 
-  // 5. Set canvas dimensions — container CSS is 100% width x 180px height
-  //    Must use fixed height (180) because when panel is hidden clientHeight = 0
-  const parent = canvas.parentElement || canvas.parentNode;
-  const parentWidth = parent ? parent.offsetWidth || parent.clientWidth : 0;
-  canvas.width = parentWidth > 100 ? parentWidth : 560;
-  canvas.height = 180;  // fixed, matches .signature-canvas-container { height: 180px }
+  // 5. Set canvas dimensions — fixed height 180 matches CSS .signature-canvas-container
+  canvas.width = 560;
+  canvas.height = 180;
 
-  // 6. Draw targetSign onto canvas
-  const drawSign = (dataUrl) => {
-    const img = new Image();
-    img.onload = () => {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const pad = 16;
-      const availW = canvas.width - (pad * 2);
-      const availH = canvas.height - (pad * 2);
-      const hRatio = availW / img.width;
-      const vRatio = availH / img.height;
-      const ratio = Math.min(hRatio, vRatio);
-      const drawW = img.width * ratio;
-      const drawH = img.height * ratio;
-      const x = (canvas.width - drawW) / 2;
-      const y = (canvas.height - drawH) / 2;
-      ctx.drawImage(img, x, y, drawW, drawH);
-      if (placeholder) placeholder.style.display = 'none';
-    };
-    img.onerror = (err) => {
-      console.error("Failed to load signature image:", err);
-    };
-    img.src = dataUrl;
+  // 6. Draw targetSign onto canvas — single draw, no recursive redraw
+  const img = new Image();
+  img.onload = () => {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const pad = 16;
+    const availW = canvas.width - (pad * 2);
+    const availH = canvas.height - (pad * 2);
+    const hRatio = availW / img.width;
+    const vRatio = availH / img.height;
+    const ratio = Math.min(hRatio, vRatio);
+    const drawW = img.width * ratio;
+    const drawH = img.height * ratio;
+    const x = (canvas.width - drawW) / 2;
+    const y = (canvas.height - drawH) / 2;
+    ctx.drawImage(img, x, y, drawW, drawH);
+    if (placeholder) placeholder.style.display = 'none';
   };
-
-  drawSign(targetSign);
-  // Re-draw after browser layout settles (in case panel width was 0 initially)
-  setTimeout(() => {
-    const pw = parent ? (parent.offsetWidth || parent.clientWidth) : 0;
-    if (pw > 100 && canvas.width !== pw) {
-      canvas.width = pw;
-    }
-    drawSign(targetSign);
-  }, 200);
+  img.onerror = (err) => {
+    console.error("Failed to load signature image:", err);
+  };
+  img.src = targetSign;
 }
 
 // Open Approval Details Modal
@@ -3107,9 +3092,9 @@ async function openApprovalModal(bookingId) {
   if (isMyTurn) {
     actionPanel.classList.remove('hidden');
     activeBookingIdForApproval = booking.id;
-    autoDrawApproverSignature();
-    setTimeout(async () => { await autoDrawApproverSignature(); }, 100);
-    setTimeout(async () => { await autoDrawApproverSignature(); }, 300);
+    // ⚠️ Call ONCE only after 350ms — multiple calls cause race conditions
+    // where each call sets canvas.width (clearing the canvas) on top of each other
+    setTimeout(() => { autoDrawApproverSignature(); }, 350);
   } else {
     actionPanel.classList.add('hidden');
     if (showEditPanel) {
