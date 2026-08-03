@@ -2734,6 +2734,53 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
   };
 }
 
+async function autoDrawApproverSignature() {
+  const canvas = document.getElementById('canvas-approver-signature');
+  const placeholder = document.getElementById('approver-sig-placeholder');
+  if (!canvas || !currentUser) return;
+
+  let targetSign = (currentUser && currentUser.sign) ? currentUser.sign : '';
+  
+  if ((!targetSign || !targetSign.startsWith('data:image')) && currentUser) {
+    const uName = (currentUser.username || '').toLowerCase();
+    try {
+      if (!usersList || usersList.length === 0) {
+        const resp = await fetch('users.json?t=' + Date.now());
+        if (resp.ok) usersList = await resp.json();
+      }
+      if (usersList && usersList.length > 0) {
+        const dbU = usersList.find(u => u.username.toLowerCase() === uName);
+        if (dbU && dbU.sign && dbU.sign.startsWith('data:image')) {
+          targetSign = dbU.sign;
+          currentUser.sign = dbU.sign;
+          localStorage.setItem('current_user', JSON.stringify(currentUser));
+        }
+      }
+    } catch(e) {
+      console.warn("Signature fetch fallback error:", e);
+    }
+  }
+
+  if (targetSign && targetSign.startsWith('data:image')) {
+    if (approverSig) {
+      approverSig.resize();
+    }
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const hRatio = canvas.width / img.width;
+      const vRatio = canvas.height / img.height;
+      const ratio = Math.min(hRatio, vRatio);
+      const x = (canvas.width - img.width * ratio) / 2;
+      const y = (canvas.height - img.height * ratio) / 2;
+      ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
+      if (placeholder) placeholder.style.display = 'none';
+    };
+    img.src = targetSign;
+  }
+}
+
 // Open Approval Details Modal
 async function openApprovalModal(bookingId) {
   if (!bookingId) return;
@@ -2892,45 +2939,8 @@ async function openApprovalModal(bookingId) {
   // Clear modal inputs
   document.getElementById('approval-comment').value = '';
   // Resize canvas and then load/draw user signature after modal is displayed
-  setTimeout(() => {
-    if (approverSig) {
-      approverSig.resize();
-      approverSig.clear();
-      
-      let targetSign = (currentUser && currentUser.sign) ? currentUser.sign : '';
-      if ((!targetSign || !targetSign.startsWith('data:image')) && currentUser) {
-        const uName = (currentUser.username || '').toLowerCase();
-        if (usersList && usersList.length > 0) {
-          const dbU = usersList.find(u => u.username.toLowerCase() === uName);
-          if (dbU && dbU.sign && dbU.sign.startsWith('data:image')) {
-            targetSign = dbU.sign;
-            currentUser.sign = dbU.sign;
-            localStorage.setItem('current_user', JSON.stringify(currentUser));
-          }
-        }
-      }
-
-      if (targetSign && targetSign.startsWith('data:image')) {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.getElementById('canvas-approver-signature');
-          if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const hRatio = canvas.width / img.width;
-            const vRatio = canvas.height / img.height;
-            const ratio = Math.min(hRatio, vRatio);
-            const x = (canvas.width - img.width * ratio) / 2;
-            const y = (canvas.height - img.height * ratio) / 2;
-            ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
-            
-            const placeholder = document.getElementById('approver-sig-placeholder');
-            if (placeholder) placeholder.style.display = 'none';
-          }
-        };
-        img.src = targetSign;
-      }
-    }
+  setTimeout(async () => {
+    await autoDrawApproverSignature();
   }, 100);
   fleetAssignBox.style.display = 'none';
   const fleetEditPanel = document.getElementById('fleet-admin-edit-panel');
