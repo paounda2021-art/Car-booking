@@ -2755,18 +2755,12 @@ async function openApprovalModal(bookingId) {
   }
 
   // Strict Permission Guard: Access limited to L2 (Fleet Admin), Booking Owner (L0), Manager (L1), and assigned Approvers
-  const isL2 = currentUser && (
-    currentUser.role === 'fleet_admin' || 
-    (currentUser.canApprove && currentUser.canApprove.includes(2))
-  );
+  const isL2 = currentUser && userHasApproveLevel(currentUser, 2);
   const isOwner = currentUser && (
     (booking.requester && currentUser.name && booking.requester.trim() === currentUser.name.trim()) ||
     (booking.requesterEmail && currentUser.email && booking.requesterEmail.toLowerCase() === currentUser.email.toLowerCase())
   );
-  const isApproverForThisBooking = currentUser && currentUser.canApprove && (
-    currentUser.canApprove.includes(booking.currentApprovalLevel) ||
-    currentUser.role === 'director' || currentUser.role === 'executive'
-  );
+  const isApproverForThisBooking = currentUser && userHasApproveLevel(currentUser, booking.currentApprovalLevel);
   const isManagerOrApprover = checkIsManagerOrApprover(booking, currentUser);
 
   if (!currentUser) {
