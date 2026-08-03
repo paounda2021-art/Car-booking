@@ -2762,10 +2762,6 @@ async function autoDrawApproverSignature() {
   const placeholder = document.getElementById('approver-sig-placeholder');
   if (!canvas || !currentUser) return;
 
-  if (approverSig) {
-    approverSig.resize();
-  }
-
   const uName = (currentUser.username || '').toLowerCase();
   
   // 1. ALWAYS load fresh users.json before resolving signature
@@ -2782,7 +2778,7 @@ async function autoDrawApproverSignature() {
   let targetSign = '';
   if (usersList && Array.isArray(usersList)) {
     const dbU = usersList.find(u => (u.username || '').toLowerCase() === uName);
-    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 100) {
+    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 50) {
       targetSign = dbU.sign.trim();
       currentUser.sign = targetSign;
       try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
@@ -2790,19 +2786,28 @@ async function autoDrawApproverSignature() {
   }
 
   // 3. Fallback to currentUser.sign if usersList didn't have it
-  if (!targetSign && currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 100) {
+  if (!targetSign && currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 50) {
     targetSign = currentUser.sign.trim();
   }
 
-  // 4. ONLY if no real signature exists in users.json or currentUser, create mock signature
+  // 4. Fallback to mock signature if no saved base64 image exists
   if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 50) {
-    console.log("No real signature in users.json for", uName, "- using mock signature.");
     targetSign = generateMockSignature(currentUser.name || 'ลงนาม');
-  } else {
-    console.log("Found real signature for", uName, "- drawing real PNG signature onto canvas!");
   }
 
-  // 5. Draw targetSign onto canvas
+  // 5. Ensure canvas width/height are set properly from layout bounding rect
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width > 50 && rect.height > 20) {
+    if (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height)) {
+      canvas.width = Math.floor(rect.width);
+      canvas.height = Math.floor(rect.height);
+    }
+  } else {
+    if (canvas.width < 100) canvas.width = 450;
+    if (canvas.height < 50) canvas.height = 150;
+  }
+
+  // 6. Draw targetSign onto canvas
   const img = new Image();
   img.onload = () => {
     const ctx = canvas.getContext('2d');
@@ -2816,7 +2821,7 @@ async function autoDrawApproverSignature() {
     if (placeholder) placeholder.style.display = 'none';
   };
   img.onerror = (err) => {
-    console.error("Failed to load real signature image:", err);
+    console.error("Failed to load signature image:", err);
   };
   img.src = targetSign;
 }
