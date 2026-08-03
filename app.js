@@ -163,18 +163,10 @@ function compressImage(file, callback) {
 function resolveManagerEmail(booking) {
   if (!booking) return 'ranida.c@fishmarket.co.th';
   
-  // Fail-safe priority override for Vichayaporn (L0) -> Patcharee (L1)
-  const reqStr = (booking.requester || '').toLowerCase();
-  const reqEmail = (booking.requesterEmail || '').toLowerCase();
-  if (reqStr.includes('วิชญาพร') || reqEmail.includes('witchayaphon')) {
-    return 'patchareeya.s@fishmarket.co.th';
-  }
-
-  const normalizeName = n => n ? n.replace(/\(.*?\)/g, '').replace(/\s+/g, '').toLowerCase() : '';
-
   // 1. Prioritize looking up requester in usersList (always accurate according to current user hierarchy!)
-  if (typeof usersList !== 'undefined' && Array.isArray(usersList) && usersList.length > 0 && booking.requester) {
+  if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
     const requesterName = booking.requester.trim();
+    const normalizeName = n => n ? n.replace(/\s+/g, '') : '';
     const reqNorm = normalizeName(requesterName);
     const userObj = usersList.find(u => 
       normalizeName(u.name) === reqNorm || 
@@ -200,9 +192,8 @@ function resolveRequesterEmail(booking) {
     return booking.requesterEmail;
   }
   if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
-    const normalizeName = n => n ? n.replace(/\(.*?\)/g, '').replace(/\s+/g, '').toLowerCase() : '';
-    const reqNorm = normalizeName(booking.requester);
-    const userObj = usersList.find(u => normalizeName(u.name) === reqNorm);
+    const requesterName = booking.requester.trim();
+    const userObj = usersList.find(u => u.name.trim() === requesterName);
     if (userObj && userObj.email && userObj.email.trim() !== '') {
       return userObj.email;
     }
@@ -673,7 +664,7 @@ async function initDatabase() {
           dbBookings = [];
         }
 
-        // Merge with local storage bookings to ensure newly created local bookings are not lost during network/cache delays
+        // Merge with local storage bookings to ensure newly updated/approved local bookings are not lost during network/cache delays
         const localDataStr = localStorage.getItem('bookings_data');
         if (localDataStr) {
           try {
@@ -681,13 +672,36 @@ async function initDatabase() {
             if (Array.isArray(localBookings)) {
               let hasMergedNew = false;
               localBookings.forEach(localB => {
-                if (localB && localB.id && localB.id !== 'system_config' && !dbBookings.some(dbB => dbB.id === localB.id)) {
+                if (!localB || !localB.id || localB.id === 'system_config') return;
+                const existingIdx = dbBookings.findIndex(dbB => dbB.id === localB.id);
+                if (existingIdx === -1) {
                   dbBookings.push(localB);
                   hasMergedNew = true;
+                } else {
+                  const dbB = dbBookings[existingIdx];
+                  const localLevel = localB.currentApprovalLevel || 1;
+                  const dbLevel = dbB.currentApprovalLevel || 1;
+                  const localCompleted = (localB.status === 'approved' || localB.status === 'rejected' || localB.status === 'cancelled');
+                  const dbCompleted = (dbB.status === 'approved' || dbB.status === 'rejected' || dbB.status === 'cancelled');
+                  
+                  if (localCompleted && !dbCompleted) {
+                    dbBookings[existingIdx] = localB;
+                    hasMergedNew = true;
+                  } else if (localLevel > dbLevel) {
+                    dbBookings[existingIdx] = localB;
+                    hasMergedNew = true;
+                  } else if (Array.isArray(localB.signatures) && Array.isArray(dbB.signatures)) {
+                    const localSigned = localB.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length;
+                    const dbSigned = dbB.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length;
+                    if (localSigned > dbSigned) {
+                      dbBookings[existingIdx] = localB;
+                      hasMergedNew = true;
+                    }
+                  }
                 }
               });
               if (hasMergedNew) {
-                console.log("🛡️ Safely merged new local bookings into fetched database!");
+                console.log("🛡️ Safely merged updated local approval states into fetched database!");
               }
             }
           } catch(e) {}
@@ -1028,21 +1042,15 @@ function userHasApproveLevel(userObj, levelNum) {
 }
 
 // Check for conflicting bookings for FMO cars
-// แทนที่ฟังก์ชันเดิมใน app.js
 function hasBookingConflict(carId, startDateStr, endDateStr, excludeId = null) {
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
-
+  
   return bookings.some(b => {
-    // กำหนดให้เช็คเฉพาะรายการที่ "ถูกจัดสรร/อนุมัติแล้วจริงๆ" (L3 ขึ้นไป)
-    const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
-    
-    // หากไม่ใช่รายการที่จัดสรรแล้ว, ถูกยกเลิก/คืนแล้ว หรือไม่ใช่รถ fmo_car ให้ข้ามไป ไม่ถือว่าทับซ้อน
-    if (b.id === excludeId || !isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== carId) return false;
-    
+    if (b.id === excludeId || b.status === 'rejected' || b.status === 'cancelled' || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== carId) return false;
     const bStart = new Date(b.startDate);
     const bEnd = new Date(b.endDate);
-    return (start < bEnd && end > bStart); // ตรวจสอบเวลาทับซ้อน
+    return (start < bEnd && end > bStart);
   });
 }
 // Central helper to update all sidebar menu items and panels based on exact user permissions
@@ -1656,19 +1664,9 @@ function updateStats() {
   if (statTotalCars) statTotalCars.textContent = `${cars.length} คัน`;
   
   const now = new Date();
-  // ค้นหาในฟังก์ชัน updateStats() และแก้ตัวแปร busyCarIds
-const busyCarIds = bookings
-  .filter(b => {
-    const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
-    if (!isAssigned || b.returnedEarly || b.travelType !== 'fmo_car') return false;
-    
-    // 🟢 เพิ่มเงื่อนไขให้เหมือนกับ renderDashboard
-    if (b.controlUnit === 'รถสวัสดิการ' && b.carPickedUp && !b.returnedEarly) {
-      return true;
-    }
-        return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
-  })
-  .map(b => b.carId);
+  const busyCarIds = bookings
+    .filter(b => (b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3)) && !b.returnedEarly && b.travelType === 'fmo_car' && new Date(b.startDate) <= now && new Date(b.endDate) >= now)
+    .map(b => b.carId);
   const availCount = cars.filter(c => !busyCarIds.includes(c.id)).length;
   if (statAvailCars) statAvailCars.textContent = `${availCount} คัน`;
 
@@ -1735,34 +1733,21 @@ const busyCarIds = bookings
   const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
   if (tabAllHistoryBadge) {
     const statusFilterSelect = document.getElementById('history-status-filter');
-    const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
-    const isL3User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(3);
-    const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
-    const filterVal = (statusFilterSelect && (isL2User || isL3User)) ? statusFilterSelect.value : 'all';
+    const isL2OrL3 = currentUser && currentUser.canApprove && (currentUser.canApprove.includes(2) || currentUser.canApprove.includes(3) || currentUser.role === 'fleet_admin');
+    const filterVal = (statusFilterSelect && isL2OrL3) ? statusFilterSelect.value : 'all';
 
     const historyCount = bookings.filter(b => {
       const isMyRequest = checkIsMyRequest(b, currentUser);
       const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
       const isCompleted = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
+      const isL4User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(4);
+      const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)));
+      const isL3User = currentUser && currentUser.canApprove && currentUser.canApprove.includes(3);
 
       let isMatchRole = false;
-      if (isL2User) {
-        if (isMyRequest) isMatchRole = true;
-        else if (b.status === 'cancelled') isMatchRole = (b.cancelledBy === 'L2');
-        else if (b.status === 'pending' || b.status.startsWith('pending')) isMatchRole = false;
-        else {
-          const hasL2Sig = Array.isArray(b.signatures) && b.signatures.some(s => s.level === 2 && (s.status === 'approved' || s.status === 'rejected' || (s.approverName && s.approverName.trim() !== '')));
-          const isL2ActionStatus = b.status === 'approved' || b.status === 'rejected' || b.status === 'waiting_for_requester_edit' || b.status === 'pending_l2_confirm';
-          const hasPassedL2 = b.currentApprovalLevel > 2;
-          isMatchRole = hasL2Sig || isL2ActionStatus || hasPassedL2;
-        }
-      } else if (isL3User) {
-        isMatchRole = true;
-      } else if (isL4User) {
-        isMatchRole = (b.status === 'approved' || isMyRequest);
-      } else if (isCompleted) {
-        isMatchRole = (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || checkCanSeeAll(currentUser));
-      }
+      if (isL2User || isL3User) isMatchRole = true;
+      else if (isL4User) isMatchRole = (b.status === 'approved' || isMyRequest);
+      else if (isCompleted) isMatchRole = (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover) || checkCanSeeAll(currentUser));
 
       if (!isMatchRole) return false;
 
@@ -1790,74 +1775,36 @@ function renderDashboard() {
 
   cars.forEach(car => {
     // Find if car has an active booking right now (approved OR pending-assigned by L2)
-    // ค้นหาในฟังก์ชัน renderDashboard() และแก้ตัวแปร activeBkg
     const activeBkg = bookings.find(b => {
       const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
-      if (!isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
-      
-      if (b.controlUnit === 'รถสวัสดิการ' && b.carPickedUp && !b.returnedEarly) {
-        return true;
-      }
-      const bStart = new Date(b.startDate);
-      const bEnd = (b.returnedEarly && b.actualReturnTime) ? new Date(b.actualReturnTime) : new Date(b.endDate);
-      return bStart <= now && bEnd >= now;
+      if (!isAssigned || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+      return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
     });
 
-    let upcomingBkg = null;
-    if (!activeBkg) {
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(now);
-      todayEnd.setHours(23, 59, 59, 999);
-
-      upcomingBkg = bookings.find(b => {
-        const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
-        if (!isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
-        const bStart = new Date(b.startDate);
-        return bStart > now && bStart >= todayStart && bStart <= todayEnd;
-      });
-    }
-
+    const isAvailable = !activeBkg;
     let cardClass = 'car-card available';
     let badgeText = '🟢 ว่าง';
     let badgeClass = 'car-status-badge status-avail';
     let statusDesc = 'ว่างพร้อมปฏิบัติหน้าที่';
+    let actionBtnHtml = '';
 
     if (activeBkg) {
       const isApproved = activeBkg.status === 'approved';
       cardClass = isApproved ? 'car-card occupied' : 'car-card occupied pending-res';
       badgeText = isApproved ? '🔴 ปฏิบัติงาน' : '🟡 จองแล้ว (รออนุมัติ)';
       badgeClass = isApproved ? 'car-status-badge status-busy' : 'car-status-badge status-pending';
-      let dept2Val = (activeBkg.office && activeBkg.office !== '-') ? activeBkg.office : '';
-      if (!dept2Val && activeBkg.requester && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
-        const uObj = usersList.find(u => u.name && u.name.trim() === activeBkg.requester.trim());
-        if (uObj) dept2Val = uObj.department2 || uObj.department1 || '';
-      }
-      if (!dept2Val) {
-        dept2Val = [activeBkg.office, activeBkg.division, activeBkg.department, activeBkg.position]
-          .find(d => d && d.trim() !== '' && d.trim() !== '-') || '';
-      }
-      const deptStr = dept2Val ? ` / ${dept2Val}` : '';
-      statusDesc = isApproved ? `ไม่ว่าง (เรื่อง: ${activeBkg.purpose}${deptStr})` : `จองล่วงหน้า (เรื่อง: ${activeBkg.purpose}${deptStr})`;
-    } else if (upcomingBkg) {
-      const isApproved = upcomingBkg.status === 'approved';
-      cardClass = 'car-card occupied pending-res';
-      const timeStartStr = formatThaiTimeOnlyNoSuffix(upcomingBkg.startDate);
-      const timeEndStr = formatThaiTimeOnlyNoSuffix(upcomingBkg.endDate);
-      badgeText = isApproved ? `🟡 มีคิววันนี้ (${timeStartStr} น.)` : `🟡 จองวันนี้ (${timeStartStr} น.)`;
-      badgeClass = 'car-status-badge status-pending';
+      statusDesc = isApproved ? `ไม่ว่าง (เรื่อง: ${activeBkg.purpose})` : `จองล่วงหน้า (เรื่อง: ${activeBkg.purpose})`;
 
-      let dept2Val = (upcomingBkg.office && upcomingBkg.office !== '-') ? upcomingBkg.office : '';
-      if (!dept2Val && upcomingBkg.requester && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
-        const uObj = usersList.find(u => u.name && u.name.trim() === upcomingBkg.requester.trim());
-        if (uObj) dept2Val = uObj.department2 || uObj.department1 || '';
+      const isL2 = currentUser && currentUser.role === 'fleet_admin';
+      const isRequester = currentUser && activeBkg.requester === currentUser.name;
+      const isDriver = currentUser && activeBkg.driverName && currentUser.name && activeBkg.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
+      if ((isL2 || isRequester || isDriver) && isApproved) {
+        actionBtnHtml = `
+          <button class="btn btn-warning btn-sm btn-return-early" data-booking-id="${activeBkg.id}" style="width: 100%; margin-top: 0.5rem; font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+            เปลี่ยนเป็นว่าง (คืนรถก่อนเวลา)
+          </button>
+        `;
       }
-      if (!dept2Val) {
-        dept2Val = [upcomingBkg.office, upcomingBkg.division, upcomingBkg.department, upcomingBkg.position]
-          .find(d => d && d.trim() !== '' && d.trim() !== '-') || '';
-      }
-      const deptStr = dept2Val ? ` / ${dept2Val}` : '';
-      statusDesc = `ว่างขณะนี้ (มีคิววันนี้ ${timeStartStr}-${timeEndStr} น. เรื่อง: ${upcomingBkg.purpose}${deptStr})`;
     }
 
     const card = document.createElement('div');
@@ -1876,6 +1823,7 @@ function renderDashboard() {
           ${car.phone ? `<p class="car-phone">เบอร์โทร: <strong>${car.phone}</strong></p>` : ''}
         ` : ''}
         <p class="car-status-desc">${statusDesc}</p>
+        ${actionBtnHtml}
       </div>
     `;
     carListContainer.appendChild(card);
@@ -1929,18 +1877,16 @@ function renderTimelineScheduler() {
     });
 
     const todayBookings = carBookings.filter(b => {
-      const effEnd = (b.returnedEarly && b.actualReturnTime) ? b.actualReturnTime : b.endDate;
       const bStart = new Date(b.startDate);
-      const bEnd = new Date(effEnd);
+      const bEnd = new Date(b.endDate);
       return bStart <= timelineEnd && bEnd >= timelineStart;
     });
 
     let bookingBarsHtml = '';
 
     todayBookings.forEach(b => {
-      const effEnd = (b.returnedEarly && b.actualReturnTime) ? b.actualReturnTime : b.endDate;
       const bStart = new Date(b.startDate);
-      const bEnd = new Date(effEnd);
+      const bEnd = new Date(b.endDate);
 
       const barStart = bStart < timelineStart ? timelineStart : bStart;
       const barEnd = bEnd > timelineEnd ? timelineEnd : bEnd;
@@ -1953,21 +1899,15 @@ function renderTimelineScheduler() {
         const widthPercent = (durationMin / 1440) * 100;
 
         let badgeClass = 'timeline-badge';
-        if (b.returnedEarly) badgeClass += ' returned';
-        else if (b.status === 'approved') badgeClass += ' approved';
+        if (b.status === 'approved') badgeClass += ' approved';
         else if (b.status === 'pending' || b.status.startsWith('pending')) badgeClass += ' pending';
 
         const sh = formatThaiTimeOnlyNoSuffix(b.startDate);
-        const eh = formatThaiTimeOnlyNoSuffix(effEnd);
+        const eh = formatThaiTimeOnlyNoSuffix(b.endDate);
 
-        let checkPrefix = '';
-        if (b.returnedEarly) checkPrefix = '🏁 ';
-        else if (b.driverAccepted) checkPrefix = '✅ ';
-
-        const returnSuffix = b.returnedEarly ? ' (คืนรถแล้ว)' : '';
-
+        const checkPrefix = b.driverAccepted ? '✅ ' : '';
         bookingBarsHtml += `
-          <div class="${badgeClass}" title="${b.purpose} (${sh} - ${eh}) ผู้จอง: ${b.requester}${returnSuffix}" style="position: absolute; left: ${leftPercent}%; width: ${widthPercent}%; top: 50%; transform: translateY(-50%); height: 38px; border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: default; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-sm); z-index: 2;">
+          <div class="${badgeClass}" title="${b.purpose} (${sh} - ${eh}) ผู้จอง: ${b.requester}" style="position: absolute; left: ${leftPercent}%; width: ${widthPercent}%; top: 50%; transform: translateY(-50%); height: 38px; border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; line-height: 1.2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: default; display: flex; flex-direction: column; justify-content: center; box-shadow: var(--shadow-sm); z-index: 2;">
             <strong style="color: var(--text-main); text-overflow: ellipsis; overflow: hidden; display: block;">${checkPrefix}${b.purpose}</strong>
             <span style="color: var(--text-muted); font-size: 0.65rem;">${sh}-${eh} (${b.requester})</span>
           </div>
@@ -2047,7 +1987,7 @@ function helperCreateTableRow(b, isPendingForMe) {
   let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
   if (b.status === 'cancelled') {
     statusClass = 'danger';
-    const byL = b.cancelledBy || ((b.cancelReason && (b.cancelReason.includes('ผู้จัด') || b.cancelReason.includes('L2'))) ? 'L2' : 'L0');
+    const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
     statusText = `🚫 ยกเลิกโดย: ${byL}`;
   } else if (b.status === 'cancellation_requested') {
     statusClass = 'warning';
@@ -2221,7 +2161,7 @@ function renderBookingsLists() {
 
     if (b.status === 'cancelled') {
       statusClass = 'danger';
-      const byL = b.cancelledBy || ((b.cancelReason && (b.cancelReason.includes('ผู้จัด') || b.cancelReason.includes('L2'))) ? 'L2' : 'L0');
+      const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
       statusText = `🚫 ยกเลิกโดย: ${byL}`;
     } else if (b.status === 'cancellation_requested') {
       statusClass = 'warning';
@@ -2381,36 +2321,10 @@ function renderBookingsLists() {
     const isL3User = userHasApproveLevel(currentUser, 3);
     const isL4User = userHasApproveLevel(currentUser, 4);
 
+    // 🎯 เงื่อนไข: ใบจองที่จะมาแสดงที่ L2/L3/L4 ในประวัติ ต้องผ่าน L1 เรียบร้อยแล้ว (currentApprovalLevel >= 2 หรือ อนุมัติ/ปฏิเสธ/ยกเลิกแล้ว)
     const hasPassedL1 = b.currentApprovalLevel >= 2 || b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled' || b.status === 'cancellation_requested';
 
-    // 🎯 สำหรับ L2: แสดงเฉพาะรายการที่ L2 ได้ดำเนินการแล้ว (อนุมัติ/จัดรถ/ปฏิเสธ/ยกเลิกโดย L2) หรือรายการที่ L2 ขอเองเท่านั้น
-    const hasL2Processed = (booking) => {
-      if (isMyRequest) return true;
-      if (booking.status === 'cancelled') {
-        return booking.cancelledBy === 'L2';
-      }
-      if (booking.status === 'pending' || booking.status.startsWith('pending')) {
-        return false;
-      }
-      const hasL2Sig = Array.isArray(booking.signatures) && booking.signatures.some(s => s.level === 2 && (s.status === 'approved' || s.status === 'rejected' || (s.approverName && s.approverName.trim() !== '')));
-      const isL2ActionStatus = booking.status === 'approved' || booking.status === 'rejected' || booking.status === 'waiting_for_requester_edit' || booking.status === 'pending_l2_confirm';
-      const hasPassedL2 = booking.currentApprovalLevel > 2;
-
-      return hasL2Sig || isL2ActionStatus || hasPassedL2;
-    };
-
-    const isL4Only = isL4User && !isL2User && !isL3User;
-
-    if (isL4Only) {
-      // 🎯 L4 เห็นเฉพาะรายการที่อนุมัติเสร็จสิ้นแล้วเท่านั้น (status === 'approved') หรือรายการที่ตนเองเป็นผู้ขอ
-      if (b.status === 'approved' || isMyRequest) {
-        allBookingsList.push({ booking: b, isPendingForMe });
-      }
-    } else if (isL2User) {
-      if (hasL2Processed(b)) {
-        allBookingsList.push({ booking: b, isPendingForMe });
-      }
-    } else if (isL3User || (canSeeAll && !isL4User)) {
+    if (isL2User || isL3User || isL4User || canSeeAll) {
       if (hasPassedL1 || isMyRequest || isManagerOrApprover) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
@@ -2430,7 +2344,6 @@ function renderBookingsLists() {
 
   // Handle Status Filter Bar Visibility and Filtering for L2/L3/L4
   const historyFilterBar = document.getElementById('history-filter-bar');
-  const statusFilterGroup = document.getElementById('history-status-group') || document.getElementById('history-status-filter');
   const statusFilterSelect = document.getElementById('history-status-filter');
   const historySearchInput = document.getElementById('history-search-input');
   
@@ -2442,11 +2355,6 @@ function renderBookingsLists() {
     historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
   }
 
-  // 🎯 ซ่อนกลุ่มตัวกรองสถานะใบจองทั้งหมด (ทั้ง Label "🔍 กรองตามสถานะใบจอง:" และ Dropdown) สำหรับ L4
-  if (statusFilterGroup) {
-    statusFilterGroup.style.display = (isL2User || isL3User) ? 'flex' : 'none';
-  }
-
   const filterVal = statusFilterSelect ? statusFilterSelect.value : 'all';
   const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
 
@@ -2455,16 +2363,11 @@ function renderBookingsLists() {
       const b = item.booking;
       const st = b.status;
       let matchStatus = true;
-
-      if (isL4Only) {
-        matchStatus = (st === 'approved' || checkIsMyRequest(b, currentUser));
-      } else if (filterVal !== 'all' && (isL2User || isL3User)) {
-        if (filterVal === 'approved') matchStatus = (st === 'approved');
-        else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
-        else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
-        else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
-        else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
-      }
+      if (filterVal === 'approved') matchStatus = (st === 'approved');
+      else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
+      else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
+      else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
+      else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
 
       let matchSearch = true;
       if (searchVal) {
@@ -2551,11 +2454,6 @@ function renderBookingsLists() {
       </div>
     `
   );
-
-  const tabAllHistoryBadge = document.getElementById('tab-all-history-count');
-  if (tabAllHistoryBadge) {
-    tabAllHistoryBadge.textContent = filteredAllBookingsList.length;
-  }
 
   updateStats();
 }
@@ -3179,10 +3077,39 @@ async function openApprovalModal(bookingId) {
     driverAcceptPanel.style.display = 'none';
   }
 
-  // Handle Return Early Panel display (Disabled: Return action handled via LINE notification button)
+  // Handle Return Early Panel display
   const returnEarlyPanel = document.getElementById('return-early-action-panel');
   if (returnEarlyPanel) {
-    returnEarlyPanel.style.display = 'none';
+    const now = new Date();
+    const startD = new Date(booking.startDate);
+    const endD = new Date(booking.endDate);
+    const isActive = booking.status === 'approved' && startD <= now && endD >= now;
+    
+    const isL2 = currentUser && currentUser.role === 'fleet_admin';
+    const isRequester = currentUser && (booking.requester === currentUser.name || booking.username === currentUser.username);
+    const isDriver = currentUser && booking.driverName && currentUser.name && booking.driverName.replace(/\s+/g, '') === currentUser.name.replace(/\s+/g, '');
+    
+    if ((isActive && (isRequester || isDriver)) || (booking.status === 'approved' && isL2)) {
+      returnEarlyPanel.style.display = 'block';
+      const btnReturnEarly = document.getElementById('btn-modal-return-early');
+      if (btnReturnEarly) {
+        btnReturnEarly.onclick = () => {
+          booking.endDate = new Date().toISOString();
+          booking.returnedEarly = true;
+          saveBookings();
+
+          // Trigger LINE status update (finish)
+          let carObj = cars.find(c => c.id === booking.carId);
+          const carPlate = carObj ? carObj.plate : '-';
+          triggerLineNotification(booking, carPlate, 'finish');
+
+          localStorage.setItem('return_early_toast_success', `ทำรายการคืนรถยนต์ก่อนเวลา เลขที่ใบคำขอ ${booking.id} เรียบร้อยแล้ว`);
+          window.location.reload();
+        };
+      }
+    } else {
+      returnEarlyPanel.style.display = 'none';
+    }
   }
 }
 
@@ -3268,7 +3195,7 @@ function renderApprovalPipeline(booking) {
 }
 
 // Handle Approve / Reject Actions
-function handleApprovalAction(isApproved) {
+async function handleApprovalAction(isApproved) {
   if (!activeBookingIdForApproval) return;
   
   if (approverSig.isEmpty()) {
@@ -3299,7 +3226,7 @@ function handleApprovalAction(isApproved) {
         booking.driverName = '-';
         booking.waitingForRequesterInput = true;
         
-        saveBookings();
+        await saveBookings();
         document.getElementById('modal-approval').classList.remove('active');
         
         // Re-render UI views
@@ -3390,7 +3317,7 @@ function handleApprovalAction(isApproved) {
     }
   }
 
-  saveBookings();
+  await saveBookings();
   document.getElementById('modal-approval').classList.remove('active');
   
   // Re-render UI views
@@ -4881,7 +4808,7 @@ function setupEventListeners() {
 
       booking.status = 'cancelled';
       booking.cancelReason = 'ผู้ใช้ถอนคำขอ';
-      booking.cancelledBy = isRequester ? 'L0' : (isFleetAdmin ? 'L2' : 'L0');
+      booking.cancelledBy = isFleetAdmin ? 'L2' : 'L0';
       saveBookings();
       showToast("ถอนคำขอและยกเลิกใบจองเรียบร้อยแล้ว", "success");
       document.getElementById('modal-approval').classList.remove('active');
@@ -6079,10 +6006,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const booking = bookings.find(b => b.id === actionBookingId);
     if (booking) {
       booking.returnedEarly = true;
-      const tzOffset = (new Date()).getTimezoneOffset() * 60000;
-      const localNowStr = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 16);
-      booking.endDate = localNowStr;
-      booking.actualReturnTime = localNowStr;
+      booking.endDate = new Date().toISOString();
       saveBookings();
 
       // Trigger LINE status update (finish)
@@ -6588,7 +6512,7 @@ window.performExportToCSV = function(list, startVal, endVal) {
     
     let statusText = `รออนุมัติ (L${b.currentApprovalLevel})`;
     if (b.status === 'cancelled') {
-      const byL = b.cancelledBy || ((b.cancelReason && (b.cancelReason.includes('ผู้จัด') || b.cancelReason.includes('L2'))) ? 'L2' : 'L0');
+      const byL = b.cancelledBy || (b.cancelReason === 'ผู้ใช้ถอนคำขอ' ? 'L0' : 'L2');
       statusText = `ยกเลิกโดย: ${byL}`;
     } else if (b.status === 'cancellation_requested') {
       statusText = 'ร้องขอยกเลิก';

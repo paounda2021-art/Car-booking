@@ -84,6 +84,7 @@ db.exec(`
     manager_email TEXT,
     role TEXT,
     canApprove TEXT,
+    sign TEXT,
     customApprovalLevels TEXT
   );
 `);
@@ -95,6 +96,7 @@ try { db.exec("ALTER TABLE cars ADD COLUMN icon TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN driverName TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN phone TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN customApprovalLevels TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN sign TEXT;"); } catch(e) {}
 
 // SQLite Helper Functions
 
@@ -188,8 +190,18 @@ function sqliteSaveBookings(bookingsList) {
   }
 }
 
-// Automatic startup sync: load bookings.json into SQLite on server startup
+// Automatic startup sync: load bookings.json and users.json into SQLite on server startup
 try {
+  const usersJsonPath = path.join(ROOT_DIR, 'users.json');
+  if (fs.existsSync(usersJsonPath)) {
+    const rawUsers = fs.readFileSync(usersJsonPath, 'utf8').replace(/^\uFEFF/, '');
+    const fileUsers = JSON.parse(rawUsers);
+    if (fileUsers && fileUsers.length > 0) {
+      console.log(`[Startup Auto-Sync] Syncing ${fileUsers.length} user records from users.json to SQLite database...`);
+      sqliteSaveUsers(fileUsers);
+    }
+  }
+
   const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
   if (fs.existsSync(bookingsJsonPath)) {
     const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
