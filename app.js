@@ -571,14 +571,13 @@ function getSignatureImg(level, signatureVal, approverName) {
   else if (level === 3) username = 'saisunee.p';
   else if (level === 4) username = 'piyawan.k';
   
-  if (username && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
-    const u = usersList.find(x => (x.username || '').toLowerCase() === username.toLowerCase());
+  if (username && typeof usersList !== 'undefined') {
+    const u = usersList.find(x => x.username.toLowerCase() === username.toLowerCase());
     if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
       return u.sign.trim();
     }
-  } else if (approverName && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
-    const cleanName = approverName.replace(/\s+/g, '').toLowerCase();
-    const u = usersList.find(x => (x.name || '').replace(/\s+/g, '').toLowerCase().includes(cleanName) || cleanName.includes((x.name || '').replace(/\s+/g, '').toLowerCase()));
+  } else if (level === 0 && approverName && typeof usersList !== 'undefined') {
+    const u = usersList.find(x => x.name.replace(/\s+/g, '') === approverName.replace(/\s+/g, ''));
     if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
       return u.sign.trim();
     }
@@ -2761,21 +2760,15 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
 async function autoDrawApproverSignature() {
   const canvas = document.getElementById('canvas-approver-signature');
   const placeholder = document.getElementById('approver-sig-placeholder');
-  if (!canvas) return;
+  if (!canvas || !currentUser) return;
 
-  const booking = activeBookingIdForApproval ? bookings.find(b => b.id === activeBookingIdForApproval) : null;
-  const currentLvl = booking ? booking.currentApprovalLevel : 4;
+  const uName = (currentUser.username || '').toLowerCase();
+  const uEmail = (currentUser.email || '').toLowerCase();
+  const uNameClean = (currentUser.name || '').replace(/\s+/g, '');
 
-  let targetUsername = 'piyawan.k';
-  if (currentLvl === 1) targetUsername = 'prathum.c';
-  else if (currentLvl === 2) targetUsername = 'chalong.c';
-  else if (currentLvl === 3) targetUsername = 'saisunee.p';
-  else if (currentLvl === 4) targetUsername = 'piyawan.k';
-
-  if (currentUser && currentUser.username) {
-    targetUsername = currentUser.username.toLowerCase();
-  }
-
+  // Hide placeholder text immediately
+  if (placeholder) placeholder.style.display = 'none';
+  
   // 1. ALWAYS load fresh users.json before resolving signature
   try {
     const resp = await fetch('users.json?t=' + Date.now());
@@ -2786,57 +2779,50 @@ async function autoDrawApproverSignature() {
     console.warn("Signature fetch usersList error:", e);
   }
 
-  // 2. Find target user in fresh usersList — match by username, email, or name
+  // 2. Find target user in fresh usersList by username, email, or name
   let targetSign = '';
   if (usersList && Array.isArray(usersList)) {
-    const normalizeStr = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
-    const dbU = usersList.find(u => {
-      const uUsernameMatch = u.username && normalizeStr(u.username) === normalizeStr(targetUsername);
-      const uEmailMatch = currentUser && currentUser.email && u.email && normalizeStr(u.email) === normalizeStr(currentUser.email);
-      const uNameMatch = currentUser && currentUser.name && u.name && normalizeStr(u.name) === normalizeStr(currentUser.name);
-      return uUsernameMatch || uEmailMatch || uNameMatch;
-    }) || usersList.find(u => (u.username || '').toLowerCase() === 'piyawan.k');
-
+    const dbU = usersList.find(u => 
+      (u.username && u.username.toLowerCase() === uName) ||
+      (u.email && u.email.toLowerCase() === uEmail) ||
+      (u.name && u.name.replace(/\s+/g, '') === uNameClean)
+    );
     if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 50) {
       targetSign = dbU.sign.trim();
+      currentUser.sign = targetSign;
+      try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
     }
   }
 
-  // 3. Fallback to currentUser.sign or piyawan.k sign
+  // 3. Fallback to currentUser.sign if usersList didn't have it
   if (!targetSign && currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 50) {
     targetSign = currentUser.sign.trim();
   }
 
   // 4. Fallback to mock signature if no saved base64 image exists
   if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 50) {
-    targetSign = generateMockSignature(currentUser ? currentUser.name : 'น.ส.ปิยวรรณ  แก้วกล้า');
+    targetSign = generateMockSignature(currentUser.name || 'ลงนาม');
   }
 
-  // Hide placeholder immediately
-  if (placeholder) placeholder.style.display = 'none';
-
-  // 5. Set canvas dimensions — fixed height 180 matches CSS .signature-canvas-container
+  // 5. Ensure canvas width/height match parent box dimensions properly
   const parent = canvas.parentElement || canvas.parentNode;
-  const parentWidth = parent ? (parent.offsetWidth || parent.clientWidth) : 560;
-  canvas.width = parentWidth > 100 ? parentWidth : 560;
-  canvas.height = 180;
+  const parentWidth = parent ? parent.clientWidth : 500;
+  canvas.width = parentWidth > 100 ? parentWidth : 500;
+  canvas.height = 150;
 
-  // 6. Draw targetSign onto canvas — single draw, no recursive redraw
+  // 6. Draw targetSign onto canvas
   const img = new Image();
   img.onload = () => {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const pad = 16;
-    const availW = canvas.width - (pad * 2);
-    const availH = canvas.height - (pad * 2);
-    const hRatio = availW / img.width;
-    const vRatio = availH / img.height;
+    const targetW = canvas.width * 0.85;
+    const targetH = canvas.height * 0.85;
+    const hRatio = targetW / img.width;
+    const vRatio = targetH / img.height;
     const ratio = Math.min(hRatio, vRatio);
-    const drawW = img.width * ratio;
-    const drawH = img.height * ratio;
-    const x = (canvas.width - drawW) / 2;
-    const y = (canvas.height - drawH) / 2;
-    ctx.drawImage(img, x, y, drawW, drawH);
+    const x = (canvas.width - img.width * ratio) / 2;
+    const y = (canvas.height - img.height * ratio) / 2;
+    ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
     if (placeholder) placeholder.style.display = 'none';
   };
   img.onerror = (err) => {
@@ -3099,8 +3085,9 @@ async function openApprovalModal(bookingId) {
     actionPanel.classList.remove('hidden');
     activeBookingIdForApproval = booking.id;
     autoDrawApproverSignature();
-    setTimeout(() => { autoDrawApproverSignature(); }, 150);
-    setTimeout(() => { autoDrawApproverSignature(); }, 400);
+    setTimeout(async () => {
+      await autoDrawApproverSignature();
+    }, 150);
   } else {
     actionPanel.classList.add('hidden');
     if (showEditPanel) {
@@ -3348,25 +3335,6 @@ function renderApprovalPipeline(booking) {
     } else if (rejectLevel !== null && step.level > rejectLevel) {
       statusText = 'ไม่ดำเนินการต่อ';
       icon = '⚪';
-    } else {
-      // Pending step: render expected approver & signature preview (especially for L4 Piyawan)
-      if (step.level === booking.currentApprovalLevel || step.level === 4) {
-        let approverNameDef = '';
-        if (step.level === 1) approverNameDef = 'หัวหน้าสำนักงาน / หัวหน้าแผนก (L1)';
-        else if (step.level === 2) approverNameDef = 'นายฉลอง เจียมผักแว่น (L2)';
-        else if (step.level === 3) approverNameDef = 'น.ส.สายสุนีย์ พูลวาณิชย์สกุล (L3)';
-        else if (step.level === 4) approverNameDef = 'น.ส.ปิยวรรณ  แก้วกล้า (L4)';
-
-        const previewSigImg = getSignatureImg(step.level, null, approverNameDef);
-        detailsHtml = `
-          <div class="pipeline-details" style="margin-top:0.4rem; padding-left:1.5rem; font-size:0.8rem; line-height:1.4; opacity: 0.9;">
-            <span>ผู้มีอำนาจลงนาม: <strong>${approverNameDef}</strong></span><br>
-            <div style="margin-top:0.25rem;">
-              ${(previewSigImg && previewSigImg.length > 30) ? `<img src="${previewSigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">` : ''}
-            </div>
-          </div>
-        `;
-      }
     }
 
     const stepDiv = document.createElement('div');
