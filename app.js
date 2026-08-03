@@ -559,6 +559,26 @@ function generateMockSignature(name) {
   }
 }
 
+function dataURItoBlob(dataURI) {
+  try {
+    if (!dataURI || typeof dataURI !== 'string') return null;
+    const cleanURI = dataURI.trim().replace(/[\r\n]/g, '');
+    const parts = cleanURI.split(',');
+    if (parts.length < 2) return null;
+    const byteString = atob(parts[1]);
+    const mimeString = parts[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
+  } catch (e) {
+    console.error("dataURItoBlob error:", e);
+    return null;
+  }
+}
+
 // Get signature image (database base64 or generated mock signature)
 function getSignatureImg(level, signatureVal, approverName) {
   if (signatureVal && typeof signatureVal === 'string' && signatureVal.trim().startsWith('data:image') && signatureVal.length > 30) {
@@ -571,8 +591,11 @@ function getSignatureImg(level, signatureVal, approverName) {
   else if (level === 3) username = 'saisunee.p';
   else if (level === 4) username = 'piyawan.k';
   
-  if (username && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
-    const u = usersList.find(x => x.username && x.username.toLowerCase() === username.toLowerCase());
+  if (typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+    const u = usersList.find(x => 
+      (username && x.username && x.username.toLowerCase() === username.toLowerCase()) ||
+      (level === 4 && (x.username === 'piyawan.k' || x.username === 'supbhachart.c' || (x.name && x.name.includes('ปิยวรรณ'))))
+    );
     if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
       return u.sign.trim().replace(/[\r\n]/g, '');
     }
@@ -2815,7 +2838,10 @@ async function autoDrawApproverSignature() {
   canvas.width = parentWidth > 100 ? parentWidth : 500;
   canvas.height = 150;
 
-  // 6. Draw targetSign onto canvas
+  // 6. Load and draw targetSign onto canvas using Blob URL (prevents ERR_INVALID_URL)
+  const blob = dataURItoBlob(targetSign);
+  const objectUrl = blob ? URL.createObjectURL(blob) : targetSign;
+
   const img = new Image();
   img.onload = () => {
     const ctx = canvas.getContext('2d');
@@ -2827,9 +2853,11 @@ async function autoDrawApproverSignature() {
     const y = (canvas.height - img.height * ratio) / 2;
     ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
     if (placeholder) placeholder.style.display = 'none';
+    if (blob) URL.revokeObjectURL(objectUrl);
   };
   img.onerror = (err) => {
-    console.error("Failed to load signature image:", err);
+    console.error("Failed to load signature image, using fallback mock:", err);
+    if (blob) URL.revokeObjectURL(objectUrl);
     const mock = generateMockSignature(currentUser.name || 'ลงนาม');
     if (mock) {
       const mockImg = new Image();
@@ -2842,7 +2870,7 @@ async function autoDrawApproverSignature() {
       mockImg.src = mock;
     }
   };
-  img.src = targetSign;
+  img.src = objectUrl;
 }
 
 // Open Approval Details Modal

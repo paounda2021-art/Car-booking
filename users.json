@@ -164,7 +164,9 @@
     "department1": "ฝบง.",
     "department2": "",
     "role": "executive",
-    "canApprove": [4],
+    "canApprove": [
+      4
+    ],
     "manager_email": "supbhachart.c@fishmarket.co.th",
     "sign": "data:image/png;base64,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",
     "customApprovalLevels": null
@@ -230,7 +232,11 @@
     "department1": "ฝสศ.",
     "department2": "สสส.",
     "role": "director",
-    "canApprove": [1, 3, 4],
+    "canApprove": [
+      1,
+      3,
+      4
+    ],
     "manager_email": "wasanchai.j@fishmarket.co.th",
     "sign": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIgAAAA8CAYAAAC94fIxAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAPTSURBVHhe7dpbb9pmGAfwfrXtetIudlCvNm3rpK2dtmWHlGwiTVYSikKzNiFQiCGQYLAdTg4YMOCYAEmWtFu3Tq007cP8J4MCAZtUAipF0/93hd+DQe/z2O9jixs3iIiIiIiIiIiIiIiIiIiIiOiyk+NzZDMHGG0n6hKTCpODnGmlBpODxlMLVSbI/03T+INBJWdV7Rym8fdMEuS4czaT89A1IaVK3YDWKi/ws2sTu3uTbw+d9hkq5frE8+maiUdT/WCq+VMszG/Cv6bA7Q5NFGSj0UJNP5xoLl0ze/G0LZBq4TlufbaCt9/6BCsrUVt/tVq2tV12oFau7KcZO2k/m/mCn5yeIRgKX3nevT0DebVpG/PprTm89/4XMJsvbH1bwQhkJWdrpymUajUUSib0+m/dha3XjxHaiiOVVHHcevraxdYPO9iO7b12nNloo5A3ENwSEUs4v8CKJpLQG+1uXzDoHOh7y4+QSjvXGPGE6NhOU7jvC2FxKYzbd3z4dm4VW0EJpZLzHl7IDQdGyeiQ9huIRFNIK/l+X1FtoNMcfmR9siXBuyrigTeNQGiQIGqxhQe+beQKZretUKwisp3FQfHU8TdEBNmxPZMdfD/N0H7+HB6PBDH5DP61LFIp+239QiQkodP6s9//3fdeFLXeFnTY/L3fHgo4X8l+Xxly6iWS4hFyaqc7pnn0Cq6FddTqg/l3brsc51tCYRFpyf6W9KDI2uONKFdeIRzuXb1XyWVq2Inu98cpSgnRnRIaxj9Dc/eVKtote31gWXbn8fihCVnpbWcWw3iJmNB7zL3gmvc4zrcIQgqR7eG7hVaujR1PU4gnylj1iige/IWPP1q8cpF3ogrEZKY/Znc3g3LF/kLKqjFG2yxL92L41a/j5ge/4O7Co/6Y+btryCiDBG23j7G86HM8h2VjQ7D1FVTN1kZTqmhNuBYeolzu1QrxhIbAhgKf1x4Ai5TOQtMGgTDqJ/D7g91jrfi0O9f6LAjS0PxAQMCKJ9Bv+/GHYLfOuTj+8ObnaB097x/Lsgy/bzB+lHW+y8dHLedahaY0981PcC8OrmTL4/UEVu/3gj5Kr9hv44dmB7GYgq+/8uDdd77EknsdTXM4YJXK0SCpGv9ClntPKRek/eH/a5jGIXRteMyonUQOsXgeomgVs5O/daUxZCmHzY0nM1tYvWxCzenIZ66+1QcCcZimfVuahFEfX0zTlPSq82PsmyZJ/HcXjSEISSYHjRcJJ5ggNJ5WZM1AYyR3s0wOGk+WCkwQIiIiIiIiIiIiIiIiIiIiIiIiIiIiouvmP6r6TVR7ZrPFAAAAAElFTkSuQmCC",
     "customApprovalLevels": null
@@ -270,7 +276,11 @@
     "department1": "ฝบง.",
     "department2": "สพด.",
     "role": "director",
-    "canApprove": [1, 3, 4],
+    "canApprove": [
+      1,
+      3,
+      4
+    ],
     "manager_email": "piyawan.k@fishmarket.co.th",
     "sign": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIgAAAA8CAYAAAC94fIxAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAPTSURBVHhe7dpbb9pmGAfwfrXtetIudlCvNm3rpK2dtmWHlGwiTVYSikKzNiFQiCGQYLAdTg4YMOCYAEmWtFu3Tq007cP8J4MCAZtUAipF0/93hd+DQe/z2O9jixs3iIiIiIiIiIiIiIiIiIiIiOiyk+NzZDMHGG0n6hKTCpODnGmlBpODxlMLVSbI/03T+INBJWdV7Rym8fdMEuS4czaT89A1IaVK3YDWKi/ws2sTu3uTbw+d9hkq5frE8+maiUdT/WCq+VMszG/Cv6bA7Q5NFGSj0UJNP5xoLl0ze/G0LZBq4TlufbaCt9/6BCsrUVt/tVq2tV12oFau7KcZO2k/m/mCn5yeIRgKX3nevT0DebVpG/PprTm89/4XMJsvbH1bwQhkJWdrpymUajUUSib0+m/dha3XjxHaiiOVVHHcevraxdYPO9iO7b12nNloo5A3ENwSEUs4v8CKJpLQG+1uXzDoHOh7y4+QSjvXGPGE6NhOU7jvC2FxKYzbd3z4dm4VW0EJpZLzHl7IDQdGyeiQ9huIRFNIK/l+X1FtoNMcfmR9siXBuyrigTeNQGiQIGqxhQe+beQKZretUKwisp3FQfHU8TdEBNmxPZMdfD/N0H7+HB6PBDH5DP61LFIp+239QiQkodP6s9//3fdeFLXeFnTY/L3fHgo4X8l+Xxly6iWS4hFyaqc7pnn0Cq6FddTqg/l3brsc51tCYRFpyf6W9KDI2uONKFdeIRzuXb1XyWVq2Inu98cpSgnRnRIaxj9Dc/eVKtote31gWXbn8fihCVnpbWcWw3iJmNB7zL3gmvc4zrcIQgqR7eG7hVaujR1PU4gnylj1iige/IWPP1q8cpF3ogrEZKY/Znc3g3LF/kLKqjFG2yxL92L41a/j5ge/4O7Co/6Y+btryCiDBG23j7G86HM8h2VjQ7D1FVTN1kZTqmhNuBYeolzu1QrxhIbAhgKf1x4Ai5TOQtMGgTDqJ/D7g91jrfi0O9f6LAjS0PxAQMCKJ9Bv+/GHYLfOuTj+8ObnaB097x/Lsgy/bzB+lHW+y8dHLedahaY0981PcC8OrmTL4/UEVu/3gj5Kr9hv44dmB7GYgq+/8uDdd77EknsdTXM4YJXK0SCpGv9ClntPKRek/eH/a5jGIXRteMyonUQOsXgeomgVs5O/daUxZCmHzY0nM1tYvWxCzenIZ66+1QcCcZimfVuahFEfX0zTlPSq82PsmyZJ/HcXjSEISSYHjRcJJ5ggNJ5WZM1AYyR3s0wOGk+WCkwQIiIiIiIiIiIiIiIiIiIiIiIiIiIiouvmP6r6TVR7ZrPFAAAAAElFTkSuQmCC",
     "customApprovalLevels": null
@@ -284,7 +294,10 @@
     "department1": "ฝบง.",
     "department2": "สบช.",
     "role": "supervisor",
-    "canApprove": [1, 4],
+    "canApprove": [
+      1,
+      4
+    ],
     "manager_email": "piyawan.k@fishmarket.co.th",
     "sign": "",
     "customApprovalLevels": null
@@ -1248,7 +1261,7 @@
     "department2": "",
     "role": "user",
     "manager_email": "preeda.y@fishmarket.co.th",
-    "sign": "",
+    "sign": "data:image/png;base64,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",
     "customApprovalLevels": null
   },
   {
@@ -1351,7 +1364,9 @@
     "department1": "ฝบง.",
     "department2": "สพด.",
     "role": "fleet_admin",
-    "canApprove": [2],
+    "canApprove": [
+      2
+    ],
     "manager_email": "saisunee.p@fishmarket.co.th",
     "sign": "",
     "customApprovalLevels": null
@@ -1495,7 +1510,9 @@
     "department1": "ฝบง.",
     "department2": "สพด.",
     "role": "director",
-    "canApprove": [3],
+    "canApprove": [
+      3
+    ],
     "manager_email": "saisunee.p@fishmarket.co.th",
     "sign": "",
     "customApprovalLevels": null
