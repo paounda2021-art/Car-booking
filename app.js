@@ -1747,13 +1747,13 @@ function updateStats() {
   if (tabPendingBadge) tabPendingBadge.textContent = pendingCount;
 
   // 3. เพิ่มการอัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่ง
-  // (น้องเน็ตดักจับคลาส .notification-badge เผื่อไว้ให้ด้วย ป้องกันกระดิ่งไม่ยอมโชว์)
+  // 🔔 แสดงตัวเลขแจ้งเตือนงานรออนุมัติ (pendingCount) ที่กระดิ่ง เป็นอันดับแรก
   const emailBadge = document.getElementById('email-inbox-badge') || document.querySelector('.notification-badge');
   if (emailBadge) {
     const activeLogs = getActiveEmailLogs();
-    const count = activeLogs.length;
-    emailBadge.textContent = count;
-    emailBadge.style.display = count > 0 ? 'inline-block' : 'none';
+    const bellCount = pendingCount > 0 ? pendingCount : activeLogs.length;
+    emailBadge.textContent = bellCount;
+    emailBadge.style.display = bellCount > 0 ? 'inline-block' : 'none';
   }
 
   // 4. คำนวณจำนวนรายการที่ฉันขอ (L0) - เพิ่มการดักด้วยอีเมลให้แม่นยำขึ้น
@@ -2382,14 +2382,14 @@ function renderBookingsLists() {
     if (isMyRequest) {
       canShowInHistory = true;
     } else if (isL4Active) {
-      // 🎯 สำหรับ L4: แสดงเฉพาะเคสที่เสร็จสิ้นเท่านั้น (Approved, Rejected, Cancelled)
-      if (isCompleted) {
+      // 🎯 สำหรับ L4: แสดงเฉพาะเคสที่อนุมัติเสร็จสิ้นเท่านั้น (status === 'approved')
+      if (b.status === 'approved') {
         canShowInHistory = true;
       }
     } else if (isL2OrL3 || canSeeAll || isManagerOrApprover) {
       // 🎯 สำหรับ L2 และ L3: แสดงทุกสถานะ
       canShowInHistory = true;
-    } else if (isCompleted) {
+    } else if (b.status === 'approved') {
       canShowInHistory = true;
     }
 
@@ -2419,14 +2419,15 @@ function renderBookingsLists() {
   const activeLvlNow = sessionStorage.getItem('activeApprovalLevel') || 'all';
   const isL4ActiveNow = isL4UserNow && (activeLvlNow === '4' || (!isL2UserNow && !isL3UserNow));
 
-  // L2 และ L3 แสดงตัวกรอง (มีตัวกรองค้นหาด้วย)
-  // L4 ไม่ต้องมีกรอง (ซ่อนแถบตัวกรองเด็ดขาด)
   const isL2OrL3Filter = (isL2UserNow || isL3UserNow) && !isL4ActiveNow;
+  const isL2OrL3OrL4 = isL2OrL3Filter || isL4ActiveNow || (currentUser && checkCanSeeAll(currentUser));
 
+  // แถบตัวกรองแสดงให้ L2, L3, L4 (L4 จะมีช่องค้นหาข้อความไว้ใช้งาน)
   if (historyFilterBar) {
-    historyFilterBar.style.display = isL2OrL3Filter ? 'flex' : 'none';
+    historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
   }
 
+  // Dropdown สถานะแสดงเฉพาะ L2 และ L3 (ซ่อนสำหรับ L4)
   if (historyStatusLabel && historyStatusSelect) {
     if (isL2OrL3Filter) {
       historyStatusLabel.style.display = 'inline-flex';
@@ -2438,18 +2439,20 @@ function renderBookingsLists() {
   }
 
   const filterVal = (historyStatusSelect && isL2OrL3Filter) ? historyStatusSelect.value : 'all';
-  const searchVal = (historySearchInput && isL2OrL3Filter) ? historySearchInput.value.trim().toLowerCase() : '';
+  const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
 
-  if (isL2OrL3Filter) {
+  if (isL2OrL3OrL4) {
     filteredAllBookingsList = allBookingsList.filter(item => {
       const b = item.booking;
       const st = b.status;
       let matchStatus = true;
-      if (filterVal === 'approved') matchStatus = (st === 'approved');
-      else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
-      else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
-      else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
-      else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
+      if (isL2OrL3Filter) {
+        if (filterVal === 'approved') matchStatus = (st === 'approved');
+        else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
+        else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
+        else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
+        else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
+      }
 
       let matchSearch = true;
       if (searchVal) {
