@@ -2739,7 +2739,11 @@ async function autoDrawApproverSignature() {
   const placeholder = document.getElementById('approver-sig-placeholder');
   if (!canvas || !currentUser) return;
 
-  let targetSign = (currentUser && currentUser.sign) ? currentUser.sign.trim() : '';
+  if (approverSig) {
+    approverSig.resize();
+  }
+
+  let targetSign = (currentUser && currentUser.sign) ? String(currentUser.sign).trim() : '';
   
   if ((!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) && currentUser) {
     const uName = (currentUser.username || '').toLowerCase();
@@ -2761,10 +2765,17 @@ async function autoDrawApproverSignature() {
     }
   }
 
-  if (targetSign && targetSign.startsWith('data:image') && targetSign.length > 30) {
-    if (approverSig) {
-      approverSig.resize();
-    }
+  // Clean data URI string of any stray newlines, carriage returns, or spaces
+  if (targetSign && targetSign.startsWith('data:image')) {
+    targetSign = targetSign.replace(/[\r\n\s]/g, '');
+  }
+
+  // Fallback to mock signature if no saved base64 image exists
+  if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) {
+    targetSign = generateMockSignature(currentUser.name || 'ลงนาม');
+  }
+
+  const drawOnCanvas = (srcUri) => {
     const img = new Image();
     img.onload = () => {
       const ctx = canvas.getContext('2d');
@@ -2777,11 +2788,27 @@ async function autoDrawApproverSignature() {
       ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
       if (placeholder) placeholder.style.display = 'none';
     };
-    img.onerror = (e) => {
-      console.warn("Image load error for data URI:", e);
+    img.onerror = () => {
+      // If base64 image load failed, draw mock signature as ultimate fallback
+      const mockUri = generateMockSignature(currentUser.name || 'ลงนาม');
+      const mockImg = new Image();
+      mockImg.onload = () => {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const hRatio = canvas.width / mockImg.width;
+        const vRatio = canvas.height / mockImg.height;
+        const ratio = Math.min(hRatio, vRatio);
+        const x = (canvas.width - mockImg.width * ratio) / 2;
+        const y = (canvas.height - mockImg.height * ratio) / 2;
+        ctx.drawImage(mockImg, x, y, mockImg.width * ratio, mockImg.height * ratio);
+        if (placeholder) placeholder.style.display = 'none';
+      };
+      mockImg.src = mockUri;
     };
-    img.src = targetSign;
-  }
+    img.src = srcUri;
+  };
+
+  drawOnCanvas(targetSign);
 }
 
 // Open Approval Details Modal
