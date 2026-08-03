@@ -2321,10 +2321,17 @@ function renderBookingsLists() {
     const isL3User = userHasApproveLevel(currentUser, 3);
     const isL4User = userHasApproveLevel(currentUser, 4);
 
-    // 🎯 เงื่อนไข: ใบจองที่จะมาแสดงที่ L2/L3/L4 ในประวัติ ต้องผ่าน L1 เรียบร้อยแล้ว (currentApprovalLevel >= 2 หรือ อนุมัติ/ปฏิเสธ/ยกเลิกแล้ว)
+    // 🎯 เงื่อนไข: ใบจองที่จะมาแสดงที่ L2/L3 ในประวัติ ต้องผ่าน L1 เรียบร้อยแล้ว
     const hasPassedL1 = b.currentApprovalLevel >= 2 || b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled' || b.status === 'cancellation_requested';
 
-    if (isL2User || isL3User || isL4User || canSeeAll) {
+    const isL4Only = isL4User && !isL2User && !isL3User;
+
+    if (isL4Only) {
+      // 🎯 สำหรับ L4 ให้เห็นประวัติทั้งหมดเฉพาะรายการที่สถานะอนุมัติเสร็จสิ้นแล้วเท่านั้น (b.status === 'approved')
+      if (b.status === 'approved' || isMyRequest) {
+        allBookingsList.push({ booking: b, isPendingForMe });
+      }
+    } else if (isL2User || isL3User || canSeeAll) {
       if (hasPassedL1 || isMyRequest || isManagerOrApprover) {
         allBookingsList.push({ booking: b, isPendingForMe });
       }
@@ -2342,9 +2349,8 @@ function renderBookingsLists() {
     return numB - numA;
   });
 
-  // Handle Status Filter Bar Visibility and Filtering for L2/L3/L4
+  // Handle Search Input Filtering for History List
   const historyFilterBar = document.getElementById('history-filter-bar');
-  const statusFilterSelect = document.getElementById('history-status-filter');
   const historySearchInput = document.getElementById('history-search-input');
   
   let filteredAllBookingsList = allBookingsList;
@@ -2355,30 +2361,16 @@ function renderBookingsLists() {
     historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
   }
 
-  const filterVal = statusFilterSelect ? statusFilterSelect.value : 'all';
   const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
 
-  if (isL2OrL3OrL4) {
+  if (searchVal) {
     filteredAllBookingsList = allBookingsList.filter(item => {
       const b = item.booking;
-      const st = b.status;
-      let matchStatus = true;
-      if (filterVal === 'approved') matchStatus = (st === 'approved');
-      else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
-      else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
-      else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
-      else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
-
-      let matchSearch = true;
-      if (searchVal) {
-        const idStr = (b.id || '').toLowerCase();
-        const reqStr = (b.requester || '').toLowerCase();
-        const purpStr = (b.purpose || '').toLowerCase();
-        const destStr = (b.destination || '').toLowerCase();
-        matchSearch = idStr.includes(searchVal) || reqStr.includes(searchVal) || purpStr.includes(searchVal) || destStr.includes(searchVal);
-      }
-
-      return matchStatus && matchSearch;
+      const idStr = (b.id || '').toLowerCase();
+      const reqStr = (b.requester || '').toLowerCase();
+      const purpStr = (b.purpose || '').toLowerCase();
+      const destStr = (b.destination || '').toLowerCase();
+      return idStr.includes(searchVal) || reqStr.includes(searchVal) || purpStr.includes(searchVal) || destStr.includes(searchVal);
     });
   }
 
