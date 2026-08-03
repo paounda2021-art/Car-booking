@@ -2321,28 +2321,45 @@ function renderBookingsLists() {
     const canSeeAll = checkCanSeeAll(currentUser);
     const isManagerOrApprover = checkIsManagerOrApprover(b, currentUser);
     const isCompleted = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
+    const isL1User = userHasApproveLevel(currentUser, 1) || (currentUser && currentUser.role === 'supervisor');
     const isL2User = userHasApproveLevel(currentUser, 2);
     const isL3User = userHasApproveLevel(currentUser, 3);
     const isL4User = userHasApproveLevel(currentUser, 4);
 
-    // 🎯 เงื่อนไข: ใบจองที่จะมาแสดงที่ L2/L3 ในประวัติ ต้องผ่าน L1 เรียบร้อยแล้ว
-    const hasPassedL1 = b.currentApprovalLevel >= 2 || b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled' || b.status === 'cancellation_requested';
+    // 🎯 ตรวจสอบว่าผู้ใช้เคยลงนามอนุมัติใบจองนี้แล้วหรือยัง
+    const hasUserSigned = Array.isArray(b.signatures) && b.signatures.some(s => 
+      (s.approverName && s.approverName.includes(currentUser.name)) ||
+      (s.status === 'approved' && s.level === 2 && isL2User) ||
+      (s.status === 'approved' && s.level === 3 && isL3User) ||
+      (s.status === 'approved' && s.level === 4 && isL4User)
+    );
 
-    const isL4Only = isL4User && !isL2User && !isL3User;
+    let canShowInHistory = false;
 
-    if (isL4Only) {
-      // 🎯 สำหรับ L4 ให้เห็นประวัติทั้งหมดเฉพาะรายการที่สถานะอนุมัติเสร็จสิ้นแล้วเท่านั้น (b.status === 'approved')
-      if (b.status === 'approved' || isMyRequest) {
-        allBookingsList.push({ booking: b, isPendingForMe });
-      }
-    } else if (isL2User || isL3User || canSeeAll) {
-      if (hasPassedL1 || isMyRequest || isManagerOrApprover) {
-        allBookingsList.push({ booking: b, isPendingForMe });
-      }
+    if (isMyRequest) {
+      canShowInHistory = true;
     } else if (isCompleted) {
-      if (isMyRequest || (currentUser && currentUser.role === 'supervisor' && isManagerOrApprover)) {
-        allBookingsList.push({ booking: b, isPendingForMe });
+      if (canSeeAll || isL2User || isL3User || isL4User || isManagerOrApprover) {
+        canShowInHistory = true;
       }
+    } else {
+      // 🎯 สำหรับงานที่อยู่ระหว่างรออนุมัติ (Pending): แสดงเฉพาะ L ใคร L มัน!
+      // L2 เห็นเฉพาะงานที่รอ L2 หรือ L2 เคยอนุมัติแล้ว
+      // L3 เห็นเฉพาะงานที่ส่งถึง L3 แล้ว (currentApprovalLevel === 3) หรือ L3 เคยอนุมัติแล้ว
+      // L4 เห็นเฉพาะงานที่ส่งถึง L4 แล้ว (currentApprovalLevel === 4) หรือ L4 เคยอนุมัติแล้ว
+      if (isL2User && (b.currentApprovalLevel === 2 || hasUserSigned)) {
+        canShowInHistory = true;
+      } else if (isL3User && (b.currentApprovalLevel === 3 || (b.currentApprovalLevel > 3 && hasUserSigned))) {
+        canShowInHistory = true;
+      } else if (isL4User && (b.currentApprovalLevel === 4 || (b.currentApprovalLevel > 4 && hasUserSigned))) {
+        canShowInHistory = true;
+      } else if (isL1User && (b.currentApprovalLevel === 1 && isManagerOrApprover)) {
+        canShowInHistory = true;
+      }
+    }
+
+    if (canShowInHistory) {
+      allBookingsList.push({ booking: b, isPendingForMe });
     }
   });
 
