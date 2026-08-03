@@ -2804,6 +2804,11 @@ async function autoDrawApproverSignature() {
     targetSign = generateMockSignature(currentUser.name || 'ลงนาม');
   }
 
+  // Sanitize targetSign to prevent ERR_INVALID_URL in Chrome/Edge
+  if (targetSign) {
+    targetSign = targetSign.replace(/[\r\n\s"']/g, '');
+  }
+
   // 5. Ensure canvas width/height match parent box dimensions properly
   const parent = canvas.parentElement || canvas.parentNode;
   const parentWidth = parent ? parent.clientWidth : 500;
