@@ -2822,6 +2822,14 @@ async function autoDrawApproverSignature() {
 }
 
 // Open Approval Details Modal
+function formatDateTimeForInput(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 async function openApprovalModal(bookingId) {
   if (!bookingId) return;
 
@@ -3151,6 +3159,15 @@ async function openApprovalModal(bookingId) {
           editDriverInput.disabled = false;
         }
       }
+
+      const editStartInput = document.getElementById('edit-start-date');
+      const editEndInput = document.getElementById('edit-end-date');
+      if (editStartInput && booking.startDate) {
+        editStartInput.value = formatDateTimeForInput(booking.startDate);
+      }
+      if (editEndInput && booking.endDate) {
+        editEndInput.value = formatDateTimeForInput(booking.endDate);
+      }
     }
   }
 
@@ -3275,12 +3292,24 @@ function renderApprovalPipeline(booking) {
       statusText = 'อนุมัติแล้ว';
       const timeStr = formatThaiDateTime(sig.timestamp);
       const sigImg = getSignatureImg(step.level, sig.signature, sig.approverName);
+      
+      let carAssignedText = '';
+      if (step.level === 2) {
+        if (booking.travelType === 'public_car' || booking.carId === 'taxi') {
+          carAssignedText = 'รถรับจ้างสาธารณะ (TAXI)';
+        } else if (booking.carId) {
+          const carObj = cars.find(c => c.id === booking.carId);
+          carAssignedText = carObj ? `${carObj.name} (ทะเบียน: ${carObj.plate})` : booking.carId;
+        }
+      }
+
       detailsHtml = `
         <div class="pipeline-details" style="margin-top:0.4rem; padding-left:1.5rem; font-size:0.8rem; line-height:1.4;">
           <span>ลงนามโดย: <strong>${sig.approverName}</strong></span><br>
           <span>เมื่อ: ${timeStr}</span><br>
           ${sig.comment ? `<span>ความเห็น: "${sig.comment}"</span><br>` : ''}
-          ${sig.driverName ? `<span style="color:var(--primary); font-weight:bold;">จัดพนักงานขับรถ: ${sig.driverName}${getDriverPhoneByName(sig.driverName) ? ` (โทร. ${getDriverPhoneByName(sig.driverName)})` : ''}</span><br>` : ''}
+          ${carAssignedText ? `<span style="color:var(--primary); font-weight:bold;">🚘 จัดรถยนต์: ${carAssignedText}</span><br>` : ''}
+          ${(step.level === 2 || sig.driverName) ? `<span style="color:var(--primary); font-weight:bold;">👤 จัดพนักงานขับรถ: ${sig.driverName || booking.driverName || '-'}${getDriverPhoneByName(sig.driverName || booking.driverName) ? ` (โทร. ${getDriverPhoneByName(sig.driverName || booking.driverName)})` : ''}</span><br>` : ''}
           <div style="margin-top:0.25rem;">
             ${(sigImg && sigImg.length > 30) ? `<img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">` : ''}
           </div>
@@ -5074,6 +5103,19 @@ function setupEventListeners() {
     if (!activeBookingIdForApproval) return;
     const booking = bookings.find(b => b.id === activeBookingIdForApproval);
     if (!booking) return;
+
+    const editStartInput = document.getElementById('edit-start-date');
+    const editEndInput = document.getElementById('edit-end-date');
+    if (editStartInput && editEndInput && editStartInput.value && editEndInput.value) {
+      const newStart = new Date(editStartInput.value);
+      const newEnd = new Date(editEndInput.value);
+      if (newEnd <= newStart) {
+        showToast("วันเวลาสิ้นสุดต้องมาหลังวันเวลาเริ่มต้น", "warning");
+        return;
+      }
+      booking.startDate = newStart.toISOString();
+      booking.endDate = newEnd.toISOString();
+    }
 
     const assignedCarId = document.getElementById('edit-assign-car').value;
     if (!assignedCarId) {
