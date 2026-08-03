@@ -2762,26 +2762,30 @@ async function autoDrawApproverSignature() {
     approverSig.resize();
   }
 
-  let targetSign = (currentUser && currentUser.sign) ? String(currentUser.sign).trim() : '';
+  const uName = (currentUser.username || '').toLowerCase();
   
-  if ((!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) && currentUser) {
-    const uName = (currentUser.username || '').toLowerCase();
-    try {
-      if (!usersList || usersList.length === 0) {
-        const resp = await fetch('users.json?t=' + Date.now());
-        if (resp.ok) usersList = await resp.json();
-      }
-      if (usersList && usersList.length > 0) {
-        const dbU = usersList.find(u => u.username.toLowerCase() === uName);
-        if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.length > 30) {
-          targetSign = dbU.sign.trim();
-          currentUser.sign = targetSign;
-          localStorage.setItem('current_user', JSON.stringify(currentUser));
-        }
-      }
-    } catch(e) {
-      console.warn("Signature fetch fallback error:", e);
+  // ALWAYS fetch/ensure usersList is loaded to get real signature from users.json
+  try {
+    if (!usersList || usersList.length === 0) {
+      const resp = await fetch('users.json?t=' + Date.now());
+      if (resp.ok) usersList = await resp.json();
     }
+  } catch(e) {
+    console.warn("Signature fetch usersList error:", e);
+  }
+
+  let targetSign = '';
+  if (usersList && usersList.length > 0) {
+    const dbU = usersList.find(u => u.username.toLowerCase() === uName);
+    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.length > 50) {
+      targetSign = dbU.sign.trim();
+      currentUser.sign = targetSign;
+      try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
+    }
+  }
+
+  if (!targetSign && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+    targetSign = currentUser.sign.trim();
   }
 
   // Clean data URI string of any stray newlines, carriage returns, or spaces
@@ -2789,7 +2793,7 @@ async function autoDrawApproverSignature() {
     targetSign = targetSign.replace(/[\r\n\s]/g, '');
   }
 
-  // Fallback to mock signature if no saved base64 image exists
+  // Ultimate fallback to mock signature if no saved base64 image exists
   if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) {
     targetSign = generateMockSignature(currentUser.name || 'ลงนาม');
   }
