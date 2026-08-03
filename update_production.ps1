@@ -1,5 +1,5 @@
 # update_production.ps1
-# Script to safely backup server data to ZIP and update production server to match GitHub main 100%
+# Script to safely backup server data to ZIP in C:\Backups\ and update production server to match GitHub main 100%
 
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (-not $rootDir) { $rootDir = Get-Location }
@@ -12,15 +12,15 @@ try {
     pm2 stop car-booking
 } catch {}
 
-# 2. Create timestamped ZIP backup before pulling new code
+# 2. Create timestamped ZIP backup in C:\Backups\ before pulling new code
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-$backupDir = Join-Path $rootDir "backups"
-if (-not (Test-Path $backupDir)) {
-    New-Item -ItemType Directory -Path $backupDir | Out-Null
+$targetBackupDir = "C:\Backups"
+if (-not (Test-Path $targetBackupDir)) {
+    New-Item -ItemType Directory -Path $targetBackupDir | Out-Null
 }
 
 $zipFileName = "backup_server_$timestamp.zip"
-$zipFilePath = Join-Path $backupDir $zipFileName
+$zipFilePath = Join-Path $targetBackupDir $zipFileName
 
 Write-Host "📦 Creating timestamped ZIP backup at $zipFilePath..." -ForegroundColor Yellow
 
@@ -35,9 +35,9 @@ foreach ($item in @("database.db", "bookings.json", "users.json", "app.js", "ser
 if ($itemsToZip.Count -gt 0) {
     try {
         Compress-Archive -Path $itemsToZip -DestinationPath $zipFilePath -Force
-        Write-Host "✅ Server ZIP Backup created successfully: $zipFileName" -ForegroundColor Green
+        Write-Host "✅ Server ZIP Backup created successfully: $zipFilePath" -ForegroundColor Green
     } catch {
-        Write-Host "⚠️ Warning creating ZIP backup: $_" -ForegroundColor Red
+        Write-Host "⚠️ Warning creating ZIP backup in C:\Backups: $_" -ForegroundColor Red
     }
 }
 
@@ -63,4 +63,4 @@ git reset --hard origin/main
 Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Yellow
 pm2 start car-booking
 
-Write-Host "🎉 Production server updated successfully! Backup ZIP saved in backups/$zipFileName" -ForegroundColor Green
+Write-Host "🎉 Production server updated successfully! Backup ZIP saved in $zipFilePath" -ForegroundColor Green
