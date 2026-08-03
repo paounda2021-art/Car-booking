@@ -2375,27 +2375,22 @@ function renderBookingsLists() {
     );
 
     let canShowInHistory = false;
+    const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+    const isL4Active = isL4User && (activeLevel === '4' || (!isL2User && !isL3User));
+    const isL2OrL3 = (isL2User || isL3User) && !isL4Active;
 
     if (isMyRequest) {
       canShowInHistory = true;
+    } else if (isL4Active) {
+      // 🎯 สำหรับ L4: แสดงเฉพาะเคสที่เสร็จสิ้นเท่านั้น (Approved, Rejected, Cancelled)
+      if (isCompleted) {
+        canShowInHistory = true;
+      }
+    } else if (isL2OrL3 || canSeeAll || isManagerOrApprover) {
+      // 🎯 สำหรับ L2 และ L3: แสดงทุกสถานะ
+      canShowInHistory = true;
     } else if (isCompleted) {
-      if (canSeeAll || isL2User || isL3User || isL4User || isManagerOrApprover) {
-        canShowInHistory = true;
-      }
-    } else {
-      // 🎯 สำหรับงานที่อยู่ระหว่างรออนุมัติ (Pending): แสดงเฉพาะ L ใคร L มัน!
-      // L2 เห็นเฉพาะงานที่รอ L2 หรือ L2 เคยอนุมัติแล้ว
-      // L3 เห็นเฉพาะงานที่ส่งถึง L3 แล้ว (currentApprovalLevel === 3) หรือ L3 เคยอนุมัติแล้ว
-      // L4 เห็นเฉพาะงานที่ส่งถึง L4 แล้ว (currentApprovalLevel === 4) หรือ L4 เคยอนุมัติแล้ว
-      if (isL2User && (b.currentApprovalLevel === 2 || hasUserSigned)) {
-        canShowInHistory = true;
-      } else if (isL3User && (b.currentApprovalLevel === 3 || (b.currentApprovalLevel > 3 && hasUserSigned))) {
-        canShowInHistory = true;
-      } else if (isL4User && (b.currentApprovalLevel === 4 || (b.currentApprovalLevel > 4 && hasUserSigned))) {
-        canShowInHistory = true;
-      } else if (isL1User && (b.currentApprovalLevel === 1 && isManagerOrApprover)) {
-        canShowInHistory = true;
-      }
+      canShowInHistory = true;
     }
 
     if (canShowInHistory) {
@@ -2418,21 +2413,22 @@ function renderBookingsLists() {
   
   let filteredAllBookingsList = allBookingsList;
 
-  const isL2User = currentUser && userHasApproveLevel(currentUser, 2);
-  const isL3User = currentUser && userHasApproveLevel(currentUser, 3);
-  const isL4User = currentUser && userHasApproveLevel(currentUser, 4);
+  const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
+  const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
+  const isL4UserNow = currentUser && userHasApproveLevel(currentUser, 4);
+  const activeLvlNow = sessionStorage.getItem('activeApprovalLevel') || 'all';
+  const isL4ActiveNow = isL4UserNow && (activeLvlNow === '4' || (!isL2UserNow && !isL3UserNow));
 
-  // Status dropdown filter is shown ONLY for L2 and L3 (STRICTLY HIDDEN FOR L4)
-  const showStatusFilter = (isL2User || isL3User) && !isL4User;
-  const isL2OrL3OrL4 = isL2User || isL3User || isL4User || (currentUser && checkCanSeeAll(currentUser));
+  // L2 และ L3 แสดงตัวกรอง (มีตัวกรองค้นหาด้วย)
+  // L4 ไม่ต้องมีกรอง (ซ่อนแถบตัวกรองเด็ดขาด)
+  const isL2OrL3Filter = (isL2UserNow || isL3UserNow) && !isL4ActiveNow;
 
   if (historyFilterBar) {
-    historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
+    historyFilterBar.style.display = isL2OrL3Filter ? 'flex' : 'none';
   }
 
-  // Toggle status filter dropdown visibility: Show ONLY for L2 & L3, ALWAYS hide for L4
   if (historyStatusLabel && historyStatusSelect) {
-    if (showStatusFilter) {
+    if (isL2OrL3Filter) {
       historyStatusLabel.style.display = 'inline-flex';
       historyStatusSelect.style.display = 'inline-block';
     } else {
@@ -2441,21 +2437,19 @@ function renderBookingsLists() {
     }
   }
 
-  const filterVal = (historyStatusSelect && showStatusFilter) ? historyStatusSelect.value : 'all';
-  const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
+  const filterVal = (historyStatusSelect && isL2OrL3Filter) ? historyStatusSelect.value : 'all';
+  const searchVal = (historySearchInput && isL2OrL3Filter) ? historySearchInput.value.trim().toLowerCase() : '';
 
-  if (isL2OrL3OrL4) {
+  if (isL2OrL3Filter) {
     filteredAllBookingsList = allBookingsList.filter(item => {
       const b = item.booking;
       const st = b.status;
       let matchStatus = true;
-      if (showStatusFilter) {
-        if (filterVal === 'approved') matchStatus = (st === 'approved');
-        else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
-        else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
-        else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
-        else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
-      }
+      if (filterVal === 'approved') matchStatus = (st === 'approved');
+      else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
+      else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
+      else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
+      else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
 
       let matchSearch = true;
       if (searchVal) {
