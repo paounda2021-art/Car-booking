@@ -2914,7 +2914,7 @@ async function openApprovalModal(bookingId) {
   let isMyTurn = false;
   if (booking.status === 'pending' && currentUser && !booking.waitingForRequesterInput) {
     const lvl = booking.currentApprovalLevel;
-    const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(lvl);
+    const canApproveThisLevel = userHasApproveLevel(currentUser, lvl);
     
     if (canApproveThisLevel) {
       if (lvl === 1) {
@@ -3251,128 +3251,151 @@ async function handleApprovalAction(isApproved) {
     return;
   }
 
-  const booking = bookings.find(b => b.id === activeBookingIdForApproval);
-  if (!booking) return;
+  const btnApprove = document.getElementById('btn-approve-request');
+  const btnReject = document.getElementById('btn-reject-request');
+  const activeBtn = isApproved ? btnApprove : btnReject;
+  const originalApproveText = btnApprove ? btnApprove.innerHTML : '';
+  const originalRejectText = btnReject ? btnReject.innerHTML : '';
 
-  const comment = document.getElementById('approval-comment').value;
-  const level = booking.currentApprovalLevel;
+  // ⚡ ให้ UI ตอบสนองทันที: ปิดปุ่มป้องกันการกดซ้ำ และแสดงสถานะกำลังบันทึก
+  if (btnApprove) btnApprove.disabled = true;
+  if (btnReject) btnReject.disabled = true;
+  if (activeBtn) activeBtn.innerHTML = '⏳ กำลังบันทึกการทำรายการ...';
 
-  // Fleet admin (L2) validation for car selection and driver name assignment
-  let assignedDriver = '';
-  let assignedCarId = '';
-  if (currentUser.role === 'fleet_admin' && level === 2 && isApproved) {
-    assignedCarId = document.getElementById('assign-car').value;
-    if (!assignedCarId) {
-      showToast("ในขั้นตอนผู้จัดรถ (L2) กรุณาเลือกรถยนต์ของ อสป. หรือแท็กซี่ (TAXI)", "warning");
-      return;
-    }
-    
-    if (assignedCarId === 'taxi') {
-      if (!booking.distance || !booking.price || booking.distance == 0 || booking.price == 0) {
-        booking.travelType = 'public_car';
-        booking.carId = '';
-        booking.driverName = '-';
-        booking.waitingForRequesterInput = true;
-        
-        await saveBookings();
-        document.getElementById('modal-approval').classList.remove('active');
-        
-        // Re-render UI views
-        updateStats();
-        renderDashboard();
-        renderBookingsLists();
-        renderMonthCalendar();
+  try {
+    const booking = bookings.find(b => b.id === activeBookingIdForApproval);
+    if (!booking) return;
 
-        // Trigger email notification (L2 -> L0 TAXI Loop)
-        const reqEmail = resolveRequesterEmail(booking);
-        const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
-        const body = `
-          <p>เรียน คุณ ${booking.requester},</p>
-          <p>ใบขออนุญาตใช้ยานพาหนะเลขที่ <strong>${booking.id}</strong> ของท่าน ได้รับความเห็นในการจัดสรรพาหนะเดินทางแบบ <strong>รถรับจ้างสาธารณะ (TAXI)</strong> เนื่องจากรถยนต์ส่วนกลางไม่ว่างปฏิบัติงานในช่วงเวลาดังกล่าว</p>
-          <p>รบกวนท่านเข้าสู่ระบบเพื่อดำเนินการกรอกข้อมูล <strong>ระยะทางประมาณการ (กิโลเมตร)</strong> และ <strong>วงเงินงบประมาณเบิกจ่ายโดยประมาณ (บาท)</strong> เพื่อส่งใบงานกลับไปดำเนินการเสนออนุมัติตามลำดับขั้นต่อไป</p>
-          <p>ท่านสามารถคลิกที่ปุ่มสีแดง <strong>[กรอกค่าพาหนะ]</strong> ในตารางรายการที่ฉันขอ เพื่อระบุข้อมูลได้ทันที:</p>
-          <div style="text-align: center; margin: 25px 0;">
-            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">กรอกรายละเอียดค่าพาหนะ</a>
-          </div>
-        `;
-        sendEmailNotification(reqEmail, subject, body);
-        
-        showToast(`ได้ส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกข้อมูลระยะทางและค่าใช้จ่ายรถรับจ้างเรียบร้อยแล้ว`, "success");
-        return;
-      } else {
-        booking.travelType = 'public_car';
-        booking.carId = '';
-        booking.driverName = '-';
-        assignedDriver = '-';
-      }
-    } else {
-      // Conflict check
-      if (hasBookingConflict(assignedCarId, booking.startDate, booking.endDate, booking.id)) {
-        showToast("ขออภัย! รถยนต์คันนี้ได้รับการจองในช่วงเวลานี้แล้ว กรุณาเลือกรถยนต์คันอื่น", "error");
+    const comment = document.getElementById('approval-comment').value;
+    const level = booking.currentApprovalLevel;
+
+    // Fleet admin (L2) validation for car selection and driver name assignment
+    let assignedDriver = '';
+    let assignedCarId = '';
+    if (currentUser.role === 'fleet_admin' && level === 2 && isApproved) {
+      assignedCarId = document.getElementById('assign-car').value;
+      if (!assignedCarId) {
+        showToast("ในขั้นตอนผู้จัดรถ (L2) กรุณาเลือกรถยนต์ของ อสป. หรือแท็กซี่ (TAXI)", "warning");
         return;
       }
       
-      assignedDriver = document.getElementById('assign-driver').value;
-      if (!assignedDriver.trim() || assignedDriver === '-') {
-        showToast("ในขั้นตอนผู้จัดรถ (L2) กรุณาระบุชื่อพนักงานขับรถปฏิบัติหน้าที่", "warning");
-        return;
-      }
-      booking.travelType = 'fmo_car';
-      booking.carId = assignedCarId;
-      booking.driverName = assignedDriver;
-    }
-  }
+      if (assignedCarId === 'taxi') {
+        if (!booking.distance || !booking.price || booking.distance == 0 || booking.price == 0) {
+          booking.travelType = 'public_car';
+          booking.carId = '';
+          booking.driverName = '-';
+          booking.waitingForRequesterInput = true;
+          
+          await saveBookings();
+          document.getElementById('modal-approval').classList.remove('active');
+          
+          // Re-render UI views
+          updateStats();
+          renderDashboard();
+          renderBookingsLists();
+          renderMonthCalendar();
 
-  const sigBlock = booking.signatures.find(s => s.level === level);
-  if (sigBlock) {
-    let nameToSave = currentUser.name;
-    const lUsername = (currentUser.username || '').toLowerCase();
-    if (level === 3) {
-      const actingL3User = localStorage.getItem('acting_l3_user');
-      if (actingL3User && lUsername === actingL3User.toLowerCase()) {
-        nameToSave = `${currentUser.name} / (ร.หส.พด.)`;
-      }
-    } else if (level === 4) {
-      const actingL4User = localStorage.getItem('acting_l4_user');
-      if (actingL4User && lUsername === actingL4User.toLowerCase()) {
-        nameToSave = `${currentUser.name} / (ร.ผฝ.บง.)`;
+          // Trigger email notification asynchronously (L2 -> L0 TAXI Loop)
+          const reqEmail = resolveRequesterEmail(booking);
+          const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
+          const body = `
+            <p>เรียน คุณ ${booking.requester},</p>
+            <p>ใบขออนุญาตใช้ยานพาหนะเลขที่ <strong>${booking.id}</strong> ของท่าน ได้รับความเห็นในการจัดสรรพาหนะเดินทางแบบ <strong>รถรับจ้างสาธารณะ (TAXI)</strong> เนื่องจากรถยนต์ส่วนกลางไม่ว่างปฏิบัติงานในช่วงเวลาดังกล่าว</p>
+            <p>รบกวนท่านเข้าสู่ระบบเพื่อดำเนินการกรอกข้อมูล <strong>ระยะทางประมาณการ (กิโลเมตร)</strong> และ <strong>วงเงินงบประมาณเบิกจ่ายโดยประมาณ (บาท)</strong> เพื่อส่งใบงานกลับไปดำเนินการเสนออนุมัติตามลำดับขั้นต่อไป</p>
+            <p>ท่านสามารถคลิกที่ปุ่มสีแดง <strong>[กรอกค่าพาหนะ]</strong> ในตารางรายการที่ฉันขอ เพื่อระบุข้อมูลได้ทันที:</p>
+            <div style="text-align: center; margin: 25px 0;">
+              <a href="https://car-booking.fishmarket.co.th/" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">กรอกรายละเอียดค่าพาหนะ</a>
+            </div>
+          `;
+          sendEmailNotification(reqEmail, subject, body).catch(e => console.error("Email send error:", e));
+          
+          showToast(`ได้ส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกข้อมูลระยะทางและค่าใช้จ่ายรถรับจ้างเรียบร้อยแล้ว`, "success");
+          return;
+        } else {
+          booking.travelType = 'public_car';
+          booking.carId = '';
+          booking.driverName = '-';
+          assignedDriver = '-';
+        }
+      } else {
+        // Conflict check
+        if (hasBookingConflict(assignedCarId, booking.startDate, booking.endDate, booking.id)) {
+          showToast("ขออภัย! รถยนต์คันนี้ได้รับการจองในช่วงเวลานี้แล้ว กรุณาเลือกรถยนต์คันอื่น", "error");
+          return;
+        }
+        
+        assignedDriver = document.getElementById('assign-driver').value;
+        if (!assignedDriver.trim() || assignedDriver === '-') {
+          showToast("ในขั้นตอนผู้จัดรถ (L2) กรุณาระบุชื่อพนักงานขับรถปฏิบัติหน้าที่", "warning");
+          return;
+        }
+        booking.travelType = 'fmo_car';
+        booking.carId = assignedCarId;
+        booking.driverName = assignedDriver;
       }
     }
-    sigBlock.approverName = nameToSave;
-    sigBlock.status = isApproved ? 'approved' : 'rejected';
-    sigBlock.comment = comment;
-    sigBlock.timestamp = new Date().toISOString();
-    sigBlock.signature = approverSig.getDataUrl();
+
+    const sigBlock = booking.signatures.find(s => s.level === level);
+    if (sigBlock) {
+      let nameToSave = currentUser.name;
+      const lUsername = (currentUser.username || '').toLowerCase();
+      if (level === 3) {
+        const actingL3User = localStorage.getItem('acting_l3_user');
+        if (actingL3User && lUsername === actingL3User.toLowerCase()) {
+          nameToSave = `${currentUser.name} / (ร.หส.พด.)`;
+        }
+      } else if (level === 4) {
+        const actingL4User = localStorage.getItem('acting_l4_user');
+        if (actingL4User && lUsername === actingL4User.toLowerCase()) {
+          nameToSave = `${currentUser.name} / (ร.ผฝ.บง.)`;
+        }
+      }
+      sigBlock.approverName = nameToSave;
+      sigBlock.status = isApproved ? 'approved' : 'rejected';
+      sigBlock.comment = comment;
+      sigBlock.timestamp = new Date().toISOString();
+      sigBlock.signature = approverSig.getDataUrl();
+      
+      if (assignedCarId && assignedCarId !== 'taxi') {
+        booking.carId = assignedCarId;
+      }
+      
+      if (assignedDriver) {
+        sigBlock.driverName = assignedDriver;
+        booking.driverName = assignedDriver;
+      }
+    }
+
+    // Update status routing workflow
+    if (!isApproved) {
+      booking.status = 'rejected';
+    } else {
+      booking.currentApprovalLevel = level + 1;
+      const maxLevel = 4;
+      if (booking.currentApprovalLevel > maxLevel) {
+        booking.status = 'approved';
+      }
+    }
+
+    await saveBookings();
+    document.getElementById('modal-approval').classList.remove('active');
     
-    if (assignedCarId && assignedCarId !== 'taxi') {
-      booking.carId = assignedCarId;
+    // Re-render UI views immediately
+    updateStats();
+    renderDashboard();
+    renderBookingsLists();
+    renderMonthCalendar();
+  } finally {
+    // ⚡ คืนค่าปุ่มให้กลับมาเหมือนเดิม
+    if (btnApprove) {
+      btnApprove.disabled = false;
+      btnApprove.innerHTML = originalApproveText || '✅ อนุมัติ / เห็นชอบ';
     }
-    
-    if (assignedDriver) {
-      sigBlock.driverName = assignedDriver;
-      booking.driverName = assignedDriver;
-    }
-  }
-
-  // Update status routing workflow
-  if (!isApproved) {
-    booking.status = 'rejected';
-  } else {
-    booking.currentApprovalLevel = level + 1;
-    const maxLevel = 4;
-    if (booking.currentApprovalLevel > maxLevel) {
-      booking.status = 'approved';
+    if (btnReject) {
+      btnReject.disabled = false;
+      btnReject.innerHTML = originalRejectText || '❌ ปฏิเสธอนุมัติ';
     }
   }
-
-  await saveBookings();
-  document.getElementById('modal-approval').classList.remove('active');
-  
-  // Re-render UI views
-  updateStats();
-  renderDashboard();
-  renderBookingsLists();
-  renderMonthCalendar();
 
   // Trigger emails depending on outcomes
   let carObj = cars.find(c => c.id === booking.carId);
