@@ -562,7 +562,7 @@ function generateMockSignature(name) {
 // Get signature image (database base64 or generated mock signature)
 function getSignatureImg(level, signatureVal, approverName) {
   if (signatureVal && typeof signatureVal === 'string' && signatureVal.trim().startsWith('data:image') && signatureVal.length > 30) {
-    return signatureVal.trim();
+    return signatureVal.trim().replace(/[\r\n]/g, '');
   }
   
   let username = '';
@@ -571,15 +571,15 @@ function getSignatureImg(level, signatureVal, approverName) {
   else if (level === 3) username = 'saisunee.p';
   else if (level === 4) username = 'piyawan.k';
   
-  if (username && typeof usersList !== 'undefined') {
-    const u = usersList.find(x => x.username.toLowerCase() === username.toLowerCase());
+  if (username && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+    const u = usersList.find(x => x.username && x.username.toLowerCase() === username.toLowerCase());
     if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
-      return u.sign.trim();
+      return u.sign.trim().replace(/[\r\n]/g, '');
     }
-  } else if (level === 0 && approverName && typeof usersList !== 'undefined') {
-    const u = usersList.find(x => x.name.replace(/\s+/g, '') === approverName.replace(/\s+/g, ''));
+  } else if (level === 0 && approverName && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+    const u = usersList.find(x => x.name && x.name.replace(/\s+/g, '') === approverName.replace(/\s+/g, ''));
     if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
-      return u.sign.trim();
+      return u.sign.trim().replace(/[\r\n]/g, '');
     }
   }
   
@@ -2764,10 +2764,7 @@ async function autoDrawApproverSignature() {
 
   const uName = (currentUser.username || '').toLowerCase();
   const uEmail = (currentUser.email || '').toLowerCase();
-  const uNameClean = (currentUser.name || '').replace(/\s+/g, '');
-
-  // Hide placeholder text immediately
-  if (placeholder) placeholder.style.display = 'none';
+  const uNameThai = (currentUser.name || '').replace(/\s+/g, '');
   
   // 1. ALWAYS load fresh users.json before resolving signature
   try {
@@ -2779,37 +2776,40 @@ async function autoDrawApproverSignature() {
     console.warn("Signature fetch usersList error:", e);
   }
 
-  // 2. Find target user in fresh usersList by username, email, or name
+  // 2. Find target user in fresh usersList
   let targetSign = '';
   if (usersList && Array.isArray(usersList)) {
     const dbU = usersList.find(u => 
       (u.username && u.username.toLowerCase() === uName) ||
       (u.email && u.email.toLowerCase() === uEmail) ||
-      (u.name && u.name.replace(/\s+/g, '') === uNameClean)
+      (u.name && u.name.replace(/\s+/g, '') === uNameThai) ||
+      (currentUser.role === 'executive' && u.username === 'piyawan.k') ||
+      (userHasApproveLevel(currentUser, 4) && u.username === 'piyawan.k') ||
+      (userHasApproveLevel(currentUser, 3) && u.username === 'saisunee.p') ||
+      (userHasApproveLevel(currentUser, 2) && u.username === 'chalong.c') ||
+      (userHasApproveLevel(currentUser, 1) && u.username === 'prathum.c')
     );
-    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 50) {
-      targetSign = dbU.sign.trim();
+    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 30) {
+      targetSign = dbU.sign.trim().replace(/[\r\n]/g, '');
       currentUser.sign = targetSign;
       try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
     }
   }
 
   // 3. Fallback to currentUser.sign if usersList didn't have it
-  if (!targetSign && currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 50) {
-    targetSign = currentUser.sign.trim();
+  if (!targetSign && currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 30) {
+    targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
   }
 
   // 4. Fallback to mock signature if no saved base64 image exists
-  if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 50) {
+  if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) {
     targetSign = generateMockSignature(currentUser.name || 'ลงนาม');
   }
 
-  // Sanitize targetSign to prevent ERR_INVALID_URL in Chrome/Edge
-  if (targetSign) {
-    targetSign = targetSign.replace(/[\r\n\s"']/g, '');
-  }
+  // Hide placeholder immediately
+  if (placeholder) placeholder.style.display = 'none';
 
-  // 5. Ensure canvas width/height match parent box dimensions properly
+  // 5. Ensure canvas width/height match parent box dimensions
   const parent = canvas.parentElement || canvas.parentNode;
   const parentWidth = parent ? parent.clientWidth : 500;
   canvas.width = parentWidth > 100 ? parentWidth : 500;
@@ -2820,10 +2820,8 @@ async function autoDrawApproverSignature() {
   img.onload = () => {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const targetW = canvas.width * 0.85;
-    const targetH = canvas.height * 0.85;
-    const hRatio = targetW / img.width;
-    const vRatio = targetH / img.height;
+    const hRatio = canvas.width / img.width;
+    const vRatio = canvas.height / img.height;
     const ratio = Math.min(hRatio, vRatio);
     const x = (canvas.width - img.width * ratio) / 2;
     const y = (canvas.height - img.height * ratio) / 2;
@@ -2832,6 +2830,17 @@ async function autoDrawApproverSignature() {
   };
   img.onerror = (err) => {
     console.error("Failed to load signature image:", err);
+    const mock = generateMockSignature(currentUser.name || 'ลงนาม');
+    if (mock) {
+      const mockImg = new Image();
+      mockImg.onload = () => {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(mockImg, (canvas.width - mockImg.width)/2, (canvas.height - mockImg.height)/2);
+        if (placeholder) placeholder.style.display = 'none';
+      };
+      mockImg.src = mock;
+    }
   };
   img.src = targetSign;
 }
@@ -3089,7 +3098,6 @@ async function openApprovalModal(bookingId) {
   if (isMyTurn) {
     actionPanel.classList.remove('hidden');
     activeBookingIdForApproval = booking.id;
-    autoDrawApproverSignature();
     setTimeout(async () => {
       await autoDrawApproverSignature();
     }, 150);
