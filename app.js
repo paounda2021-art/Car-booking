@@ -2795,17 +2795,14 @@ async function autoDrawApproverSignature() {
     targetSign = generateMockSignature(currentUser.name || 'ลงนาม');
   }
 
-  // 5. Ensure canvas width/height are set properly from layout bounding rect
-  const rect = canvas.getBoundingClientRect();
-  if (rect.width > 50 && rect.height > 20) {
-    if (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height)) {
-      canvas.width = Math.floor(rect.width);
-      canvas.height = Math.floor(rect.height);
-    }
-  } else {
-    if (canvas.width < 100) canvas.width = 450;
-    if (canvas.height < 50) canvas.height = 150;
-  }
+  // Hide placeholder immediately
+  if (placeholder) placeholder.style.display = 'none';
+
+  // 5. Ensure canvas width/height match parent box dimensions
+  const parent = canvas.parentElement || canvas.parentNode;
+  const parentWidth = parent ? parent.clientWidth : 500;
+  canvas.width = parentWidth > 100 ? parentWidth : 500;
+  canvas.height = 150;
 
   // 6. Draw targetSign onto canvas
   const img = new Image();
@@ -2991,10 +2988,6 @@ async function openApprovalModal(bookingId) {
   
   // Clear modal inputs
   document.getElementById('approval-comment').value = '';
-  // Resize canvas and then load/draw user signature after modal is displayed
-  setTimeout(async () => {
-    await autoDrawApproverSignature();
-  }, 100);
   fleetAssignBox.style.display = 'none';
   const fleetEditPanel = document.getElementById('fleet-admin-edit-panel');
   if (fleetEditPanel) fleetEditPanel.style.display = 'none';
@@ -3083,6 +3076,9 @@ async function openApprovalModal(bookingId) {
   if (isMyTurn) {
     actionPanel.classList.remove('hidden');
     activeBookingIdForApproval = booking.id;
+    setTimeout(async () => {
+      await autoDrawApproverSignature();
+    }, 150);
   } else {
     actionPanel.classList.add('hidden');
     if (showEditPanel) {
