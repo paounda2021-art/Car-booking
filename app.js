@@ -2763,6 +2763,8 @@ async function autoDrawApproverSignature() {
   if (!canvas || !currentUser) return;
 
   const uName = (currentUser.username || '').toLowerCase();
+  const uEmail = (currentUser.email || '').toLowerCase();
+  const uFullName = (currentUser.name || '').trim();
   
   // 1. ALWAYS load fresh users.json before resolving signature
   try {
@@ -2774,10 +2776,16 @@ async function autoDrawApproverSignature() {
     console.warn("Signature fetch usersList error:", e);
   }
 
-  // 2. Find target user in fresh usersList
+  // 2. Find target user in fresh usersList (matching username, email, name, or piyawan/ปิยวรรณ keyword)
   let targetSign = '';
   if (usersList && Array.isArray(usersList)) {
-    const dbU = usersList.find(u => (u.username || '').toLowerCase() === uName);
+    const dbU = usersList.find(u => 
+      (u.username && u.username.toLowerCase() === uName) ||
+      (u.email && u.email.toLowerCase() === uEmail) ||
+      (u.name && u.name.trim() === uFullName) ||
+      (uName.includes('piyawan') && u.username && u.username.toLowerCase().includes('piyawan')) ||
+      (uFullName.includes('ปิยวรรณ') && u.name && u.name.includes('ปิยวรรณ'))
+    );
     if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 50) {
       targetSign = dbU.sign.trim();
       currentUser.sign = targetSign;
@@ -2801,20 +2809,26 @@ async function autoDrawApproverSignature() {
   // 5. Ensure canvas width/height match parent box dimensions
   const parent = canvas.parentElement || canvas.parentNode;
   const parentWidth = parent ? parent.clientWidth : 500;
+  const parentHeight = parent ? parent.clientHeight : 180;
   canvas.width = parentWidth > 100 ? parentWidth : 500;
-  canvas.height = 150;
+  canvas.height = parentHeight > 50 ? parentHeight : 180;
 
   // 6. Draw targetSign onto canvas
   const img = new Image();
   img.onload = () => {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const hRatio = canvas.width / img.width;
-    const vRatio = canvas.height / img.height;
+    const pad = 12;
+    const availW = canvas.width - (pad * 2);
+    const availH = canvas.height - (pad * 2);
+    const hRatio = availW / img.width;
+    const vRatio = availH / img.height;
     const ratio = Math.min(hRatio, vRatio);
-    const x = (canvas.width - img.width * ratio) / 2;
-    const y = (canvas.height - img.height * ratio) / 2;
-    ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
+    const drawW = img.width * ratio;
+    const drawH = img.height * ratio;
+    const x = (canvas.width - drawW) / 2;
+    const y = (canvas.height - drawH) / 2;
+    ctx.drawImage(img, x, y, drawW, drawH);
     if (placeholder) placeholder.style.display = 'none';
   };
   img.onerror = (err) => {
@@ -3076,9 +3090,9 @@ async function openApprovalModal(bookingId) {
   if (isMyTurn) {
     actionPanel.classList.remove('hidden');
     activeBookingIdForApproval = booking.id;
-    setTimeout(async () => {
-      await autoDrawApproverSignature();
-    }, 150);
+    autoDrawApproverSignature();
+    setTimeout(async () => { await autoDrawApproverSignature(); }, 100);
+    setTimeout(async () => { await autoDrawApproverSignature(); }, 300);
   } else {
     actionPanel.classList.add('hidden');
     if (showEditPanel) {
