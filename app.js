@@ -2361,17 +2361,21 @@ function renderBookingsLists() {
   
   let filteredAllBookingsList = allBookingsList;
 
-  const isL2OrL3 = currentUser && (userHasApproveLevel(currentUser, 2) || userHasApproveLevel(currentUser, 3) || checkCanSeeAll(currentUser));
-  const isL4Only = currentUser && userHasApproveLevel(currentUser, 4) && !userHasApproveLevel(currentUser, 2) && !userHasApproveLevel(currentUser, 3);
-  const isL2OrL3OrL4 = isL2OrL3 || isL4Only;
+  const isL2User = currentUser && userHasApproveLevel(currentUser, 2);
+  const isL3User = currentUser && userHasApproveLevel(currentUser, 3);
+  const isL4User = currentUser && userHasApproveLevel(currentUser, 4);
+
+  // Status dropdown filter is shown ONLY for L2 and L3 (STRICTLY HIDDEN FOR L4)
+  const showStatusFilter = (isL2User || isL3User) && !isL4User;
+  const isL2OrL3OrL4 = isL2User || isL3User || isL4User || (currentUser && checkCanSeeAll(currentUser));
 
   if (historyFilterBar) {
     historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
   }
 
-  // Toggle status filter dropdown visibility: Show for L2 & L3, Hide for L4
+  // Toggle status filter dropdown visibility: Show ONLY for L2 & L3, ALWAYS hide for L4
   if (historyStatusLabel && historyStatusSelect) {
-    if (isL2OrL3) {
+    if (showStatusFilter) {
       historyStatusLabel.style.display = 'inline-flex';
       historyStatusSelect.style.display = 'inline-block';
     } else {
@@ -2380,7 +2384,7 @@ function renderBookingsLists() {
     }
   }
 
-  const filterVal = (historyStatusSelect && isL2OrL3) ? historyStatusSelect.value : 'all';
+  const filterVal = (historyStatusSelect && showStatusFilter) ? historyStatusSelect.value : 'all';
   const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
 
   if (isL2OrL3OrL4) {
@@ -2388,11 +2392,13 @@ function renderBookingsLists() {
       const b = item.booking;
       const st = b.status;
       let matchStatus = true;
-      if (filterVal === 'approved') matchStatus = (st === 'approved');
-      else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
-      else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
-      else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
-      else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
+      if (showStatusFilter) {
+        if (filterVal === 'approved') matchStatus = (st === 'approved');
+        else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
+        else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
+        else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
+        else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
+      }
 
       let matchSearch = true;
       if (searchVal) {
