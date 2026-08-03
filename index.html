@@ -318,7 +318,18 @@
           <!-- Tab 3: All History -->
           <div id="tab-all-history" class="tab-content">
             <div id="history-filter-bar" style="margin-bottom: 1rem; display: none; gap: 0.75rem; align-items: center; flex-wrap: wrap; background: var(--bg-card); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
-              <input type="text" id="history-search-input" placeholder="🔍 ค้นหาเลขคำขอ / ชื่อ / เรื่อง..." class="form-control" style="max-width: 320px; padding: 0.35rem 0.65rem; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);" />
+              <label id="history-status-label" for="history-status-filter" style="font-weight: 600; font-size: 0.85rem; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
+                🔍 กรองตามสถานะใบจอง:
+              </label>
+              <select id="history-status-filter" class="form-control" style="max-width: 240px; padding: 0.35rem 0.65rem; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+                <option value="all">-- แสดงทุกสถานะ --</option>
+                <option value="approved">🟢 อนุมัติเสร็จสิ้น</option>
+                <option value="pending">🟡 อยู่ระหว่างรออนุมัติ</option>
+                <option value="rejected">🔴 ปฏิเสธคำขอ</option>
+                <option value="cancelled">🚫 ยกเลิกคำขอ</option>
+                <option value="waiting_for_requester_edit">✏️ รอผู้ขอปรับปรุง วัน/เวลา</option>
+              </select>
+              <input type="text" id="history-search-input" placeholder="🔍 ค้นหาเลขคำขอ / ชื่อ / เรื่อง..." class="form-control" style="max-width: 240px; padding: 0.35rem 0.65rem; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);" />
             </div>
             <div class="booking-list" id="all-history-container">
               <!-- Injected dynamically -->

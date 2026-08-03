@@ -2349,28 +2349,57 @@ function renderBookingsLists() {
     return numB - numA;
   });
 
-  // Handle Search Input Filtering for History List
+  // Handle Status & Search Filtering for History List
   const historyFilterBar = document.getElementById('history-filter-bar');
+  const historyStatusLabel = document.getElementById('history-status-label');
+  const historyStatusSelect = document.getElementById('history-status-filter');
   const historySearchInput = document.getElementById('history-search-input');
   
   let filteredAllBookingsList = allBookingsList;
 
-  const isL2OrL3OrL4 = currentUser && (userHasApproveLevel(currentUser, 2) || userHasApproveLevel(currentUser, 3) || userHasApproveLevel(currentUser, 4) || checkCanSeeAll(currentUser));
+  const isL2OrL3 = currentUser && (userHasApproveLevel(currentUser, 2) || userHasApproveLevel(currentUser, 3) || checkCanSeeAll(currentUser));
+  const isL4Only = currentUser && userHasApproveLevel(currentUser, 4) && !userHasApproveLevel(currentUser, 2) && !userHasApproveLevel(currentUser, 3);
+  const isL2OrL3OrL4 = isL2OrL3 || isL4Only;
 
   if (historyFilterBar) {
     historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
   }
 
+  // Toggle status filter dropdown visibility: Show for L2 & L3, Hide for L4
+  if (historyStatusLabel && historyStatusSelect) {
+    if (isL2OrL3) {
+      historyStatusLabel.style.display = 'inline-flex';
+      historyStatusSelect.style.display = 'inline-block';
+    } else {
+      historyStatusLabel.style.display = 'none';
+      historyStatusSelect.style.display = 'none';
+    }
+  }
+
+  const filterVal = (historyStatusSelect && isL2OrL3) ? historyStatusSelect.value : 'all';
   const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
 
-  if (searchVal) {
+  if (isL2OrL3OrL4) {
     filteredAllBookingsList = allBookingsList.filter(item => {
       const b = item.booking;
-      const idStr = (b.id || '').toLowerCase();
-      const reqStr = (b.requester || '').toLowerCase();
-      const purpStr = (b.purpose || '').toLowerCase();
-      const destStr = (b.destination || '').toLowerCase();
-      return idStr.includes(searchVal) || reqStr.includes(searchVal) || purpStr.includes(searchVal) || destStr.includes(searchVal);
+      const st = b.status;
+      let matchStatus = true;
+      if (filterVal === 'approved') matchStatus = (st === 'approved');
+      else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
+      else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
+      else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
+      else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
+
+      let matchSearch = true;
+      if (searchVal) {
+        const idStr = (b.id || '').toLowerCase();
+        const reqStr = (b.requester || '').toLowerCase();
+        const purpStr = (b.purpose || '').toLowerCase();
+        const destStr = (b.destination || '').toLowerCase();
+        matchSearch = idStr.includes(searchVal) || reqStr.includes(searchVal) || purpStr.includes(searchVal) || destStr.includes(searchVal);
+      }
+
+      return matchStatus && matchSearch;
     });
   }
 
