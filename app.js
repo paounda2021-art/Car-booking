@@ -2290,15 +2290,25 @@ function renderBookingsLists() {
     
     if ((b.status.startsWith('pending') || isCancellationRequestForL2) && currentUser && !b.waitingForRequesterInput) {
       const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
-      const canApproveThisLevel = (currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel)) || isCancellationRequestForL2;
-      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel || (b.status === 'cancellation_requested' && activeLevel === 'all'));
+      const lvl = b.currentApprovalLevel;
+      const canApproveThisLevel = userHasApproveLevel(currentUser, lvl) || isCancellationRequestForL2;
+      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === lvl || (b.status === 'cancellation_requested' && activeLevel === 'all'));
 
-      if (canApproveThisLevel && isSelectedLevel) {
-        if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
-          // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
+      // 🎯 ตรวจสอบว่า user คนนี้ได้อนุมัติใบนี้ไปแล้วหรือยัง (ถ้าอนุมัติแล้ว ไม่ต้องแสดงในคิวรออนุมัติ)
+      const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
+        s.level === lvl && s.status === 'approved' &&
+        (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
+      );
+
+      if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
+        if (lvl === 1 && b.status !== 'cancellation_requested') {
+          // L1: ตรวจสอบทั้ง email และ role supervisor
           const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
-          if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
+          const isL1ByRole = userHasApproveLevel(currentUser, 1);
+          const isL1ByEmail = mEmail && mEmail === cEmail;
+          const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+          if (isL1ByRole || isL1ByEmail || isL1Fallback) {
             isPendingForMe = true;
           }
         } else {
@@ -2306,6 +2316,7 @@ function renderBookingsLists() {
         }
       }
     }
+
 
     if (isMyRequest) {
       myBookingsList.push({ booking: b, isPendingForMe });
