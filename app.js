@@ -2776,16 +2776,21 @@ async function autoDrawApproverSignature() {
     console.warn("Signature fetch usersList error:", e);
   }
 
-  // 2. Find target user in fresh usersList (matching username, email, name, or piyawan/ปิยวรรณ keyword)
+  // 2. Find target user in fresh usersList — match by username, email, or name (normalized)
   let targetSign = '';
   if (usersList && Array.isArray(usersList)) {
-    const dbU = usersList.find(u => 
-      (u.username && u.username.toLowerCase() === uName) ||
-      (u.email && u.email.toLowerCase() === uEmail) ||
-      (u.name && u.name.trim() === uFullName) ||
-      (uName.includes('piyawan') && u.username && u.username.toLowerCase().includes('piyawan')) ||
-      (uFullName.includes('ปิยวรรณ') && u.name && u.name.includes('ปิยวรรณ'))
-    );
+    const normalizeStr = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const dbU = usersList.find(u => {
+      const uUsernameMatch = u.username && normalizeStr(u.username) === normalizeStr(uName);
+      const uEmailMatch = u.email && normalizeStr(u.email) === normalizeStr(uEmail);
+      const uNameMatch = u.name && normalizeStr(u.name) === normalizeStr(uFullName);
+      const uUsernamePartial = uName && u.username && normalizeStr(u.username).includes(normalizeStr(uName).split('.')[0]);
+      const uEmailPartial = uEmail && u.email && normalizeStr(u.email) === normalizeStr(uEmail);
+      return uUsernameMatch || uEmailMatch || uNameMatch || uEmailPartial || (uName.length > 3 && uUsernamePartial);
+    });
+    if (dbU) {
+      console.log('[autoDrawSign] Matched user:', dbU.username, 'sign length:', dbU.sign ? dbU.sign.length : 0);
+    }
     if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 50) {
       targetSign = dbU.sign.trim();
       currentUser.sign = targetSign;
