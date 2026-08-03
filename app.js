@@ -2764,74 +2764,57 @@ async function autoDrawApproverSignature() {
 
   const uName = (currentUser.username || '').toLowerCase();
   
-  // ALWAYS fetch/ensure usersList is loaded to get real signature from users.json
+  // 1. ALWAYS load fresh users.json before resolving signature
   try {
-    if (!usersList || usersList.length === 0) {
-      const resp = await fetch('users.json?t=' + Date.now());
-      if (resp.ok) usersList = await resp.json();
+    const resp = await fetch('users.json?t=' + Date.now());
+    if (resp.ok) {
+      usersList = await resp.json();
     }
   } catch(e) {
     console.warn("Signature fetch usersList error:", e);
   }
 
+  // 2. Find target user in fresh usersList
   let targetSign = '';
-  if (usersList && usersList.length > 0) {
-    const dbU = usersList.find(u => u.username.toLowerCase() === uName);
-    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.length > 50) {
+  if (usersList && Array.isArray(usersList)) {
+    const dbU = usersList.find(u => (u.username || '').toLowerCase() === uName);
+    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 100) {
       targetSign = dbU.sign.trim();
       currentUser.sign = targetSign;
       try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
     }
   }
 
-  if (!targetSign && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+  // 3. Fallback to currentUser.sign if usersList didn't have it
+  if (!targetSign && currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 100) {
     targetSign = currentUser.sign.trim();
   }
 
-  // Clean data URI string of any stray newlines, carriage returns, or spaces
-  if (targetSign && targetSign.startsWith('data:image')) {
-    targetSign = targetSign.replace(/[\r\n\s]/g, '');
-  }
-
-  // Ultimate fallback to mock signature if no saved base64 image exists
-  if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) {
+  // 4. ONLY if no real signature exists in users.json or currentUser, create mock signature
+  if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 50) {
+    console.log("No real signature in users.json for", uName, "- using mock signature.");
     targetSign = generateMockSignature(currentUser.name || 'ลงนาม');
+  } else {
+    console.log("Found real signature for", uName, "- drawing real PNG signature onto canvas!");
   }
 
-  const drawOnCanvas = (srcUri) => {
-    const img = new Image();
-    img.onload = () => {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const hRatio = canvas.width / img.width;
-      const vRatio = canvas.height / img.height;
-      const ratio = Math.min(hRatio, vRatio);
-      const x = (canvas.width - img.width * ratio) / 2;
-      const y = (canvas.height - img.height * ratio) / 2;
-      ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
-      if (placeholder) placeholder.style.display = 'none';
-    };
-    img.onerror = () => {
-      // If base64 image load failed, draw mock signature as ultimate fallback
-      const mockUri = generateMockSignature(currentUser.name || 'ลงนาม');
-      const mockImg = new Image();
-      mockImg.onload = () => {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const hRatio = canvas.width / mockImg.width;
-        const vRatio = canvas.height / mockImg.height;
-        const ratio = Math.min(hRatio, vRatio);
-        const x = (canvas.width - mockImg.width * ratio) / 2;
-        const y = (canvas.height - mockImg.height * ratio) / 2;
-        ctx.drawImage(mockImg, x, y, mockImg.width * ratio, mockImg.height * ratio);
-        if (placeholder) placeholder.style.display = 'none';
-      };
-      mockImg.src = mockUri;
-    };
-    img.src = srcUri;
+  // 5. Draw targetSign onto canvas
+  const img = new Image();
+  img.onload = () => {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const hRatio = canvas.width / img.width;
+    const vRatio = canvas.height / img.height;
+    const ratio = Math.min(hRatio, vRatio);
+    const x = (canvas.width - img.width * ratio) / 2;
+    const y = (canvas.height - img.height * ratio) / 2;
+    ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
+    if (placeholder) placeholder.style.display = 'none';
   };
-
-  drawOnCanvas(targetSign);
+  img.onerror = (err) => {
+    console.error("Failed to load real signature image:", err);
+  };
+  img.src = targetSign;
 }
 
 // Open Approval Details Modal
