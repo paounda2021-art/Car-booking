@@ -2038,7 +2038,7 @@ function helperCreateTableRow(b, isPendingForMe) {
   for (let i = 1; i <= maxSteps; i++) {
     let dotClass = 'step-dot';
     if (b.currentApprovalLevel > i) dotClass += ' completed';
-    else if (b.currentApprovalLevel === i && b.status === 'pending') dotClass += ' active';
+    else if (b.currentApprovalLevel === i && (b.status === 'pending' || b.status.startsWith('pending'))) dotClass += ' active';
     else if (b.status === 'rejected' && b.currentApprovalLevel === i) dotClass += ' rejected';
     stepsDots += `<span class="${dotClass}" title="สายอนุมัติที่ ${i}"></span>`;
   }
@@ -2221,7 +2221,7 @@ function renderBookingsLists() {
     for (let i = 1; i <= maxSteps; i++) {
       let dotClass = 'step-dot';
       if (b.currentApprovalLevel > i) dotClass += ' completed';
-      else if (b.currentApprovalLevel === i && b.status === 'pending') dotClass += ' active';
+      else if (b.currentApprovalLevel === i && (b.status === 'pending' || b.status.startsWith('pending'))) dotClass += ' active';
       else if (b.status === 'rejected' && b.currentApprovalLevel === i) dotClass += ' rejected';
       stepsDots += `<span class="${dotClass}" title="สายอนุมัติที่ ${i}"></span>`;
     }
@@ -2920,7 +2920,7 @@ async function openApprovalModal(bookingId) {
   if (fleetEditPanel) fleetEditPanel.style.display = 'none';
 
   let isMyTurn = false;
-  if (booking.status === 'pending' && currentUser && !booking.waitingForRequesterInput) {
+  if ((booking.status === 'pending' || booking.status.startsWith('pending')) && currentUser && !booking.waitingForRequesterInput) {
     const lvl = booking.currentApprovalLevel;
 
     if (lvl === 1) {
@@ -2998,7 +2998,7 @@ async function openApprovalModal(bookingId) {
 
 
   const showEditPanel = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2) && 
-                        (booking.status === 'approved' || (booking.status === 'pending' && booking.currentApprovalLevel > 2));
+                        (booking.status === 'approved' || ((booking.status === 'pending' || booking.status.startsWith('pending')) && booking.currentApprovalLevel > 2));
 
   if (isMyTurn) {
     actionPanel.classList.remove('hidden');
@@ -5625,7 +5625,7 @@ function autoGenerateMissingEmailLogs() {
   const deletedLogs = JSON.parse(localStorage.getItem('deleted_email_logs') || '[]');
   
   bookings.forEach(b => {
-    if ((b.status === 'pending' || b.status === 'pending_l1') && !b.waitingForRequesterInput) {
+    if ((b.status === 'pending' || b.status.startsWith('pending')) && !b.waitingForRequesterInput) {
       const lvl = b.currentApprovalLevel;
       let isForCurrentUser = false;
       let targetEmail = '';
