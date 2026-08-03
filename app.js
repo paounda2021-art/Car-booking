@@ -561,8 +561,8 @@ function generateMockSignature(name) {
 
 // Get signature image (database base64 or generated mock signature)
 function getSignatureImg(level, signatureVal, approverName) {
-  if (signatureVal && signatureVal.startsWith('data:image')) {
-    return signatureVal;
+  if (signatureVal && typeof signatureVal === 'string' && signatureVal.trim().startsWith('data:image') && signatureVal.length > 30) {
+    return signatureVal.trim();
   }
   
   let username = '';
@@ -573,13 +573,13 @@ function getSignatureImg(level, signatureVal, approverName) {
   
   if (username && typeof usersList !== 'undefined') {
     const u = usersList.find(x => x.username.toLowerCase() === username.toLowerCase());
-    if (u && u.sign && u.sign.startsWith('data:image')) {
-      return u.sign;
+    if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
+      return u.sign.trim();
     }
   } else if (level === 0 && approverName && typeof usersList !== 'undefined') {
     const u = usersList.find(x => x.name.replace(/\s+/g, '') === approverName.replace(/\s+/g, ''));
-    if (u && u.sign && u.sign.startsWith('data:image')) {
-      return u.sign;
+    if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
+      return u.sign.trim();
     }
   }
   
@@ -2739,9 +2739,9 @@ async function autoDrawApproverSignature() {
   const placeholder = document.getElementById('approver-sig-placeholder');
   if (!canvas || !currentUser) return;
 
-  let targetSign = (currentUser && currentUser.sign) ? currentUser.sign : '';
+  let targetSign = (currentUser && currentUser.sign) ? currentUser.sign.trim() : '';
   
-  if ((!targetSign || !targetSign.startsWith('data:image')) && currentUser) {
+  if ((!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) && currentUser) {
     const uName = (currentUser.username || '').toLowerCase();
     try {
       if (!usersList || usersList.length === 0) {
@@ -2750,9 +2750,9 @@ async function autoDrawApproverSignature() {
       }
       if (usersList && usersList.length > 0) {
         const dbU = usersList.find(u => u.username.toLowerCase() === uName);
-        if (dbU && dbU.sign && dbU.sign.startsWith('data:image')) {
-          targetSign = dbU.sign;
-          currentUser.sign = dbU.sign;
+        if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.length > 30) {
+          targetSign = dbU.sign.trim();
+          currentUser.sign = targetSign;
           localStorage.setItem('current_user', JSON.stringify(currentUser));
         }
       }
@@ -2761,7 +2761,7 @@ async function autoDrawApproverSignature() {
     }
   }
 
-  if (targetSign && targetSign.startsWith('data:image')) {
+  if (targetSign && targetSign.startsWith('data:image') && targetSign.length > 30) {
     if (approverSig) {
       approverSig.resize();
     }
@@ -2776,6 +2776,9 @@ async function autoDrawApproverSignature() {
       const y = (canvas.height - img.height * ratio) / 2;
       ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
       if (placeholder) placeholder.style.display = 'none';
+    };
+    img.onerror = (e) => {
+      console.warn("Image load error for data URI:", e);
     };
     img.src = targetSign;
   }
@@ -3242,7 +3245,7 @@ function renderApprovalPipeline(booking) {
           ${sig.comment ? `<span>ความเห็น: "${sig.comment}"</span><br>` : ''}
           ${sig.driverName ? `<span style="color:var(--primary); font-weight:bold;">จัดพนักงานขับรถ: ${sig.driverName}${getDriverPhoneByName(sig.driverName) ? ` (โทร. ${getDriverPhoneByName(sig.driverName)})` : ''}</span><br>` : ''}
           <div style="margin-top:0.25rem;">
-            <img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">
+            ${(sigImg && sigImg.length > 30) ? `<img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">` : ''}
           </div>
         </div>
       `;
@@ -3258,7 +3261,7 @@ function renderApprovalPipeline(booking) {
           <span>เมื่อ: ${timeStr}</span><br>
           <span style="color:var(--danger);">เหตุผล: "${sig.comment || 'ไม่มีการระบุเหตุผล'}"</span><br>
           <div style="margin-top:0.25rem;">
-            <img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">
+            ${(sigImg && sigImg.length > 30) ? `<img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">` : ''}
           </div>
         </div>
       `;
