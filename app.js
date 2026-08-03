@@ -4522,7 +4522,7 @@ function setupEventListeners() {
         requesterSig.clear();
         const sigSrc = (currentUser && currentUser.sign && currentUser.sign.startsWith('data:image')) 
           ? currentUser.sign 
-          : (currentUser && currentUser.name ? generateMockSignature(currentUser.name) : '');
+          : '';
           
         if (sigSrc) {
           const img = new Image();
@@ -4543,6 +4543,9 @@ function setupEventListeners() {
             }
           };
           img.src = sigSrc;
+        } else {
+          const placeholder = document.getElementById('requester-sig-placeholder');
+          if (placeholder) placeholder.style.display = 'block';
         }
       }
     }, 100);
@@ -4570,13 +4573,19 @@ function setupEventListeners() {
   document.getElementById('form-create-booking').addEventListener('submit', (e) => {
     e.preventDefault();
 
+    if (requesterSig.isEmpty() && (!currentUser || !currentUser.sign || !currentUser.sign.startsWith('data:image'))) {
+      showToast("กรุณาเซ็นชื่อลงในกระดานลงนามดิจิทัลก่อนกดยืนยันการส่งใบขออนุญาต", "warning");
+      return;
+    }
+
     let requesterSignatureUrl = '';
     if (!requesterSig.isEmpty()) {
       requesterSignatureUrl = requesterSig.getDataUrl();
     } else if (currentUser && currentUser.sign && currentUser.sign.startsWith('data:image')) {
       requesterSignatureUrl = currentUser.sign;
     } else {
-      requesterSignatureUrl = generateMockSignature((currentUser && currentUser.name) || 'ผู้ขอใช้รถ');
+      showToast("กรุณาเซ็นชื่อลงในกระดานลงนามดิจิทัลก่อนกดยืนยันการส่งใบขออนุญาต", "warning");
+      return;
     }
 
     const travelType = 'fmo_car';
