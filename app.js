@@ -2911,77 +2911,80 @@ async function openApprovalModal(bookingId) {
   let isMyTurn = false;
   if (booking.status === 'pending' && currentUser && !booking.waitingForRequesterInput) {
     const lvl = booking.currentApprovalLevel;
-    const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(lvl);
-    
-    if (canApproveThisLevel) {
-      if (lvl === 1) {
-        // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
-        const mEmail = resolveManagerEmail(booking).toLowerCase();
-        const cEmail = (currentUser.email || '').toLowerCase();
-        if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
-          isMyTurn = true;
-        }
-      }
-      else if (lvl === 2) {
-        isMyTurn = true;
-        fleetAssignBox.style.display = 'block';
-        
-        const carSelectGroup = document.getElementById('fleet-admin-car-select-group');
-        const driverGroup = document.getElementById('fleet-admin-driver-group');
-        
-        if (carSelectGroup) carSelectGroup.style.display = 'block';
-        
-        const carSelect = document.getElementById('assign-car');
-        carSelect.innerHTML = `
-          <option value="">-- กรุณาเลือกรถยนต์ --</option>
-          <option value="taxi">🚕 รถแท็กซี่ (TAXI)</option>
-        `;
-        cars.forEach(car => {
-          const hasConflict = hasBookingConflict(car.id, booking.startDate, booking.endDate, booking.id);
-          const now = new Date();
-          const isBusyNow = bookings.some(b => {
-            const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
-            if (b.id === booking.id || !isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
-            return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
-          });
 
-          let statusText = '';
-          if (hasConflict) {
-            statusText = ' (ไม่ว่างช่วงที่ขอ)';
-          } else {
-            statusText = isBusyNow ? ' (ไม่ว่างขณะนี้/ว่างช่วงที่ขอ)' : ' (ว่าง)';
-          }
-
-          const disabled = hasConflict ? ' disabled style="color:var(--text-muted);"' : '';
-          carSelect.innerHTML += `<option value="${car.id}"${disabled}>${car.name} (${car.plate})${statusText}</option>`;
-        });
-        
-        const driverInput = document.getElementById('assign-driver');
-        
-        if (booking.travelType === 'public_car') {
-          carSelect.value = 'taxi';
-          if (driverGroup) driverGroup.style.display = 'block';
-          if (driverInput) {
-            driverInput.value = '-';
-            driverInput.disabled = true;
-          }
-        } else {
-          if (driverGroup) driverGroup.style.display = 'block';
-          if (driverInput) {
-            driverInput.value = booking.driverName || (booking.controlUnit === 'รถสวัสดิการ' ? booking.requester : 'นายดีเลิศ สมใจ');
-            driverInput.disabled = false;
-          }
-          carSelect.value = booking.carId || '';
-        }
-      }
-      else if (lvl === 3) {
-        isMyTurn = true;
-      }
-      else if (lvl === 4) {
+    if (lvl === 1) {
+      // ✅ ใช้ userHasApproveLevel L1 ซึ่งครอบคลุม role supervisor, canApprove[1], managerEmail
+      const mEmail = resolveManagerEmail(booking).toLowerCase();
+      const cEmail = (currentUser.email || '').toLowerCase();
+      const isL1ByRole = userHasApproveLevel(currentUser, 1);
+      const isL1ByEmail = mEmail && mEmail === cEmail;
+      const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+      if (isL1ByRole || isL1ByEmail || isL1Fallback) {
         isMyTurn = true;
       }
     }
+    else if (lvl === 2 && userHasApproveLevel(currentUser, 2)) {
+      isMyTurn = true;
+      fleetAssignBox.style.display = 'block';
+      
+      const carSelectGroup = document.getElementById('fleet-admin-car-select-group');
+      const driverGroup = document.getElementById('fleet-admin-driver-group');
+      
+      if (carSelectGroup) carSelectGroup.style.display = 'block';
+      
+      const carSelect = document.getElementById('assign-car');
+      carSelect.innerHTML = `
+          <option value="">-- กรุณาเลือกรถยนต์ --</option>
+          <option value="taxi">🚕 รถแท็กซี่ (TAXI)</option>
+        `;
+      cars.forEach(car => {
+        const hasConflict = hasBookingConflict(car.id, booking.startDate, booking.endDate, booking.id);
+        const now = new Date();
+        const isBusyNow = bookings.some(b => {
+          const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+          if (b.id === booking.id || !isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+          return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
+        });
+
+        let statusText = '';
+        if (hasConflict) {
+          statusText = ' (ไม่ว่างช่วงที่ขอ)';
+        } else {
+          statusText = isBusyNow ? ' (ไม่ว่างขณะนี้/ว่างช่วงที่ขอ)' : ' (ว่าง)';
+        }
+
+        const disabled = hasConflict ? ' disabled style="color:var(--text-muted);"' : '';
+        carSelect.innerHTML += `<option value="${car.id}"${disabled}>${car.name} (${car.plate})${statusText}</option>`;
+      });
+      
+      const driverInput = document.getElementById('assign-driver');
+      
+      if (booking.travelType === 'public_car') {
+        carSelect.value = 'taxi';
+        if (driverGroup) driverGroup.style.display = 'block';
+        if (driverInput) {
+          driverInput.value = '-';
+          driverInput.disabled = true;
+        }
+      } else {
+        if (driverGroup) driverGroup.style.display = 'block';
+        if (driverInput) {
+          driverInput.value = booking.driverName || (booking.controlUnit === 'รถสวัสดิการ' ? booking.requester : 'นายดีเลิศ สมใจ');
+          driverInput.disabled = false;
+        }
+        carSelect.value = booking.carId || '';
+      }
+    }
+    else if (lvl === 3 && userHasApproveLevel(currentUser, 3)) {
+      isMyTurn = true;
+    }
+    else if (lvl === 4 && userHasApproveLevel(currentUser, 4)) {
+      isMyTurn = true;
+    }
   }
+
+
+
 
   const showEditPanel = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2) && 
                         (booking.status === 'approved' || (booking.status === 'pending' && booking.currentApprovalLevel > 2));
