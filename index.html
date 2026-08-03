@@ -864,7 +864,7 @@
         <!-- Special Edit Panel for L2 (Fleet Admin) when booking is approved or pending L3/L4 -->
         <div id="fleet-admin-edit-panel" style="display:none; margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px;">
           <div id="l2-schedule-review-container"></div>
-          <h4 style="margin-bottom: 0.5rem; color: var(--warning); font-size: 1rem;">🔧 แก้ไขการจัดสรรยานพาหนะและวันเวลาเดินทาง (เฉพาะผู้จัดรถ L2)</h4>
+          <h4 style="margin-bottom: 0.5rem; color: var(--warning); font-size: 1rem;">🔧 แก้ไขการจัดสรรยานพาหนะ (เฉพาะผู้จัดรถ L2)</h4>
           
           <div class="form-group" style="margin-top:0.5rem;">
             <label for="edit-assign-car">เลือกรถยนต์ของ อสป. ที่ว่าง หรือเลือก TAXI</label>
@@ -878,19 +878,9 @@
             <input type="text" id="edit-assign-driver" class="form-control" placeholder="ระบุชื่อพนักงานขับรถ">
           </div>
 
-          <div class="form-group" style="margin-top:0.75rem;">
-            <label for="edit-start-date" style="font-weight:600; color:var(--text-color);">📅 วัน/เวลา เริ่มต้นเดินทาง (สำหรับ L2 ปรับปรุงวันเวลา)</label>
-            <input type="datetime-local" id="edit-start-date" class="form-control">
-          </div>
-
-          <div class="form-group" style="margin-top:0.5rem;">
-            <label for="edit-end-date" style="font-weight:600; color:var(--text-color);">📅 วัน/เวลา สิ้นสุดเดินทาง (สำหรับ L2 ปรับปรุงวันเวลา)</label>
-            <input type="datetime-local" id="edit-end-date" class="form-control">
-          </div>
-
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem; flex-wrap:wrap; gap:0.5rem;">
-            <button class="btn btn-warning btn-sm" id="btn-return-to-l0-for-edit" style="background-color:#d97706; color:white; font-weight:600;">🔄 ส่งกลับให้ผู้ขอปรับปรุง วัน/เวลา</button>
-            <button class="btn btn-warning btn-sm" id="btn-save-car-changes">💾 บันทึกการเปลี่ยนแปลงยานพาหนะและวันเวลา</button>
+            <button class="btn btn-warning btn-sm" id="btn-return-to-l0-for-edit" style="background-color:#d97706; color:white; font-weight:600; display:none;">🔄 ส่งกลับให้ผู้ขอปรับปรุง วัน/เวลา</button>
+            <button class="btn btn-warning btn-sm" id="btn-save-car-changes">💾 บันทึกการเปลี่ยนแปลงยานพาหนะ</button>
           </div>
         </div>
 

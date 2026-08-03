@@ -3159,15 +3159,6 @@ async function openApprovalModal(bookingId) {
           editDriverInput.disabled = false;
         }
       }
-
-      const editStartInput = document.getElementById('edit-start-date');
-      const editEndInput = document.getElementById('edit-end-date');
-      if (editStartInput && booking.startDate) {
-        editStartInput.value = formatDateTimeForInput(booking.startDate);
-      }
-      if (editEndInput && booking.endDate) {
-        editEndInput.value = formatDateTimeForInput(booking.endDate);
-      }
     }
   }
 
@@ -5103,19 +5094,6 @@ function setupEventListeners() {
     if (!activeBookingIdForApproval) return;
     const booking = bookings.find(b => b.id === activeBookingIdForApproval);
     if (!booking) return;
-
-    const editStartInput = document.getElementById('edit-start-date');
-    const editEndInput = document.getElementById('edit-end-date');
-    if (editStartInput && editEndInput && editStartInput.value && editEndInput.value) {
-      const newStart = new Date(editStartInput.value);
-      const newEnd = new Date(editEndInput.value);
-      if (newEnd <= newStart) {
-        showToast("วันเวลาสิ้นสุดต้องมาหลังวันเวลาเริ่มต้น", "warning");
-        return;
-      }
-      booking.startDate = newStart.toISOString();
-      booking.endDate = newEnd.toISOString();
-    }
 
     const assignedCarId = document.getElementById('edit-assign-car').value;
     if (!assignedCarId) {
