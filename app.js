@@ -635,6 +635,15 @@ async function initDatabase() {
   try {
     const response = await fetch('users.json?t=' + Date.now());
     usersList = await response.json();
+    if (currentUser && usersList && usersList.length > 0) {
+      const freshUser = usersList.find(u => u.username.toLowerCase() === (currentUser.username || '').toLowerCase());
+      if (freshUser) {
+        if (freshUser.sign) currentUser.sign = freshUser.sign;
+        if (freshUser.canApprove) currentUser.canApprove = freshUser.canApprove;
+        if (freshUser.role) currentUser.role = freshUser.role;
+        localStorage.setItem('current_user', JSON.stringify(currentUser));
+      }
+    }
   } catch (error) {
     console.error("Error loading users list from users.json:", error);
   }
@@ -2887,7 +2896,21 @@ async function openApprovalModal(bookingId) {
     if (approverSig) {
       approverSig.resize();
       approverSig.clear();
-      if (currentUser && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+      
+      let targetSign = (currentUser && currentUser.sign) ? currentUser.sign : '';
+      if ((!targetSign || !targetSign.startsWith('data:image')) && currentUser) {
+        const uName = (currentUser.username || '').toLowerCase();
+        if (usersList && usersList.length > 0) {
+          const dbU = usersList.find(u => u.username.toLowerCase() === uName);
+          if (dbU && dbU.sign && dbU.sign.startsWith('data:image')) {
+            targetSign = dbU.sign;
+            currentUser.sign = dbU.sign;
+            localStorage.setItem('current_user', JSON.stringify(currentUser));
+          }
+        }
+      }
+
+      if (targetSign && targetSign.startsWith('data:image')) {
         const img = new Image();
         img.onload = () => {
           const canvas = document.getElementById('canvas-approver-signature');
@@ -2905,7 +2928,7 @@ async function openApprovalModal(bookingId) {
             if (placeholder) placeholder.style.display = 'none';
           }
         };
-        img.src = currentUser.sign;
+        img.src = targetSign;
       }
     }
   }, 100);
