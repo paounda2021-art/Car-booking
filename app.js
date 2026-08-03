@@ -1710,14 +1710,21 @@ function updateStats() {
       if ((b.status.startsWith('pending') || isCancellationRequestForL2) && !b.waitingForRequesterInput) {
         
         // ตรวจสอบว่า งานเลเวลนี้ (b.currentApprovalLevel) อยู่ในสิทธิ์ที่ User คนนี้อนุมัติได้จริงไหม
-        const canApproveThisLevel = (currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel)) || isCancellationRequestForL2;
+        const canApproveThisLevel = userHasApproveLevel(currentUser, b.currentApprovalLevel) || isCancellationRequestForL2;
         
-        if (canApproveThisLevel && isSelectedLevel) {
+        const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
+          s.level === b.currentApprovalLevel && s.status === 'approved' &&
+          (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
+        );
+
+        if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
           // เงื่อนไขคัดกรองพิเศษเพิ่มเติมสำหรับระดับ L1 (Supervisor)
           if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
             const mEmail = resolveManagerEmail(b).toLowerCase();
             const cEmail = (currentUser.email || '').toLowerCase();
-            if (mEmail === cEmail || mEmail === '') {
+            const isL1ByEmail = mEmail && mEmail === cEmail;
+            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+            if (isL1ByEmail || isL1Fallback) {
               pendingCount++;
             }
           } 
@@ -2330,13 +2337,12 @@ function renderBookingsLists() {
 
       if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
         if (lvl === 1 && b.status !== 'cancellation_requested') {
-          // L1: ตรวจสอบทั้ง email และ role supervisor
+          // L1: แสดงเฉพาะงานที่ส่งถึง Manager ท่านนี้ตามอีเมล หรือ Prathum fallback
           const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
-          const isL1ByRole = userHasApproveLevel(currentUser, 1);
           const isL1ByEmail = mEmail && mEmail === cEmail;
           const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
-          if (isL1ByRole || isL1ByEmail || isL1Fallback) {
+          if (isL1ByEmail || isL1Fallback) {
             isPendingForMe = true;
           }
         } else {
