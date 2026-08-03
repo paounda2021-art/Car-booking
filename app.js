@@ -2448,7 +2448,8 @@ function renderBookingsLists() {
       let matchStatus = true;
       if (isL2OrL3Filter) {
         if (filterVal === 'approved') matchStatus = (st === 'approved');
-        else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
+        else if (filterVal === 'pending') matchStatus = st.startsWith('pending') && !b.waitingForRequesterInput;
+        else if (filterVal === 'waiting_taxi_amount') matchStatus = (st === 'waiting_taxi_amount' || st === 'pending_l0_taxi' || b.waitingForRequesterInput === true || (b.carId === 'taxi' && !b.estimatedCost));
         else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
         else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
         else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
