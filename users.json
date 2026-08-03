@@ -1164,7 +1164,7 @@
     "position": "หัวหน้าสำนักงาน",
     "department1": "ฝสศ.",
     "department2": "สบคพ.",
-    "role": "user",
+    "role": "supervisor",
     "manager_email": "sutak.j@fishmarket.co.th",
     "sign": "",
     "customApprovalLevels": null
@@ -1177,7 +1177,7 @@
     "position": "หัวหน้าสำนักงาน",
     "department1": "สลข.ผอ.",
     "department2": "",
-    "role": "user",
+    "role": "supervisor",
     "manager_email": "preeda.y@fishmarket.co.th",
     "sign": "",
     "customApprovalLevels": null

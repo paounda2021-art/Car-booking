@@ -1033,7 +1033,11 @@ function userHasApproveLevel(userObj, levelNum) {
   const usernameLower = (userObj.username || '').toLowerCase();
   const role = userObj.role || '';
   
-  if (levelInt === 1 && (role === 'supervisor' || ['sarena.m'].includes(usernameLower))) return true;
+  if (levelInt === 1) {
+    if (role === 'supervisor' || (userObj.position && userObj.position.includes('หัวหน้า')) || ['sarena.m', 'jaruwan.s', 'test.l1'].includes(usernameLower)) return true;
+    const uEmail = (userObj.email || '').toLowerCase();
+    if (uEmail && Array.isArray(bookings) && bookings.some(b => b.currentApprovalLevel === 1 && (b.managerEmail || '').toLowerCase() === uEmail)) return true;
+  }
   if (levelInt === 2 && (role === 'fleet_admin' || ['chalong.c', 'sakda.a'].includes(usernameLower))) return true;
   if (levelInt === 3 && (role === 'director' || ['panadon.p', 'saisunee.p'].includes(usernameLower))) return true;
   if (levelInt === 4 && (role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes(usernameLower))) return true;
