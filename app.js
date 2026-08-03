@@ -2693,10 +2693,12 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
   canvas.addEventListener('touchmove', draw, { passive: false });
   window.addEventListener('touchend', stopDraw);
 
-  clearBtn.addEventListener('click', () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (placeholder) placeholder.style.display = 'flex';
-  });
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (placeholder) placeholder.style.display = 'flex';
+    });
+  }
 
   return {
     isEmpty: () => {
@@ -3239,15 +3241,23 @@ function renderApprovalPipeline(booking) {
 
 // Handle Approve / Reject Actions
 async function handleApprovalAction(isApproved) {
-  if (!activeBookingIdForApproval) return;
+  console.log('[handleApprovalAction] called, isApproved=', isApproved, 'activeBookingIdForApproval=', activeBookingIdForApproval);
+  if (!activeBookingIdForApproval) {
+    console.warn('[handleApprovalAction] No active booking ID. Aborting.');
+    return;
+  }
   
-  if (approverSig.isEmpty()) {
+  // Guard: approverSig อาจยัง null ถ้า canvas ยังไม่ถูก initialize
+  if (!approverSig || approverSig.isEmpty()) {
     showToast("กรุณาเซ็นชื่อลงในกระดานลงนามดิจิทัลก่อนกดยืนยันการทำรายการ", "warning");
     return;
   }
 
   const booking = bookings.find(b => b.id === activeBookingIdForApproval);
-  if (!booking) return;
+  if (!booking) {
+    console.warn('[handleApprovalAction] Booking not found:', activeBookingIdForApproval);
+    return;
+  }
 
   const comment = document.getElementById('approval-comment').value;
   const level = booking.currentApprovalLevel;
