@@ -5874,17 +5874,45 @@ function updateEmailInboxUI() {
   autoGenerateMissingEmailLogs();
   const badge = document.getElementById('email-inbox-badge');
   const list = document.getElementById('email-logs-list');
-  if (!list) return;
 
-  // กรองเฉพาะข้อความแจ้งเตือนที่ยังค้างดำเนินการอยู่สำหรับผู้ใช้งานปัจจุบัน
-  const filteredLogs = getActiveEmailLogs();
-  const count = filteredLogs.length;
-  if (badge) {
-    badge.textContent = count;
-    badge.style.display = count > 0 ? 'inline-block' : 'none';
+  // 🔔 คำนวณจำนวนงานรออนุมัติจริงของผู้ใช้ปัจจุบัน เพื่อแสดงตัวเลขสีแดงบนกระดิ่ง
+  let pCount = 0;
+  if (currentUser && Array.isArray(bookings)) {
+    const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+    bookings.forEach(b => {
+      const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser.canApprove && currentUser.canApprove.includes(2);
+      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel || (b.status === 'cancellation_requested' && activeLevel === 'all'));
+      if ((b.status.startsWith('pending') || isCancellationRequestForL2) && !b.waitingForRequesterInput) {
+        const canApproveThisLevel = userHasApproveLevel(currentUser, b.currentApprovalLevel) || isCancellationRequestForL2;
+        const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
+          s.level === b.currentApprovalLevel && s.status === 'approved' &&
+          (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
+        );
+        if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
+          if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
+            const mEmail = resolveManagerEmail(b).toLowerCase();
+            const cEmail = (currentUser.email || '').toLowerCase();
+            const isL1ByEmail = mEmail && mEmail === cEmail;
+            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+            if (isL1ByEmail || isL1Fallback) pCount++;
+          } else {
+            pCount++;
+          }
+        }
+      }
+    });
   }
 
-  if (count === 0) {
+  const filteredLogs = getActiveEmailLogs();
+  const bellCount = pCount > 0 ? pCount : filteredLogs.length;
+  if (badge) {
+    badge.textContent = bellCount;
+    badge.style.display = bellCount > 0 ? 'inline-flex' : 'none';
+  }
+
+  if (!list) return;
+
+  if (filteredLogs.length === 0) {
     list.innerHTML = `
       <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">
         ยังไม่มีข้อความแจ้งเตือนสำหรับคุณในเซสชันนี้
