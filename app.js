@@ -2598,25 +2598,30 @@ function renderBookingsLists() {
 
       for (let p = startPage; p <= endPage; p++) {
         if (p === historyCurrentPage) {
-          pageBtnsHtml += `<button class="btn btn-sm" style="background: var(--primary); color: white; border-radius: 6px; padding: 0.35rem 0.75rem; font-weight: bold; border: none; cursor: default;">${p}</button>`;
+          pageBtnsHtml += `<button class="btn btn-sm" style="background: var(--primary); color: white; border-radius: 6px; padding: 0.25rem 0.5rem; font-weight: bold; border: none; cursor: default; min-width: 28px; font-size: 0.8rem;">${p}</button>`;
         } else {
-          pageBtnsHtml += `<button class="btn btn-sm" onclick="setHistoryPage(${p})" style="background: var(--bg-card); color: var(--text-main); border-radius: 6px; padding: 0.35rem 0.75rem; border: 1px solid var(--border-color); cursor: pointer;">${p}</button>`;
+          pageBtnsHtml += `<button class="btn btn-sm" onclick="setHistoryPage(${p})" style="background: var(--bg-card); color: var(--text-main); border-radius: 6px; padding: 0.25rem 0.5rem; border: 1px solid var(--border-color); cursor: pointer; min-width: 28px; font-size: 0.8rem;">${p}</button>`;
         }
       }
 
-      const prevDisabled = historyCurrentPage === 1 ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 0.35rem 0.75rem; font-size: 0.85rem; border-radius: 6px;"' : `onclick="changeHistoryPage(-1)" style="cursor: pointer; padding: 0.35rem 0.75rem; font-size: 0.85rem; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);"`;
-      const nextDisabled = historyCurrentPage === totalPages ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 0.35rem 0.75rem; font-size: 0.85rem; border-radius: 6px;"' : `onclick="changeHistoryPage(1)" style="cursor: pointer; padding: 0.35rem 0.75rem; font-size: 0.85rem; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);"`;
+      const prevDisabled = historyCurrentPage === 1 
+        ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px; white-space: nowrap;"' 
+        : `onclick="changeHistoryPage(-1)" style="cursor: pointer; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); white-space: nowrap;"`;
+      
+      const nextDisabled = historyCurrentPage === totalPages 
+        ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px; white-space: nowrap;"' 
+        : `onclick="changeHistoryPage(1)" style="cursor: pointer; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); white-space: nowrap;"`;
 
       paginationContainer.innerHTML = `
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">
+        <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; text-align: center; width: 100%;">
           แสดง <strong>${currentStart} - ${currentEnd}</strong> จากทั้งหมด <strong>${totalHistoryCount}</strong> รายการ (หน้า <strong>${historyCurrentPage}</strong> / <strong>${totalPages}</strong>)
         </div>
-        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
-          <button class="btn btn-secondary btn-sm" ${prevDisabled}>◀ หน้าก่อนหน้า</button>
-          <div style="display: flex; gap: 0.25rem;">
+        <div style="display: flex; gap: 0.25rem; align-items: center; justify-content: center; width: 100%; flex-wrap: nowrap; overflow-x: auto; padding: 2px 0;">
+          <button class="btn btn-secondary btn-sm" ${prevDisabled}>◀ ก่อนหน้า</button>
+          <div style="display: flex; gap: 0.2rem; flex-wrap: nowrap;">
             ${pageBtnsHtml}
           </div>
-          <button class="btn btn-secondary btn-sm" ${nextDisabled}>หน้าถัดไป ▶</button>
+          <button class="btn btn-secondary btn-sm" ${nextDisabled}>ถัดไป ▶</button>
         </div>
       `;
     }
