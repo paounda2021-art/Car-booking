@@ -2928,16 +2928,26 @@ async function autoDrawApproverSignature() {
   // 2. Find target user in fresh usersList
   let targetSign = '';
   if (usersList && Array.isArray(usersList)) {
-    const dbU = usersList.find(u => 
-      (u.username && u.username.toLowerCase() === uName) ||
-      (u.email && u.email.toLowerCase() === uEmail) ||
-      (u.name && u.name.replace(/\s+/g, '') === uNameThai) ||
-      (currentUser.role === 'executive' && u.username === 'piyawan.k') ||
-      (userHasApproveLevel(currentUser, 4) && u.username === 'piyawan.k') ||
-      (userHasApproveLevel(currentUser, 3) && u.username === 'saisunee.p') ||
-      (userHasApproveLevel(currentUser, 2) && u.username === 'chalong.c') ||
-      (userHasApproveLevel(currentUser, 1) && u.username === 'prathum.c')
-    );
+    let dbU = usersList.find(u => u.username && u.username.toLowerCase() === uName);
+    if (!dbU && uEmail) {
+      dbU = usersList.find(u => u.email && u.email.toLowerCase() === uEmail);
+    }
+    if (!dbU && uNameThai) {
+      dbU = usersList.find(u => u.name && u.name.replace(/\s+/g, '') === uNameThai);
+    }
+    if (!dbU) {
+      const activeLvl = sessionStorage.getItem('activeApprovalLevel') || 'all';
+      if (activeLvl === '4' || userHasApproveLevel(currentUser, 4)) {
+        dbU = usersList.find(u => u.username === 'piyawan.k' || u.username === 'supbhachart.c');
+      } else if (activeLvl === '3' || userHasApproveLevel(currentUser, 3)) {
+        dbU = usersList.find(u => u.username === 'saisunee.p');
+      } else if (activeLvl === '2' || userHasApproveLevel(currentUser, 2)) {
+        dbU = usersList.find(u => u.username === 'chalong.c');
+      } else if (activeLvl === '1' || userHasApproveLevel(currentUser, 1)) {
+        dbU = usersList.find(u => u.username === 'prathum.c');
+      }
+    }
+
     if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 30) {
       targetSign = dbU.sign.trim().replace(/[\r\n]/g, '');
       currentUser.sign = targetSign;
