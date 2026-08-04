@@ -383,16 +383,43 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       const body = Buffer.concat(chunks).toString('utf8');
       
+      let list = [];
+      try {
+        const rawList = JSON.parse(body);
+        if (Array.isArray(rawList)) {
+          const map = new Map();
+          rawList.forEach(item => {
+            if (!item || !item.id) return;
+            const cleanId = String(item.id).trim();
+            if (!cleanId) return;
+            if (!map.has(cleanId)) {
+              map.set(cleanId, item);
+            } else {
+              const existing = map.get(cleanId);
+              const existingComp = (existing.status === 'approved' || existing.status === 'rejected' || existing.status === 'cancelled');
+              const itemComp = (item.status === 'approved' || item.status === 'rejected' || item.status === 'cancelled');
+              if (itemComp && !existingComp) {
+                map.set(cleanId, item);
+              } else if ((item.currentApprovalLevel || 0) > (existing.currentApprovalLevel || 0)) {
+                map.set(cleanId, item);
+              }
+            }
+          });
+          list = Array.from(map.values());
+        }
+      } catch (e) {}
+
+      const cleanBody = JSON.stringify(list, null, 2);
+
       // Dual-Write 1: bookings.json file
       const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
-      fs.writeFile(bookingsFile, body, 'utf8', err => {
+      fs.writeFile(bookingsFile, cleanBody, 'utf8', err => {
         if (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'error', message: err.message }));
         } else {
           // Dual-Write 2: SQLite database
           try {
-            const list = JSON.parse(body);
             sqliteSaveBookings(list);
           } catch(sqliteErr) {
             console.error("SQLite Dual-Write failed:", sqliteErr);

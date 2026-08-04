@@ -741,6 +741,7 @@ async function initDatabase() {
           } catch(e) {}
         }
 
+        dbBookings = deduplicateBookings(dbBookings);
         localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
         bookings = dbBookings;
         dbBookingsLoaded = true;
@@ -977,6 +978,36 @@ async function initDatabase() {
   checkSystemActivation();
 }
 
+function deduplicateBookings(list) {
+  if (!Array.isArray(list)) return [];
+  const map = new Map();
+  list.forEach(item => {
+    if (!item || !item.id) return;
+    const cleanId = String(item.id).trim();
+    if (!cleanId || cleanId === 'system_config') return;
+
+    if (!map.has(cleanId)) {
+      map.set(cleanId, item);
+    } else {
+      const existing = map.get(cleanId);
+      const existingCompleted = (existing.status === 'approved' || existing.status === 'rejected' || existing.status === 'cancelled');
+      const itemCompleted = (item.status === 'approved' || item.status === 'rejected' || item.status === 'cancelled');
+
+      const existingSigs = Array.isArray(existing.signatures) ? existing.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length : 0;
+      const itemSigs = Array.isArray(item.signatures) ? item.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length : 0;
+
+      if (itemCompleted && !existingCompleted) {
+        map.set(cleanId, item);
+      } else if (itemSigs > existingSigs) {
+        map.set(cleanId, item);
+      } else if ((item.currentApprovalLevel || 0) > (existing.currentApprovalLevel || 0)) {
+        map.set(cleanId, item);
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
 // ==========================================
 // 1. ฟังก์ชันบันทึกข้อมูล (เซฟลงเครื่องเพียวๆ 100%)
 // ==========================================
@@ -985,6 +1016,9 @@ async function saveBookings() {
     console.warn("🛑 บล็อกการทำงาน: ป้องกันการเซฟ 0 รายการทับข้อมูลเดิม!");
     return;
   }
+
+  // 🛡️ Deduplicate bookings before saving
+  bookings = deduplicateBookings(bookings);
 
   // 🚀 บันทึก localStorage ทันที (พร้อมระบบป้องกัน QuotaExceededError)
   try {
@@ -2342,7 +2376,10 @@ function renderBookingsLists() {
   const pendingBookingsList = [];
   const allBookingsList = [];
 
-  bookings.forEach(b => {
+  // 🛡️ Deduplicate bookings list before building UI lists
+  const cleanBookingsList = deduplicateBookings(bookings);
+
+  cleanBookingsList.forEach(b => {
     const isMyRequest = checkIsMyRequest(b, currentUser);
     
     let isPendingForMe = false;
