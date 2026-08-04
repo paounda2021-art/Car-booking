@@ -2841,35 +2841,42 @@ span.flatpickr-weekday {
     flex-direction: column !important;
     justify-content: center !important;
     text-align: center !important;
-    gap: 0.6rem !important;
-    padding: 0.75rem 0.5rem !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem 0.25rem !important;
   }
   
   .history-pagination-info {
     flex-direction: column !important;
-    gap: 0.25rem !important;
+    gap: 0.2rem !important;
     font-size: 0.8rem !important;
   }
 
   .history-pagination-controls {
     width: 100% !important;
     justify-content: center !important;
-    gap: 0.25rem !important;
+    gap: 0.15rem !important;
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
     padding: 2px 0 !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .history-page-numbers {
+    gap: 0.15rem !important;
   }
 
   .history-nav-btn {
-    padding: 0 0.5rem !important;
-    font-size: 0.78rem !important;
-    height: 32px !important;
+    padding: 0 0.4rem !important;
+    font-size: 0.75rem !important;
+    height: 30px !important;
+    border-radius: 6px !important;
   }
 
   .history-page-btn {
-    min-width: 30px !important;
-    height: 32px !important;
-    padding: 0 0.35rem !important;
-    font-size: 0.78rem !important;
+    min-width: 26px !important;
+    height: 30px !important;
+    padding: 0 0.2rem !important;
+    font-size: 0.75rem !important;
+    border-radius: 6px !important;
   }
 }

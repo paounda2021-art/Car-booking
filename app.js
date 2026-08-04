@@ -2598,9 +2598,9 @@ function renderBookingsLists() {
 
       for (let p = startPage; p <= endPage; p++) {
         if (p === historyCurrentPage) {
-          pageBtnsHtml += `<button class="btn history-page-btn active" style="min-width: 36px !important; height: 34px !important; padding: 0 0.5rem !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 8px !important; font-size: 0.85rem !important; font-weight: 600 !important; background: var(--primary) !important; color: #ffffff !important; border: none !important; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3) !important; cursor: default !important; margin: 0 !important; flex-shrink: 0 !important;">${p}</button>`;
+          pageBtnsHtml += `<button class="btn history-page-btn active">${p}</button>`;
         } else {
-          pageBtnsHtml += `<button class="btn history-page-btn inactive" onclick="setHistoryPage(${p})" style="min-width: 36px !important; height: 34px !important; padding: 0 0.5rem !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; border-radius: 8px !important; font-size: 0.85rem !important; font-weight: 600 !important; background: var(--bg-card) !important; color: var(--text-main) !important; border: 1px solid var(--border-color) !important; cursor: pointer !important; margin: 0 !important; flex-shrink: 0 !important;">${p}</button>`;
+          pageBtnsHtml += `<button class="btn history-page-btn inactive" onclick="setHistoryPage(${p})">${p}</button>`;
         }
       }
 
@@ -2617,12 +2617,12 @@ function renderBookingsLists() {
           <span>แสดง <strong>${currentStart} - ${currentEnd}</strong> จากทั้งหมด <strong>${totalHistoryCount}</strong> รายการ</span>
           <span class="history-page-badge">หน้า <strong>${historyCurrentPage}</strong> / <strong>${totalPages}</strong></span>
         </div>
-        <div class="history-pagination-controls" style="display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-end !important; flex-wrap: nowrap !important; gap: 0.5rem !important; margin: 0 !important; padding: 0 !important; width: auto !important;">
-          <button class="btn btn-secondary history-nav-btn" ${prevDisabled} style="height: 34px !important; padding: 0 0.85rem !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 0.35rem !important; border-radius: 8px !important; font-size: 0.85rem !important; font-weight: 600 !important; white-space: nowrap !important; flex-shrink: 0 !important; width: auto !important; margin: 0 !important;">◀ ก่อนหน้า</button>
-          <div class="history-page-numbers" style="display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; gap: 0.35rem !important; margin: 0 !important; padding: 0 !important; width: auto !important;">
+        <div class="history-pagination-controls">
+          <button class="btn btn-secondary history-nav-btn" ${prevDisabled}>◀ ก่อนหน้า</button>
+          <div class="history-page-numbers">
             ${pageBtnsHtml}
           </div>
-          <button class="btn btn-secondary history-nav-btn" ${nextDisabled} style="height: 34px !important; padding: 0 0.85rem !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 0.35rem !important; border-radius: 8px !important; font-size: 0.85rem !important; font-weight: 600 !important; white-space: nowrap !important; flex-shrink: 0 !important; width: auto !important; margin: 0 !important;">ถัดไป ▶</button>
+          <button class="btn btn-secondary history-nav-btn" ${nextDisabled}>ถัดไป ▶</button>
         </div>
       `;
     }
