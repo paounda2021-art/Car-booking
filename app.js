@@ -983,8 +983,8 @@ function deduplicateBookings(list) {
   const map = new Map();
   list.forEach(item => {
     if (!item || !item.id) return;
-    const cleanId = String(item.id).trim();
-    if (!cleanId || cleanId === 'system_config') return;
+    const cleanId = String(item.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
+    if (!cleanId || cleanId === 'SYSTEM_CONFIG') return;
 
     if (!map.has(cleanId)) {
       map.set(cleanId, item);
@@ -2460,8 +2460,33 @@ function renderBookingsLists() {
     }
   });
 
+  // 🛡️ Strict Deduplication on UI Lists by Booking ID
+  const dedupeList = (arr) => {
+    const m = new Map();
+    arr.forEach(item => {
+      if (item && item.booking && item.booking.id) {
+        const k = String(item.booking.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
+        if (!m.has(k)) {
+          m.set(k, item);
+        } else {
+          const existing = m.get(k);
+          const existingComp = (existing.booking.status === 'approved' || existing.booking.status === 'rejected' || existing.booking.status === 'cancelled');
+          const itemComp = (item.booking.status === 'approved' || item.booking.status === 'rejected' || item.booking.status === 'cancelled');
+          if (itemComp && !existingComp) {
+            m.set(k, item);
+          }
+        }
+      }
+    });
+    return Array.from(m.values());
+  };
+
+  const finalMyBookingsList = dedupeList(myBookingsList);
+  const finalPendingBookingsList = dedupeList(pendingBookingsList);
+  const cleanAllBookingsList = dedupeList(allBookingsList);
+
   // 🎯 Sort history list by Booking ID descending (newest requests at the top)
-  allBookingsList.sort((a, b) => {
+  cleanAllBookingsList.sort((a, b) => {
     const numA = parseInt((a.booking.id || '').replace(/\D/g, ''), 10) || 0;
     const numB = parseInt((b.booking.id || '').replace(/\D/g, ''), 10) || 0;
     return numB - numA;
@@ -2473,7 +2498,7 @@ function renderBookingsLists() {
   const historyStatusSelect = document.getElementById('history-status-filter');
   const historySearchInput = document.getElementById('history-search-input');
   
-  let filteredAllBookingsList = allBookingsList;
+  let filteredAllBookingsList = cleanAllBookingsList;
 
   const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
   const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
@@ -2569,7 +2594,7 @@ function renderBookingsLists() {
 
   renderToContainer(
     myContainer,
-    myBookingsList,
+    finalMyBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📁</div>
@@ -2581,7 +2606,7 @@ function renderBookingsLists() {
 
   renderToContainer(
     pendingContainer,
-    pendingBookingsList,
+    finalPendingBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📋</div>

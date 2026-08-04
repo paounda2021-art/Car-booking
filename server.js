@@ -390,8 +390,8 @@ const server = http.createServer((req, res) => {
           const map = new Map();
           rawList.forEach(item => {
             if (!item || !item.id) return;
-            const cleanId = String(item.id).trim();
-            if (!cleanId) return;
+            const cleanId = String(item.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
+            if (!cleanId || cleanId === 'SYSTEM_CONFIG') return;
             if (!map.has(cleanId)) {
               map.set(cleanId, item);
             } else {
