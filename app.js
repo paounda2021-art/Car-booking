@@ -2598,30 +2598,36 @@ function renderBookingsLists() {
 
       for (let p = startPage; p <= endPage; p++) {
         if (p === historyCurrentPage) {
-          pageBtnsHtml += `<button class="btn btn-sm" style="background: var(--primary); color: white; border-radius: 6px; padding: 0.25rem 0.5rem; font-weight: bold; border: none; cursor: default; min-width: 28px; font-size: 0.8rem;">${p}</button>`;
+          pageBtnsHtml += `<button class="btn btn-sm history-page-btn" style="background: var(--primary); color: white; border-radius: 6px; padding: 0.35rem 0.75rem; font-weight: bold; border: none; cursor: default;">${p}</button>`;
         } else {
-          pageBtnsHtml += `<button class="btn btn-sm" onclick="setHistoryPage(${p})" style="background: var(--bg-card); color: var(--text-main); border-radius: 6px; padding: 0.25rem 0.5rem; border: 1px solid var(--border-color); cursor: pointer; min-width: 28px; font-size: 0.8rem;">${p}</button>`;
+          pageBtnsHtml += `<button class="btn btn-sm history-page-btn" onclick="setHistoryPage(${p})" style="background: var(--bg-card); color: var(--text-main); border-radius: 6px; padding: 0.35rem 0.75rem; border: 1px solid var(--border-color); cursor: pointer;">${p}</button>`;
         }
       }
 
       const prevDisabled = historyCurrentPage === 1 
-        ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px; white-space: nowrap;"' 
-        : `onclick="changeHistoryPage(-1)" style="cursor: pointer; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); white-space: nowrap;"`;
+        ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' 
+        : `onclick="changeHistoryPage(-1)" style="cursor: pointer; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);"`;
       
       const nextDisabled = historyCurrentPage === totalPages 
-        ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px; white-space: nowrap;"' 
-        : `onclick="changeHistoryPage(1)" style="cursor: pointer; padding: 0.25rem 0.5rem; font-size: 0.8rem; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color); white-space: nowrap;"`;
+        ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' 
+        : `onclick="changeHistoryPage(1)" style="cursor: pointer; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);"`;
 
       paginationContainer.innerHTML = `
-        <div style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500; text-align: center; width: 100%;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">
           แสดง <strong>${currentStart} - ${currentEnd}</strong> จากทั้งหมด <strong>${totalHistoryCount}</strong> รายการ (หน้า <strong>${historyCurrentPage}</strong> / <strong>${totalPages}</strong>)
         </div>
-        <div style="display: flex; gap: 0.25rem; align-items: center; justify-content: center; width: 100%; flex-wrap: nowrap; overflow-x: auto; padding: 2px 0;">
-          <button class="btn btn-secondary btn-sm" ${prevDisabled}>◀ ก่อนหน้า</button>
-          <div style="display: flex; gap: 0.2rem; flex-wrap: nowrap;">
+        <div class="history-pagination-controls">
+          <button class="btn btn-secondary btn-sm history-nav-btn" ${prevDisabled}>
+            <span class="btn-text-desktop">◀ หน้าก่อนหน้า</span>
+            <span class="btn-text-mobile">◀ ก่อนหน้า</span>
+          </button>
+          <div style="display: flex; gap: 0.25rem; flex-wrap: nowrap;">
             ${pageBtnsHtml}
           </div>
-          <button class="btn btn-secondary btn-sm" ${nextDisabled}>ถัดไป ▶</button>
+          <button class="btn btn-secondary btn-sm history-nav-btn" ${nextDisabled}>
+            <span class="btn-text-desktop">หน้าถัดไป ▶</span>
+            <span class="btn-text-mobile">ถัดไป ▶</span>
+          </button>
         </div>
       `;
     }

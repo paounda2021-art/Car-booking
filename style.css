@@ -2734,3 +2734,51 @@ span.flatpickr-weekday {
   align-items: stretch !important;
   width: 100% !important;
 }
+
+/* Responsive History Pagination Styles */
+.btn-text-desktop {
+  display: inline;
+}
+.btn-text-mobile {
+  display: none;
+}
+
+.history-pagination-controls {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 640px) {
+  .btn-text-desktop {
+    display: none;
+  }
+  .btn-text-mobile {
+    display: inline;
+  }
+  #history-pagination-container {
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem 0.5rem !important;
+  }
+  .history-pagination-controls {
+    width: 100% !important;
+    justify-content: center !important;
+    gap: 0.2rem !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    padding: 2px 0 !important;
+  }
+  .history-page-btn {
+    padding: 0.25rem 0.45rem !important;
+    font-size: 0.8rem !important;
+    min-width: 28px !important;
+  }
+  .history-nav-btn {
+    padding: 0.25rem 0.45rem !important;
+    font-size: 0.8rem !important;
+  }
+}
