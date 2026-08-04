@@ -2598,36 +2598,31 @@ function renderBookingsLists() {
 
       for (let p = startPage; p <= endPage; p++) {
         if (p === historyCurrentPage) {
-          pageBtnsHtml += `<button class="btn btn-sm history-page-btn" style="background: var(--primary); color: white; border-radius: 6px; padding: 0.35rem 0.75rem; font-weight: bold; border: none; cursor: default;">${p}</button>`;
+          pageBtnsHtml += `<button class="btn history-page-btn active">${p}</button>`;
         } else {
-          pageBtnsHtml += `<button class="btn btn-sm history-page-btn" onclick="setHistoryPage(${p})" style="background: var(--bg-card); color: var(--text-main); border-radius: 6px; padding: 0.35rem 0.75rem; border: 1px solid var(--border-color); cursor: pointer;">${p}</button>`;
+          pageBtnsHtml += `<button class="btn history-page-btn inactive" onclick="setHistoryPage(${p})">${p}</button>`;
         }
       }
 
       const prevDisabled = historyCurrentPage === 1 
         ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' 
-        : `onclick="changeHistoryPage(-1)" style="cursor: pointer; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);"`;
+        : `onclick="changeHistoryPage(-1)"`;
       
       const nextDisabled = historyCurrentPage === totalPages 
         ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' 
-        : `onclick="changeHistoryPage(1)" style="cursor: pointer; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);"`;
+        : `onclick="changeHistoryPage(1)"`;
 
       paginationContainer.innerHTML = `
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">
-          แสดง <strong>${currentStart} - ${currentEnd}</strong> จากทั้งหมด <strong>${totalHistoryCount}</strong> รายการ (หน้า <strong>${historyCurrentPage}</strong> / <strong>${totalPages}</strong>)
+        <div class="history-pagination-info">
+          <span>แสดง <strong>${currentStart} - ${currentEnd}</strong> จากทั้งหมด <strong>${totalHistoryCount}</strong> รายการ</span>
+          <span class="history-page-badge">หน้า <strong>${historyCurrentPage}</strong> / <strong>${totalPages}</strong></span>
         </div>
         <div class="history-pagination-controls">
-          <button class="btn btn-secondary btn-sm history-nav-btn" ${prevDisabled}>
-            <span class="btn-text-desktop">◀ หน้าก่อนหน้า</span>
-            <span class="btn-text-mobile">◀ ก่อนหน้า</span>
-          </button>
-          <div style="display: flex; gap: 0.25rem; flex-wrap: nowrap;">
+          <button class="btn btn-secondary history-nav-btn" ${prevDisabled}>◀ ก่อนหน้า</button>
+          <div class="history-page-numbers">
             ${pageBtnsHtml}
           </div>
-          <button class="btn btn-secondary btn-sm history-nav-btn" ${nextDisabled}>
-            <span class="btn-text-desktop">หน้าถัดไป ▶</span>
-            <span class="btn-text-mobile">ถัดไป ▶</span>
-          </button>
+          <button class="btn btn-secondary history-nav-btn" ${nextDisabled}>ถัดไป ▶</button>
         </div>
       `;
     }
