@@ -44,6 +44,8 @@ let bookings = [];
 let cars = [];
 let usersList = [];
 let currentUser = null;
+let historyCurrentPage = 1;
+const historyPerPage = 10;
 
 // Calendar view state
 let calCurrentDate = new Date();
@@ -2552,9 +2554,20 @@ function renderBookingsLists() {
     `
   );
 
+  // 🎯 Pagination for History Tab (10 items per page)
+  const totalHistoryCount = filteredAllBookingsList.length;
+  const totalPages = Math.max(1, Math.ceil(totalHistoryCount / historyPerPage));
+
+  if (historyCurrentPage > totalPages) historyCurrentPage = totalPages;
+  if (historyCurrentPage < 1) historyCurrentPage = 1;
+
+  const startIdx = (historyCurrentPage - 1) * historyPerPage;
+  const endIdx = startIdx + historyPerPage;
+  const paginatedAllBookingsList = filteredAllBookingsList.slice(startIdx, endIdx);
+
   renderToContainer(
     allContainer,
-    filteredAllBookingsList,
+    paginatedAllBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📚</div>
@@ -2563,6 +2576,51 @@ function renderBookingsLists() {
       </div>
     `
   );
+
+  // 🎯 Render History Pagination Bar
+  const paginationContainer = document.getElementById('history-pagination-container');
+  if (paginationContainer) {
+    if (totalHistoryCount === 0) {
+      paginationContainer.style.display = 'none';
+    } else {
+      paginationContainer.style.display = 'flex';
+      
+      const currentStart = startIdx + 1;
+      const currentEnd = Math.min(endIdx, totalHistoryCount);
+      
+      let pageBtnsHtml = '';
+      const maxButtons = 5;
+      let startPage = Math.max(1, historyCurrentPage - 2);
+      let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+      if (endPage - startPage < maxButtons - 1) {
+        startPage = Math.max(1, endPage - maxButtons + 1);
+      }
+
+      for (let p = startPage; p <= endPage; p++) {
+        if (p === historyCurrentPage) {
+          pageBtnsHtml += `<button class="btn btn-sm" style="background: var(--primary); color: white; border-radius: 6px; padding: 0.35rem 0.75rem; font-weight: bold; border: none; cursor: default;">${p}</button>`;
+        } else {
+          pageBtnsHtml += `<button class="btn btn-sm" onclick="setHistoryPage(${p})" style="background: var(--bg-card); color: var(--text-main); border-radius: 6px; padding: 0.35rem 0.75rem; border: 1px solid var(--border-color); cursor: pointer;">${p}</button>`;
+        }
+      }
+
+      const prevDisabled = historyCurrentPage === 1 ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 0.35rem 0.75rem; font-size: 0.85rem; border-radius: 6px;"' : `onclick="changeHistoryPage(-1)" style="cursor: pointer; padding: 0.35rem 0.75rem; font-size: 0.85rem; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);"`;
+      const nextDisabled = historyCurrentPage === totalPages ? 'disabled style="opacity: 0.4; cursor: not-allowed; padding: 0.35rem 0.75rem; font-size: 0.85rem; border-radius: 6px;"' : `onclick="changeHistoryPage(1)" style="cursor: pointer; padding: 0.35rem 0.75rem; font-size: 0.85rem; border-radius: 6px; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);"`;
+
+      paginationContainer.innerHTML = `
+        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">
+          แสดง <strong>${currentStart} - ${currentEnd}</strong> จากทั้งหมด <strong>${totalHistoryCount}</strong> รายการ (หน้า <strong>${historyCurrentPage}</strong> / <strong>${totalPages}</strong>)
+        </div>
+        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-secondary btn-sm" ${prevDisabled}>◀ หน้าก่อนหน้า</button>
+          <div style="display: flex; gap: 0.25rem;">
+            ${pageBtnsHtml}
+          </div>
+          <button class="btn btn-secondary btn-sm" ${nextDisabled}>หน้าถัดไป ▶</button>
+        </div>
+      `;
+    }
+  }
 
   updateStats();
 }
@@ -4972,11 +5030,13 @@ function setupEventListeners() {
   });
 
   document.getElementById('history-status-filter')?.addEventListener('change', () => {
+    historyCurrentPage = 1;
     updateStats();
     renderBookingsLists();
   });
 
   document.getElementById('history-search-input')?.addEventListener('input', () => {
+    historyCurrentPage = 1;
     renderBookingsLists();
   });
 
@@ -6604,10 +6664,30 @@ window.returnWelfareCar = async function(bookingId) {
   renderBookingsLists();
 };
 
+function setHistoryPage(pageNum) {
+  historyCurrentPage = pageNum;
+  renderBookingsLists();
+  const container = document.getElementById('all-history-container');
+  if (container) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function changeHistoryPage(delta) {
+  historyCurrentPage += delta;
+  renderBookingsLists();
+  const container = document.getElementById('all-history-container');
+  if (container) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 // Expose globals for inline attributes or testing
 window.openApprovalModal = openApprovalModal;
 window.openReportView = openReportView;
 window.renderMonthCalendar = renderMonthCalendar;
+window.setHistoryPage = setHistoryPage;
+window.changeHistoryPage = changeHistoryPage;
 
 // Global Capture-Phase Event Delegation for Calendar Event Badges & Booking Click Elements
 document.addEventListener('click', function(e) {
