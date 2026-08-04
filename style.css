@@ -2770,29 +2770,34 @@ span.flatpickr-weekday {
 }
 
 .history-pagination-controls {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-wrap: nowrap;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap !important;
+  gap: 0.5rem !important;
 }
 
 .history-page-numbers {
-  display: flex;
-  gap: 0.35rem;
-  align-items: center;
-  flex-wrap: nowrap;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 0.35rem !important;
 }
 
 .history-page-btn {
-  min-width: 36px;
-  height: 34px;
-  padding: 0 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  min-width: 36px !important;
+  height: 34px !important;
+  padding: 0 0.5rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
   transition: var(--transition-smooth);
 }
 
@@ -2816,15 +2821,18 @@ span.flatpickr-weekday {
 }
 
 .history-nav-btn {
-  height: 34px;
-  padding: 0 0.85rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;
+  height: 34px !important;
+  padding: 0 0.85rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  border-radius: 8px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
   transition: var(--transition-smooth);
 }
 
@@ -2838,15 +2846,16 @@ span.flatpickr-weekday {
   }
   
   .history-pagination-info {
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.8rem;
+    flex-direction: column !important;
+    gap: 0.25rem !important;
+    font-size: 0.8rem !important;
   }
 
   .history-pagination-controls {
     width: 100% !important;
     justify-content: center !important;
     gap: 0.25rem !important;
+    flex-wrap: nowrap !important;
     overflow-x: auto !important;
     padding: 2px 0 !important;
   }
