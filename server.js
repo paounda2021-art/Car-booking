@@ -16,6 +16,39 @@ const DB_PATH = fs.existsSync('C:\\apps\\car-booking\\database.db')
 console.log(`[SQLite] Using database path: ${DB_PATH}`);
 const db = new DatabaseSync(DB_PATH);
 
+// Enable WAL (Write-Ahead Logging) mode and synchronous NORMAL for high-concurrency DB locks prevention
+try {
+  db.exec("PRAGMA journal_mode = WAL;");
+  db.exec("PRAGMA synchronous = NORMAL;");
+  console.log("[SQLite] Journal mode set to WAL (Write-Ahead Logging) & synchronous NORMAL");
+} catch (pragmaErr) {
+  console.error("[SQLite] PRAGMA WAL setup error:", pragmaErr);
+}
+
+// Safe Atomic Write for JSON files to prevent file corruption during concurrent operations or restarts
+function safeWriteJsonFile(filePath, data, callback) {
+  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 8)}.tmp`;
+  const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  
+  fs.writeFile(tmpPath, content, 'utf8', (writeErr) => {
+    if (writeErr) {
+      console.error(`[SafeWrite] Temp write error for ${filePath}:`, writeErr);
+      if (callback) callback(writeErr);
+      return;
+    }
+    fs.rename(tmpPath, filePath, (renameErr) => {
+      if (renameErr) {
+        console.error(`[SafeWrite] Atomic rename error for ${filePath}:`, renameErr);
+        fs.writeFile(filePath, content, 'utf8', (fallbackErr) => {
+          if (callback) callback(fallbackErr);
+        });
+      } else {
+        if (callback) callback(null);
+      }
+    });
+  });
+}
+
 // Ensure tables exist
 db.exec(`
   CREATE TABLE IF NOT EXISTS bookings (
@@ -411,9 +444,9 @@ const server = http.createServer((req, res) => {
 
       const cleanBody = JSON.stringify(list, null, 2);
 
-      // Dual-Write 1: bookings.json file
+      // Dual-Write 1: bookings.json file (using safe atomic write)
       const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
-      fs.writeFile(bookingsFile, cleanBody, 'utf8', err => {
+      safeWriteJsonFile(bookingsFile, cleanBody, err => {
         if (err) {
           res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'error', message: err.message }));
@@ -1705,7 +1738,7 @@ const server = http.createServer((req, res) => {
               }
               
               if (updatedAny) {
-                fs.writeFile(bookingsFile, JSON.stringify(bookings, null, 2), 'utf8', (wErr) => {
+                safeWriteJsonFile(bookingsFile, bookings, (wErr) => {
                   if (wErr) console.error("Error writing bookings.json:", wErr);
                   else {
                     console.log("LINE Webhook: bookings.json updated successfully");
