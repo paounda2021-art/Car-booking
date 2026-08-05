@@ -2446,16 +2446,18 @@ function renderBookingsLists() {
     const isL2OrL3 = (isL2User || isL3User) && !isL4Active;
 
     if (isMyRequest) {
+      // 🎯 1. เจ้าของคำขอ (L0) จะเห็นเฉพาะงานที่ตนเองเป็นคนเสนอขอเท่านั้น
+      canShowInHistory = true;
+    } else if (isManagerOrApprover) {
+      // 🎯 2. หัวหน้างาน (L1) หรือผู้ที่เกี่ยวข้องกับสายอนุมัติใบนี้ จะเห็นเฉพาะงานของลูกน้องในสังกัด
       canShowInHistory = true;
     } else if (isL4Active) {
-      // 🎯 สำหรับ L4: แสดงเฉพาะเคสที่อนุมัติเสร็จสิ้นเท่านั้น (status === 'approved')
+      // 🎯 3. สำหรับ L4: แสดงเฉพาะเคสที่อนุมัติเสร็จสิ้นแล้วเท่านั้น (และไม่ใช่ของตนเอง)
       if (b.status === 'approved') {
         canShowInHistory = true;
       }
-    } else if (isL2OrL3 || canSeeAll || isManagerOrApprover) {
-      // 🎯 สำหรับ L2 และ L3: แสดงทุกสถานะ
-      canShowInHistory = true;
-    } else if (b.status === 'approved') {
+    } else if (isL2OrL3 || canSeeAll) {
+      // 🎯 4. สำหรับ L2, L3 หรือแอดมิน: แสดงทุกสถานะเพื่อการจัดการ
       canShowInHistory = true;
     }
 
