@@ -1058,30 +1058,17 @@ const server = http.createServer((req, res) => {
                         );
                       }
                     } else if (!isCancel) {
-                      if (isLocal) {
-                        list.push({
-                          type: "button",
-                          action: {
-                            type: "uri",
-                            label: "✅ กดรับงาน",
-                            uri: `${payload.origin || 'http://localhost:8080'}/index.html?action=accept-job&id=${payload.bookingId}`
-                          },
-                          style: "primary",
-                          color: "#10b981"
-                        });
-                      } else {
-                        list.push({
-                          type: "button",
-                          action: {
-                            type: "postback",
-                            label: "✅ กดรับงาน",
-                            data: `action=accept-job&id=${payload.bookingId}`,
-                            displayText: "✅ กดรับงาน"
-                          },
-                          style: "primary",
-                          color: "#10b981"
-                        });
-                      }
+                      list.push({
+                        type: "button",
+                        action: {
+                          type: "postback",
+                          label: "✅ กดรับงาน",
+                          data: `action=accept-job&id=${payload.bookingId}`,
+                          displayText: `✅ กดรับงาน ${payload.bookingId || ''}`
+                        },
+                        style: "primary",
+                        color: "#10b981"
+                      });
                     }
 
                     if (list.length === 0) return undefined;
@@ -1089,7 +1076,7 @@ const server = http.createServer((req, res) => {
                       type: "box",
                       layout: "vertical",
                       contents: list,
-                      paddingAll: "15px"
+                      paddingAll: "10px"
                     };
                   })()
                 }
@@ -1114,8 +1101,19 @@ const server = http.createServer((req, res) => {
             lineRes.on('data', (d) => { resBody += d; });
             lineRes.on('end', () => {
               console.log('LINE: Push Response Status:', lineRes.statusCode, 'Body:', resBody);
-              res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-              res.end(JSON.stringify({ status: 'success', message: 'Notification sent successfully', response: resBody }));
+              if (lineRes.statusCode >= 200 && lineRes.statusCode < 300) {
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ status: 'success', message: 'Notification sent successfully', response: resBody }));
+              } else {
+                let errMsg = `LINE API Error (${lineRes.statusCode})`;
+                try {
+                  const errObj = JSON.parse(resBody);
+                  if (errObj.message) errMsg = errObj.message;
+                } catch(e){}
+                console.error(`LINE Push Failed [${lineRes.statusCode}]: ${errMsg}`);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ status: 'error', statusCode: lineRes.statusCode, message: errMsg, response: resBody }));
+              }
             });
           });
 
@@ -1176,10 +1174,328 @@ const server = http.createServer((req, res) => {
                 console.error("Error parsing bookings.json:", e);
               }
               
+              const defaultCars = [
+                { "id": "A", "name": "Toyota Commuter", "type": "รถตู้", "plate": "ฮษ 7446", "status": "available", "icon": "🚐", "driverName": "นายชลาดล  ทองคำ", "phone": "08-0992-3735" },
+                { "id": "B", "name": "Toyota Commuter", "type": "รถตู้", "plate": "1 นญ 1865 (เช่า)", "status": "available", "icon": "🚐", "driverName": "นายสันติ สุธรรม", "phone": "09-1021-4916" },
+                { "id": "C", "name": "Toyota Commuter", "type": "รถตู้", "plate": "1 นญ 2029 (เช่า)", "status": "available", "icon": "🚐", "driverName": "นายคมกฤษ คุ้มชัย", "phone": "09-4849-1122" },
+                { "id": "D", "name": "Toyota Commuter", "type": "รถตู้", "plate": "ฮล 2521 (รถสวัสดิการ)", "status": "available", "icon": "🚐", "driverName": "", "phone": "" }
+              ];
+
+              const getCarPlateById = (carId) => {
+                const car = defaultCars.find(c => c.id === carId);
+                return car ? car.plate : '-';
+              };
+              
+              const formatThaiDateTime = (isoString) => {
+                if (!isoString) return '-';
+                const date = new Date(isoString);
+                const years = date.getFullYear() + 543;
+                const shortYear = String(years).slice(-2);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${day}/${month}/${shortYear} ${hours}.${minutes} น.`;
+              };
+
               let updatedAny = false;
               
               for (const event of payload.events) {
-                if (event.type === 'postback') {
+                if (event.type === 'message' && event.message && event.message.type === 'text') {
+                  const text = (event.message.text || '').trim();
+                  const lowerText = text.toLowerCase();
+                  
+                  let requestedCarId = null;
+                  const carMatch = lowerText.match(/(?:@|รถ\s*|งาน\s*|^)([a-d]|taxi)(?:\s*|$)/i);
+                  if (carMatch) {
+                    requestedCarId = carMatch[1].toUpperCase();
+                  }
+
+                  let requestedDriverName = null;
+                  const knownDrivers = ['ชลาดล', 'สันติ', 'คมกฤษ'];
+                  for (const dName of knownDrivers) {
+                    if (lowerText.includes(dName.toLowerCase())) {
+                      requestedDriverName = dName;
+                      break;
+                    }
+                  }
+
+                  const isJobQuery = ['เช็คงาน', 'คิวงาน', 'งานวันนี้', 'คำขอ', 'jobs', 'status', 'งาน', 'รถ'].some(kw => lowerText.includes(kw)) ||
+                                     text.startsWith('@') || requestedCarId !== null || requestedDriverName !== null;
+                                     
+                  if (isJobQuery && event.replyToken && accessToken) {
+                    console.log(`LINE Webhook: Text query received -> "${text}" (Car: ${requestedCarId || 'ALL'}, Driver: ${requestedDriverName || 'ALL'})`);
+                    
+                    let activeApproved = bookings.filter(b => b.status === 'approved' && !b.returnedEarly);
+                    
+                    const now = new Date();
+                    const currentYear = now.getFullYear();
+                    const currentMonth = now.getMonth();
+                    const firstDayOfCurrentMonth = new Date(currentYear, currentMonth, 1).toISOString().slice(0, 10);
+                    const currentAndUpcoming = activeApproved.filter(b => (b.startDate || '') >= firstDayOfCurrentMonth);
+                    if (currentAndUpcoming.length > 0) {
+                      activeApproved = currentAndUpcoming;
+                    }
+                    
+                    if (requestedCarId) {
+                      activeApproved = activeApproved.filter(b => (b.carId || '').toUpperCase() === requestedCarId);
+                    }
+                    if (requestedDriverName) {
+                      activeApproved = activeApproved.filter(b => (b.driverName || '').includes(requestedDriverName));
+                    }
+                    
+                    // Sort ascending by startDate (คิวงานที่ต้องเดินทางไปก่อน จะขึ้นแสดงเป็นอันดับแรก)
+                    activeApproved.sort((a, b) => new Date(a.startDate || 0) - new Date(b.startDate || 0));
+                    
+                    const buildSingleCarBubble = (b) => {
+                      const carPlate = getCarPlateById(b.carId);
+                      const carInfo = b.carId === 'taxi' ? 'รถรับจ้างสาธารณะ (TAXI)' : `รถยนต์ อสป. ทะเบียน ${carPlate}`;
+                      const dateTime = formatThaiDateTime(b.startDate);
+                      const isDone = !!b.returnedEarly;
+                      const isOverdue = !isDone && b.endDate && new Date(b.endDate) < new Date();
+                      
+                      let btnLabel = "✅ กดรับงาน";
+                      let btnColor = "#10b981";
+                      let btnData = `action=accept-job&id=${b.id}`;
+                      let btnDisplay = `✅ กดรับงาน ${b.id}`;
+
+                      if (b.returnedEarly) {
+                        btnLabel = "🔘 จบงานแล้ว (คืนรถเสร็จสิ้น)";
+                        btnColor = "#94a3b8";
+                        btnData = `action=already-finished&id=${b.id}`;
+                        btnDisplay = "🔘 จบงานแล้ว";
+                      } else if (b.driverAccepted) {
+                        btnLabel = "🔴 จบงาน (คืนรถ)";
+                        btnColor = "#ef4444";
+                        btnData = `action=return-early&id=${b.id}`;
+                        btnDisplay = `🔴 จบงาน ${b.id}`;
+                      }
+
+                      let headerTitle = isDone ? "🏁 เสร็จสิ้นใบสั่งงาน (พขร. คืนรถแล้ว)" : `📋 ใบสั่งงาน พขร. ${b.carId ? '(คัน ' + b.carId + ')' : ''}`;
+                      let headerSub = `📌 คำขอเลขที่: ${b.id}`;
+                      let headerBg = isDone ? "#f1f5f9" : "#f0f9ff";
+                      let headerColor = isDone ? "#64748b" : "#0284c7";
+                      let headerSubColor = isDone ? "#475569" : "#0369a1";
+
+                      if (isOverdue) {
+                        headerTitle = `⚠️ ใบสั่งงาน พขร. ${b.carId ? '(คัน ' + b.carId + ')' : ''} (เลยเวลากำหนดคืนรถ)`;
+                        headerSub = `📌 คำขอเลขที่: ${b.id} | ⏰ ลืมกดจบงานคืนรถ`;
+                        headerBg = "#fff7ed";
+                        headerColor = "#c2410c";
+                        headerSubColor = "#ea580c";
+                      }
+
+                      const bodyContents = [];
+
+                      if (isOverdue) {
+                        const endDateTimeStr = formatThaiDateTime(b.endDate);
+                        bodyContents.push({
+                          type: "box",
+                          layout: "vertical",
+                          backgroundColor: "#fee2e2",
+                          cornerRadius: "sm",
+                          paddingAll: "6px",
+                          contents: [
+                            {
+                              type: "text",
+                              text: `⚠️ แจ้งเตือน: เลยเวลากำหนดคืนรถแล้ว (${endDateTimeStr}) กรุณากดปุ่มจบงานด้านล่าง`,
+                              size: "xs",
+                              color: "#dc2626",
+                              weight: "bold",
+                              wrap: true
+                            }
+                          ]
+                        });
+                      }
+
+                      bodyContents.push(
+                        {
+                          type: "box",
+                          layout: "horizontal",
+                          contents: [
+                            { type: "text", text: "👤 พขร.:", size: "xs", color: "#64748b", flex: 4 },
+                            { type: "text", text: b.driverName || 'ไม่ระบุ', size: "xs", color: "#1e293b", weight: "bold", flex: 6, wrap: true }
+                          ],
+                          margin: isOverdue ? "xs" : undefined
+                        },
+                        {
+                          type: "box",
+                          layout: "horizontal",
+                          contents: [
+                            { type: "text", text: "🚗 ยานพาหนะ:", size: "xs", color: "#64748b", flex: 4 },
+                            { type: "text", text: carInfo, size: "xs", color: "#1e293b", flex: 6, wrap: true }
+                          ],
+                          margin: "xs"
+                        },
+                        {
+                          type: "box",
+                          layout: "horizontal",
+                          contents: [
+                            { type: "text", text: "📍 ปลายทาง:", size: "xs", color: "#64748b", flex: 4 },
+                            { type: "text", text: b.destination || 'ไม่ระบุ', size: "xs", color: "#1e293b", flex: 6, wrap: true }
+                          ],
+                          margin: "xs"
+                        },
+                        {
+                          type: "box",
+                          layout: "horizontal",
+                          contents: [
+                            { type: "text", text: "📅 เวลาเดินทาง:", size: "xs", color: "#64748b", flex: 4 },
+                            { type: "text", text: dateTime, size: "xs", color: "#1e293b", flex: 6, wrap: true }
+                          ],
+                          margin: "xs"
+                        },
+                        {
+                          type: "box",
+                          layout: "horizontal",
+                          contents: [
+                            { type: "text", text: "👤 ผู้ขอใช้รถ:", size: "xs", color: "#64748b", flex: 4 },
+                            { type: "text", text: b.requester || '-', size: "xs", color: "#1e293b", flex: 6, wrap: true }
+                          ],
+                          margin: "xs"
+                        },
+                        {
+                          type: "box",
+                          layout: "horizontal",
+                          contents: [
+                            { type: "text", text: "👨‍👩‍👦‍👦 ผู้ร่วมเดินทาง:", size: "xs", color: "#64748b", flex: 4 },
+                            { type: "text", text: b.passengers || 'ไม่มี', size: "xs", color: "#1e293b", flex: 6, wrap: true }
+                          ],
+                          margin: "xs"
+                        }
+                      );
+
+                      return {
+                        type: "bubble",
+                        header: {
+                          type: "box",
+                          layout: "vertical",
+                          contents: [
+                            { 
+                              type: "text", 
+                              text: headerTitle,
+                              weight: "bold", 
+                              size: "md", 
+                              color: headerColor,
+                              wrap: true
+                            },
+                            { 
+                              type: "text", 
+                              text: headerSub,
+                              size: "xs", 
+                              color: headerSubColor,
+                              weight: "bold", 
+                              margin: "xs",
+                              wrap: true
+                            }
+                          ],
+                          backgroundColor: headerBg,
+                          paddingAll: "10px"
+                        },
+                        body: {
+                          type: "box",
+                          layout: "vertical",
+                          contents: bodyContents,
+                          paddingAll: "10px"
+                        },
+                        footer: {
+                          type: "box",
+                          layout: "vertical",
+                          contents: [
+                            {
+                              type: "button",
+                              action: {
+                                type: "postback",
+                                label: btnLabel,
+                                data: btnData,
+                                displayText: btnDisplay
+                              },
+                              style: "secondary",
+                              color: btnColor
+                            }
+                          ],
+                          paddingAll: "8px"
+                        }
+                      };
+                    };
+
+                    let flexContents = null;
+
+                    if (activeApproved.length === 0) {
+                      const msgText = requestedDriverName
+                        ? `ℹ️ พขร. ${requestedDriverName} ขณะนี้ไม่มีคิวงานอนุมัติคงค้าง`
+                        : requestedCarId 
+                        ? `ℹ️ รถยนต์คัน ${requestedCarId} ขณะนี้ว่าง (ไม่มีคิวงานอนุมัติคงค้าง)` 
+                        : `ℹ️ ขณะนี้ยังไม่มีรายการจองรถยนต์ที่อนุมัติเสร็จสมบูรณ์คงค้างในระบบ`;
+                        
+                      const headerTitleText = requestedDriverName
+                        ? `👤 คิวงาน พขร. ${requestedDriverName}`
+                        : requestedCarId
+                        ? `🚐 สถานะรถยนต์คัน ${requestedCarId}`
+                        : `📋 คิวงาน พขร. อัปเดตล่าสุด`;
+
+                      flexContents = {
+                        type: "bubble",
+                        header: {
+                          type: "box",
+                          layout: "vertical",
+                          contents: [
+                            { type: "text", text: headerTitleText, weight: "bold", size: "md", color: "#047857" }
+                          ],
+                          backgroundColor: "#f0fdf4",
+                          paddingAll: "10px"
+                        },
+                        body: {
+                          type: "box",
+                          layout: "vertical",
+                          contents: [
+                            { type: "text", text: msgText, size: "sm", color: "#64748b", wrap: true }
+                          ],
+                          paddingAll: "10px"
+                        }
+                      };
+                    } else if (activeApproved.length === 1) {
+                      flexContents = buildSingleCarBubble(activeApproved[0]);
+                    } else {
+                      const bubbles = activeApproved.slice(0, 5).map(b => buildSingleCarBubble(b));
+                      flexContents = {
+                        type: "carousel",
+                        contents: bubbles
+                      };
+                    }
+
+                    const postData = JSON.stringify({
+                      replyToken: event.replyToken,
+                      messages: [{
+                        type: "flex",
+                        altText: requestedCarId ? `📋 คิวงานรถยนต์คัน ${requestedCarId}` : "📋 คิวงาน พขร. อัปเดตล่าสุด",
+                        contents: flexContents
+                      }]
+                    });
+                    
+                    const reqOptions = {
+                      hostname: 'api.line.me',
+                      port: 443,
+                      path: '/v2/bot/message/reply',
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + accessToken,
+                        'Content-Length': Buffer.byteLength(postData)
+                      }
+                    };
+                    
+                    const lReq = https.request(reqOptions, (lRes) => {
+                      let rBody = '';
+                      lRes.on('data', d => rBody += d);
+                      lRes.on('end', () => console.log('LINE Webhook: Text reply sent. Status:', lRes.statusCode, 'Body:', rBody));
+                    });
+                    lReq.on('error', e => console.error('LINE Reply API error:', e));
+                    lReq.write(postData);
+                    lReq.end();
+                  }
+                }
+                else if (event.type === 'postback') {
                   const postbackData = event.postback.data;
                   const params = new URLSearchParams(postbackData);
                   const action = params.get('action');
@@ -1191,44 +1507,33 @@ const server = http.createServer((req, res) => {
                     const booking = bookings.find(b => b.id === bookingId);
                     if (booking) {
                       let updated = false;
-                      if (action === 'accept-job' && !booking.driverAccepted) {
-                        booking.driverAccepted = true;
-                        updated = true;
-                      } else if (action === 'return-early' && !booking.returnedEarly) {
-                        booking.returnedEarly = true;
-                        booking.endDate = new Date().toISOString();
-                        updated = true;
+                      let alreadyAcceptedNotice = false;
+                      let alreadyReturnedNotice = false;
+
+                      if (action === 'accept-job') {
+                        if (!booking.driverAccepted) {
+                          booking.driverAccepted = true;
+                          updated = true;
+                        } else {
+                          alreadyAcceptedNotice = true;
+                        }
+                      } else if (action === 'return-early') {
+                        if (!booking.returnedEarly) {
+                          booking.returnedEarly = true;
+                          booking.endDate = new Date().toISOString();
+                          updated = true;
+                        } else {
+                          alreadyReturnedNotice = true;
+                        }
+                      } else if (action === 'already-finished') {
+                        alreadyReturnedNotice = true;
                       }
-                      
-                      if (updated) {
-                        updatedAny = true;
+
+                      if (updated || alreadyAcceptedNotice || alreadyReturnedNotice || action === 'return-early') {
+                        updatedAny = updated;
                         
                         if (accessToken) {
-                          const defaultCars = [
-                            { "id": "A", "name": "Toyota Commuter", "type": "รถตู้", "plate": "ฮษ 7446", "status": "available", "icon": "🚐", "driverName": "นายชลาดล  ทองคำ", "phone": "08-0992-3735" },
-                            { "id": "B", "name": "Toyota Commuter", "type": "รถตู้", "plate": "1 นญ 1865 (เช่า)", "status": "available", "icon": "🚐", "driverName": "นายสันติ สุธรรม", "phone": "09-1021-4916" },
-                            { "id": "C", "name": "Toyota Commuter", "type": "รถตู้", "plate": "1 นญ 2029 (เช่า)", "status": "available", "icon": "🚐", "driverName": "นายคมกฤษ คุ้มชัย", "phone": "09-4849-1122" },
-                            { "id": "D", "name": "Toyota Commuter", "type": "รถตู้", "plate": "ฮล 2521 (รถสวัสดิการ)", "status": "available", "icon": "🚐", "driverName": "", "phone": "" }
-                          ];
-                          
-                          const getCarPlateById = (carId) => {
-                            const car = defaultCars.find(c => c.id === carId);
-                            return car ? car.plate : '-';
-                          };
-                          
-                          const formatThaiDateTime = (isoString) => {
-                            if (!isoString) return '-';
-                            const date = new Date(isoString);
-                            const years = date.getFullYear() + 543;
-                            const shortYear = String(years).slice(-2);
-                            const day = String(date.getDate()).padStart(2, '0');
-                            const month = String(date.getMonth() + 1).padStart(2, '0');
-                            const hours = String(date.getHours()).padStart(2, '0');
-                            const minutes = String(date.getMinutes()).padStart(2, '0');
-                            return `${day}/${month}/${shortYear} ${hours}.${minutes} น.`;
-                          };
-
-                          const isFinished = action === 'return-early';
+                          const isFinished = action === 'return-early' || booking.returnedEarly;
                           const headerTitle = isFinished ? "🏁 เสร็จสิ้นใบสั่งงาน (พขร. คืนรถแล้ว)" : "🟢 พขร. รับงานแล้ว";
                           const headerColor = isFinished ? "#64748b" : "#10b981";
                           const headerBg = isFinished ? "#f1f5f9" : "#f0fdf4";
@@ -1243,54 +1548,54 @@ const server = http.createServer((req, res) => {
                               type: "box",
                               layout: "horizontal",
                               contents: [
-                                { type: "text", text: "👤 พขร. ปฏิบัติหน้าที่:", size: "sm", color: "#64748b", flex: 4 },
-                                { type: "text", text: booking.driverName || 'ไม่ระบุ', size: "sm", color: "#1e293b", weight: "bold", flex: 6, wrap: true }
+                                { type: "text", text: "👤 พขร. ปฏิบัติหน้าที่:", size: "xs", color: "#64748b", flex: 4 },
+                                { type: "text", text: booking.driverName || 'ไม่ระบุ', size: "xs", color: "#1e293b", weight: "bold", flex: 6, wrap: true }
                               ]
                             },
                             {
                               type: "box",
                               layout: "horizontal",
                               contents: [
-                                { type: "text", text: "🚗 ยานพาหนะ:", size: "sm", color: "#64748b", flex: 4 },
-                                { type: "text", text: carInfo, size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                                { type: "text", text: "🚗 ยานพาหนะ:", size: "xs", color: "#64748b", flex: 4 },
+                                { type: "text", text: carInfo, size: "xs", color: "#1e293b", flex: 6, wrap: true }
                               ],
-                              margin: "md"
+                              margin: "xs"
                             },
                             {
                               type: "box",
                               layout: "horizontal",
                               contents: [
-                                { type: "text", text: "📍 สถานที่ปลายทาง:", size: "sm", color: "#64748b", flex: 4 },
-                                { type: "text", text: booking.destination || 'ไม่ระบุ', size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                                { type: "text", text: "📍 สถานที่ปลายทาง:", size: "xs", color: "#64748b", flex: 4 },
+                                { type: "text", text: booking.destination || 'ไม่ระบุ', size: "xs", color: "#1e293b", flex: 6, wrap: true }
                               ],
-                              margin: "md"
+                              margin: "xs"
                             },
                             {
                               type: "box",
                               layout: "horizontal",
                               contents: [
-                                { type: "text", text: "📅 วันเวลาเดินทาง:", size: "sm", color: "#64748b", flex: 4 },
-                                { type: "text", text: dateTime, size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                                { type: "text", text: "📅 วันเวลาเดินทาง:", size: "xs", color: "#64748b", flex: 4 },
+                                { type: "text", text: dateTime, size: "xs", color: "#1e293b", flex: 6, wrap: true }
                               ],
-                              margin: "md"
+                              margin: "xs"
                             },
                             {
                               type: "box",
                               layout: "horizontal",
                               contents: [
-                                { type: "text", text: "👤 ผู้ขอใช้รถ:", size: "sm", color: "#64748b", flex: 4 },
-                                { type: "text", text: booking.requester || '', size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                                { type: "text", text: "👤 ผู้ขอใช้รถ:", size: "xs", color: "#64748b", flex: 4 },
+                                { type: "text", text: booking.requester || '', size: "xs", color: "#1e293b", flex: 6, wrap: true }
                               ],
-                              margin: "md"
+                              margin: "xs"
                             },
                             {
                               type: "box",
                               layout: "horizontal",
                               contents: [
-                                { type: "text", text: "👨‍👩‍👦‍👦 ผู้ร่วมเดินทาง:", size: "sm", color: "#64748b", flex: 4 },
-                                { type: "text", text: booking.passengers || 'ไม่มี', size: "sm", color: "#1e293b", flex: 6, wrap: true }
+                                { type: "text", text: "👨‍👩‍👦‍👦 ผู้ร่วมเดินทาง:", size: "xs", color: "#64748b", flex: 4 },
+                                { type: "text", text: booking.passengers || 'ไม่มี', size: "xs", color: "#1e293b", flex: 6, wrap: true }
                               ],
-                              margin: "md"
+                              margin: "xs"
                             }
                           ];
 
@@ -1300,16 +1605,17 @@ const server = http.createServer((req, res) => {
                               type: "box",
                               layout: "vertical",
                               contents: [
-                                { type: "text", text: headerTitle, weight: "bold", size: "lg", color: headerColor },
-                                { type: "text", text: "ระบบจองรถยนต์สะพานปลา (FMO)", size: "xs", color: "#64748b", margin: "xs" }
+                                { type: "text", text: headerTitle, weight: "bold", size: "md", color: headerColor },
+                                { type: "text", text: `📌 คำขอเลขที่: ${booking.id}`, size: "xs", color: "#475569", weight: "bold", margin: "xs" }
                               ],
                               backgroundColor: headerBg,
-                              paddingAll: "15px"
+                              paddingAll: "10px"
                             },
                             body: {
                               type: "box",
                               layout: "vertical",
-                              contents: bodyContents
+                              contents: bodyContents,
+                              paddingAll: "10px"
                             }
                           };
 
@@ -1333,13 +1639,28 @@ const server = http.createServer((req, res) => {
                             };
                           }
 
+                          const replyMessages = [];
+                          if (alreadyAcceptedNotice) {
+                            replyMessages.push({
+                              type: "text",
+                              text: `⚠️ คำขอเลขที่ ${booking.id} ได้มีผู้กดรับงานไปเรียบร้อยแล้ว!`
+                            });
+                          } else if (alreadyReturnedNotice) {
+                            replyMessages.push({
+                              type: "text",
+                              text: `ℹ️ คำขอเลขที่ ${booking.id} ได้ถูกกดจบงานคืนรถไปเรียบร้อยแล้ว!`
+                            });
+                          }
+
+                          replyMessages.push({
+                            type: "flex",
+                            altText: altText,
+                            contents: flexContents
+                          });
+
                           const postData = JSON.stringify({
                             replyToken: event.replyToken,
-                            messages: [{
-                              type: "flex",
-                              altText: altText,
-                              contents: flexContents
-                            }]
+                            messages: replyMessages
                           });
                           
                           const reqOptions = {
