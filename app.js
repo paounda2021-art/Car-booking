@@ -44,6 +44,8 @@ let bookings = [];
 let cars = [];
 let usersList = [];
 let currentUser = null;
+let historyCurrentPage = 1;
+const historyPerPage = 10;
 
 // Calendar view state
 let calCurrentDate = new Date();
@@ -559,10 +561,30 @@ function generateMockSignature(name) {
   }
 }
 
+function dataURItoBlob(dataURI) {
+  try {
+    if (!dataURI || typeof dataURI !== 'string') return null;
+    const cleanURI = dataURI.trim().replace(/[\r\n]/g, '');
+    const parts = cleanURI.split(',');
+    if (parts.length < 2) return null;
+    const byteString = atob(parts[1]);
+    const mimeString = parts[0].split(':')[1].split(';')[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeString });
+  } catch (e) {
+    console.error("dataURItoBlob error:", e);
+    return null;
+  }
+}
+
 // Get signature image (database base64 or generated mock signature)
 function getSignatureImg(level, signatureVal, approverName) {
-  if (signatureVal && signatureVal.startsWith('data:image')) {
-    return signatureVal;
+  if (signatureVal && typeof signatureVal === 'string' && signatureVal.trim().startsWith('data:image') && signatureVal.length > 30) {
+    return signatureVal.trim().replace(/[\r\n]/g, '');
   }
   
   let username = '';
@@ -571,16 +593,21 @@ function getSignatureImg(level, signatureVal, approverName) {
   else if (level === 3) username = 'saisunee.p';
   else if (level === 4) username = 'piyawan.k';
   
-  if (username && typeof usersList !== 'undefined') {
-    const u = usersList.find(x => x.username.toLowerCase() === username.toLowerCase());
-    if (u && u.sign && u.sign.startsWith('data:image')) {
-      return u.sign;
+  if (typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+    const u = usersList.find(x => 
+      (username && x.username && x.username.toLowerCase() === username.toLowerCase()) ||
+      (level === 4 && (x.username === 'piyawan.k' || x.username === 'supbhachart.c' || (x.name && x.name.includes('ปิยวรรณ'))))
+    );
+    if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
+      return u.sign.trim().replace(/[\r\n]/g, '');
     }
-  } else if (level === 0 && approverName && typeof usersList !== 'undefined') {
-    const u = usersList.find(x => x.name.replace(/\s+/g, '') === approverName.replace(/\s+/g, ''));
-    if (u && u.sign && u.sign.startsWith('data:image')) {
-      return u.sign;
+  } else if (level === 0 && approverName && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+    const u = usersList.find(x => x.name && x.name.replace(/\s+/g, '') === approverName.replace(/\s+/g, ''));
+    if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
+      return u.sign.trim().replace(/[\r\n]/g, '');
     }
+  if (level === 0 || level === 1) {
+    return '';
   }
   
   return generateMockSignature(approverName || 'ลงนาม');
@@ -635,6 +662,15 @@ async function initDatabase() {
   try {
     const response = await fetch('users.json?t=' + Date.now());
     usersList = await response.json();
+    if (currentUser && usersList && usersList.length > 0) {
+      const freshUser = usersList.find(u => u.username.toLowerCase() === (currentUser.username || '').toLowerCase());
+      if (freshUser) {
+        if (freshUser.sign) currentUser.sign = freshUser.sign;
+        if (freshUser.canApprove) currentUser.canApprove = freshUser.canApprove;
+        if (freshUser.role) currentUser.role = freshUser.role;
+        localStorage.setItem('current_user', JSON.stringify(currentUser));
+      }
+    }
   } catch (error) {
     console.error("Error loading users list from users.json:", error);
   }
@@ -947,39 +983,53 @@ async function initDatabase() {
 // 1. ฟังก์ชันบันทึกข้อมูล (เซฟลงเครื่องเพียวๆ 100%)
 // ==========================================
 async function saveBookings() {
-  // 🛡️ เกราะป้องกันขั้นสุดยอด: ห้ามเอา 0 รายการไปเซฟทับข้อมูลเดิมเด็ดขาด!
-  if (bookings.length === 0) {
+  if (!bookings || bookings.length === 0) {
     console.warn("🛑 บล็อกการทำงาน: ป้องกันการเซฟ 0 รายการทับข้อมูลเดิม!");
-    return; // สั่งหยุดการทำงานทันที ไม่ให้มันเซฟลงเครื่อง
+    return;
   }
 
-  // ถ้ามีข้อมูล (มากกว่า 0) ค่อยให้เซฟลงเครื่อง
-  localStorage.setItem('bookings_data', JSON.stringify(bookings));
-  console.log("💾 บันทึกข้อมูลสำเร็จ! จำนวนทั้งหมด:", bookings.length, "รายการ");
-
+  // 🚀 บันทึก localStorage ทันที (พร้อมระบบป้องกัน QuotaExceededError)
   try {
-    const payload = [...bookings];
-    payload.push({
-      id: 'system_config',
-      requester: 'system',
-      startDate: '',
-      endDate: '',
-      status: '',
-      active: isSystemActive
-    });
-
-    // พยายามส่งไปบันทึกที่ฐานข้อมูล Cloudflare (API)
-    await fetch('/api/save-bookings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
-    console.log("☁️ บันทึกข้อมูลลงฐานข้อมูลคลาวด์ (Cloudflare KV) สำเร็จ!");
-  } catch (error) {
-    console.error("Failed to save bookings to Cloudflare KV database:", error);
+    localStorage.setItem('bookings_data', JSON.stringify(bookings));
+    console.log("💾 บันทึกข้อมูลลง localStorage สำเร็จ! จำนวนทั้งหมด:", bookings.length, "รายการ");
+  } catch (err) {
+    console.warn("⚠️ LocalStorage quota exceeded. Saving optimized version locally...", err);
+    try {
+      // ย่อภาพลายเซ็นเฉพาะใน localStorage เพื่อประหยัดพื้นที่ (ข้อมูลเต็มส่งไป Server)
+      const optimizedBookings = bookings.map(b => {
+        if (!b.signatures || !Array.isArray(b.signatures)) return b;
+        const cleanSigs = b.signatures.map(s => {
+          if (s.signature && s.signature.length > 500) {
+            return { ...s, signature: 'db_ref' };
+          }
+          return s;
+        });
+        return { ...b, signatures: cleanSigs };
+      });
+      localStorage.setItem('bookings_data', JSON.stringify(optimizedBookings));
+    } catch (e2) {
+      console.error("⚠️ Could not write to localStorage even after optimization:", e2);
+    }
   }
+
+  // 🔄 ส่งข้อมูลฉบับเต็มไปบันทึกที่ Server (SQLite) ในพื้นหลังเสมอ
+  const payload = [...bookings];
+  payload.push({
+    id: 'system_config',
+    requester: 'system',
+    startDate: '',
+    endDate: '',
+    status: '',
+    active: isSystemActive
+  });
+
+  fetch('/api/save-bookings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(() => console.log("☁️ บันทึกข้อมูลลง Server (SQLite) สำเร็จในพื้นหลัง!"))
+  .catch(err => console.warn("⚠️ Server sync failed:", err));
 }
 
 // Function to save cars to localStorage and server API
@@ -1687,14 +1737,21 @@ function updateStats() {
       if ((b.status.startsWith('pending') || isCancellationRequestForL2) && !b.waitingForRequesterInput) {
         
         // ตรวจสอบว่า งานเลเวลนี้ (b.currentApprovalLevel) อยู่ในสิทธิ์ที่ User คนนี้อนุมัติได้จริงไหม
-        const canApproveThisLevel = (currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel)) || isCancellationRequestForL2;
+        const canApproveThisLevel = userHasApproveLevel(currentUser, b.currentApprovalLevel) || isCancellationRequestForL2;
         
-        if (canApproveThisLevel && isSelectedLevel) {
+        const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
+          s.level === b.currentApprovalLevel && s.status === 'approved' &&
+          (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
+        );
+
+        if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
           // เงื่อนไขคัดกรองพิเศษเพิ่มเติมสำหรับระดับ L1 (Supervisor)
           if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
             const mEmail = resolveManagerEmail(b).toLowerCase();
             const cEmail = (currentUser.email || '').toLowerCase();
-            if (mEmail === cEmail || mEmail === '') {
+            const isL1ByEmail = mEmail && mEmail === cEmail;
+            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+            if (isL1ByEmail || isL1Fallback) {
               pendingCount++;
             }
           } 
@@ -1717,13 +1774,13 @@ function updateStats() {
   if (tabPendingBadge) tabPendingBadge.textContent = pendingCount;
 
   // 3. เพิ่มการอัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่ง
-  // (น้องเน็ตดักจับคลาส .notification-badge เผื่อไว้ให้ด้วย ป้องกันกระดิ่งไม่ยอมโชว์)
+  // 🔔 แสดงตัวเลขแจ้งเตือนงานรออนุมัติ (pendingCount) ที่กระดิ่ง เป็นอันดับแรก
   const emailBadge = document.getElementById('email-inbox-badge') || document.querySelector('.notification-badge');
   if (emailBadge) {
     const activeLogs = getActiveEmailLogs();
-    const count = activeLogs.length;
-    emailBadge.textContent = count;
-    emailBadge.style.display = count > 0 ? 'inline-block' : 'none';
+    const bellCount = pendingCount > 0 ? pendingCount : activeLogs.length;
+    emailBadge.textContent = bellCount;
+    emailBadge.style.display = bellCount > 0 ? 'inline-block' : 'none';
   }
 
   // 4. คำนวณจำนวนรายการที่ฉันขอ (L0) - เพิ่มการดักด้วยอีเมลให้แม่นยำขึ้น
@@ -1795,7 +1852,7 @@ function renderDashboard() {
     if (activeBkg) {
       const isApproved = activeBkg.status === 'approved';
       cardClass = isApproved ? 'car-card occupied' : 'car-card occupied pending-res';
-      badgeText = isApproved ? '🔴 ปฏิบัติงาน' : '🟡 จองแล้ว (รออนุมัติ)';
+      badgeText = isApproved ? '🔴 ปฏิบัติงาน' : '🟠 จองแล้ว (รออนุมัติ)';
       badgeClass = isApproved ? 'car-status-badge status-busy' : 'car-status-badge status-pending';
       statusDesc = isApproved ? `ไม่ว่าง (เรื่อง: ${activeBkg.purpose})` : `จองล่วงหน้า (เรื่อง: ${activeBkg.purpose})`;
 
@@ -2043,7 +2100,7 @@ function helperCreateTableRow(b, isPendingForMe) {
   for (let i = 1; i <= maxSteps; i++) {
     let dotClass = 'step-dot';
     if (b.currentApprovalLevel > i) dotClass += ' completed';
-    else if (b.currentApprovalLevel === i && b.status === 'pending') dotClass += ' active';
+    else if (b.currentApprovalLevel === i && (b.status === 'pending' || b.status.startsWith('pending'))) dotClass += ' active';
     else if (b.status === 'rejected' && b.currentApprovalLevel === i) dotClass += ' rejected';
     stepsDots += `<span class="${dotClass}" title="สายอนุมัติที่ ${i}"></span>`;
   }
@@ -2226,7 +2283,7 @@ function renderBookingsLists() {
     for (let i = 1; i <= maxSteps; i++) {
       let dotClass = 'step-dot';
       if (b.currentApprovalLevel > i) dotClass += ' completed';
-      else if (b.currentApprovalLevel === i && b.status === 'pending') dotClass += ' active';
+      else if (b.currentApprovalLevel === i && (b.status === 'pending' || b.status.startsWith('pending'))) dotClass += ' active';
       else if (b.status === 'rejected' && b.currentApprovalLevel === i) dotClass += ' rejected';
       stepsDots += `<span class="${dotClass}" title="สายอนุมัติที่ ${i}"></span>`;
     }
@@ -2295,15 +2352,24 @@ function renderBookingsLists() {
     
     if ((b.status.startsWith('pending') || isCancellationRequestForL2) && currentUser && !b.waitingForRequesterInput) {
       const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
-      const canApproveThisLevel = (currentUser.canApprove && currentUser.canApprove.includes(b.currentApprovalLevel)) || isCancellationRequestForL2;
-      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel || (b.status === 'cancellation_requested' && activeLevel === 'all'));
+      const lvl = b.currentApprovalLevel;
+      const canApproveThisLevel = userHasApproveLevel(currentUser, lvl) || isCancellationRequestForL2;
+      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === lvl || (b.status === 'cancellation_requested' && activeLevel === 'all'));
 
-      if (canApproveThisLevel && isSelectedLevel) {
-        if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
-          // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
+      // 🎯 ตรวจสอบว่า user คนนี้ได้อนุมัติใบนี้ไปแล้วหรือยัง (ถ้าอนุมัติแล้ว ไม่ต้องแสดงในคิวรออนุมัติ)
+      const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
+        s.level === lvl && s.status === 'approved' &&
+        (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
+      );
+
+      if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
+        if (lvl === 1 && b.status !== 'cancellation_requested') {
+          // L1: แสดงเฉพาะงานที่ส่งถึง Manager ท่านนี้ตามอีเมล หรือ Prathum fallback
           const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
-          if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
+          const isL1ByEmail = mEmail && mEmail === cEmail;
+          const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+          if (isL1ByEmail || isL1Fallback) {
             isPendingForMe = true;
           }
         } else {
@@ -2311,6 +2377,7 @@ function renderBookingsLists() {
         }
       }
     }
+
 
     if (isMyRequest) {
       myBookingsList.push({ booking: b, isPendingForMe });
@@ -2335,27 +2402,24 @@ function renderBookingsLists() {
     );
 
     let canShowInHistory = false;
+    const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+    const isL4Active = isL4User && (activeLevel === '4' || (!isL2User && !isL3User));
+    const isL2OrL3 = (isL2User || isL3User) && !isL4Active;
 
     if (isMyRequest) {
+      // 🎯 1. เจ้าของคำขอ (L0) จะเห็นเฉพาะงานที่ตนเองเป็นคนเสนอขอเท่านั้น
       canShowInHistory = true;
-    } else if (isCompleted) {
-      if (canSeeAll || isL2User || isL3User || isL4User || isManagerOrApprover) {
+    } else if (isManagerOrApprover) {
+      // 🎯 2. หัวหน้างาน (L1) หรือผู้ที่เกี่ยวข้องกับสายอนุมัติใบนี้ จะเห็นเฉพาะงานของลูกน้องในสังกัด
+      canShowInHistory = true;
+    } else if (isL4Active) {
+      // 🎯 3. สำหรับ L4: แสดงเฉพาะเคสที่อนุมัติเสร็จสิ้นแล้วเท่านั้น (และไม่ใช่ของตนเอง)
+      if (b.status === 'approved') {
         canShowInHistory = true;
       }
-    } else {
-      // 🎯 สำหรับงานที่อยู่ระหว่างรออนุมัติ (Pending): แสดงเฉพาะ L ใคร L มัน!
-      // L2 เห็นเฉพาะงานที่รอ L2 หรือ L2 เคยอนุมัติแล้ว
-      // L3 เห็นเฉพาะงานที่ส่งถึง L3 แล้ว (currentApprovalLevel === 3) หรือ L3 เคยอนุมัติแล้ว
-      // L4 เห็นเฉพาะงานที่ส่งถึง L4 แล้ว (currentApprovalLevel === 4) หรือ L4 เคยอนุมัติแล้ว
-      if (isL2User && (b.currentApprovalLevel === 2 || hasUserSigned)) {
-        canShowInHistory = true;
-      } else if (isL3User && (b.currentApprovalLevel === 3 || (b.currentApprovalLevel > 3 && hasUserSigned))) {
-        canShowInHistory = true;
-      } else if (isL4User && (b.currentApprovalLevel === 4 || (b.currentApprovalLevel > 4 && hasUserSigned))) {
-        canShowInHistory = true;
-      } else if (isL1User && (b.currentApprovalLevel === 1 && isManagerOrApprover)) {
-        canShowInHistory = true;
-      }
+    } else if (isL2OrL3 || canSeeAll) {
+      // 🎯 4. สำหรับ L2, L3 หรือแอดมิน: แสดงทุกสถานะเพื่อการจัดการ
+      canShowInHistory = true;
     }
 
     if (canShowInHistory) {
@@ -2378,21 +2442,23 @@ function renderBookingsLists() {
   
   let filteredAllBookingsList = allBookingsList;
 
-  const isL2User = currentUser && userHasApproveLevel(currentUser, 2);
-  const isL3User = currentUser && userHasApproveLevel(currentUser, 3);
-  const isL4User = currentUser && userHasApproveLevel(currentUser, 4);
+  const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
+  const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
+  const isL4UserNow = currentUser && userHasApproveLevel(currentUser, 4);
+  const activeLvlNow = sessionStorage.getItem('activeApprovalLevel') || 'all';
+  const isL4ActiveNow = isL4UserNow && (activeLvlNow === '4' || (!isL2UserNow && !isL3UserNow));
 
-  // Status dropdown filter is shown ONLY for L2 and L3 (STRICTLY HIDDEN FOR L4)
-  const showStatusFilter = (isL2User || isL3User) && !isL4User;
-  const isL2OrL3OrL4 = isL2User || isL3User || isL4User || (currentUser && checkCanSeeAll(currentUser));
+  const isL2OrL3Filter = (isL2UserNow || isL3UserNow) && !isL4ActiveNow;
+  const isL2OrL3OrL4 = isL2OrL3Filter || isL4ActiveNow || (currentUser && checkCanSeeAll(currentUser));
 
+  // แถบตัวกรองแสดงให้ L2, L3, L4 (L4 จะมีช่องค้นหาข้อความไว้ใช้งาน)
   if (historyFilterBar) {
     historyFilterBar.style.display = isL2OrL3OrL4 ? 'flex' : 'none';
   }
 
-  // Toggle status filter dropdown visibility: Show ONLY for L2 & L3, ALWAYS hide for L4
+  // Dropdown สถานะแสดงเฉพาะ L2 และ L3 (ซ่อนสำหรับ L4)
   if (historyStatusLabel && historyStatusSelect) {
-    if (showStatusFilter) {
+    if (isL2OrL3Filter) {
       historyStatusLabel.style.display = 'inline-flex';
       historyStatusSelect.style.display = 'inline-block';
     } else {
@@ -2401,7 +2467,7 @@ function renderBookingsLists() {
     }
   }
 
-  const filterVal = (historyStatusSelect && showStatusFilter) ? historyStatusSelect.value : 'all';
+  const filterVal = (historyStatusSelect && isL2OrL3Filter) ? historyStatusSelect.value : 'all';
   const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
 
   if (isL2OrL3OrL4) {
@@ -2409,9 +2475,10 @@ function renderBookingsLists() {
       const b = item.booking;
       const st = b.status;
       let matchStatus = true;
-      if (showStatusFilter) {
+      if (isL2OrL3Filter) {
         if (filterVal === 'approved') matchStatus = (st === 'approved');
-        else if (filterVal === 'pending') matchStatus = st.startsWith('pending');
+        else if (filterVal === 'pending') matchStatus = st.startsWith('pending') && !b.waitingForRequesterInput;
+        else if (filterVal === 'waiting_taxi_amount') matchStatus = (st === 'waiting_taxi_amount' || st === 'pending_l0_taxi' || b.waitingForRequesterInput === true || (b.carId === 'taxi' && !b.estimatedCost));
         else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
         else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
         else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
@@ -2491,9 +2558,20 @@ function renderBookingsLists() {
     `
   );
 
+  // 🎯 Pagination for History Tab (10 items per page)
+  const totalHistoryCount = filteredAllBookingsList.length;
+  const totalPages = Math.max(1, Math.ceil(totalHistoryCount / historyPerPage));
+
+  if (historyCurrentPage > totalPages) historyCurrentPage = totalPages;
+  if (historyCurrentPage < 1) historyCurrentPage = 1;
+
+  const startIdx = (historyCurrentPage - 1) * historyPerPage;
+  const endIdx = startIdx + historyPerPage;
+  const paginatedAllBookingsList = filteredAllBookingsList.slice(startIdx, endIdx);
+
   renderToContainer(
     allContainer,
-    filteredAllBookingsList,
+    paginatedAllBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📚</div>
@@ -2502,6 +2580,57 @@ function renderBookingsLists() {
       </div>
     `
   );
+
+  // 🎯 Render History Pagination Bar
+  const paginationContainer = document.getElementById('history-pagination-container');
+  if (paginationContainer) {
+    if (totalHistoryCount === 0) {
+      paginationContainer.style.display = 'none';
+    } else {
+      paginationContainer.style.display = 'flex';
+      
+      const currentStart = startIdx + 1;
+      const currentEnd = Math.min(endIdx, totalHistoryCount);
+      
+      let pageBtnsHtml = '';
+      const maxButtons = 5;
+      let startPage = Math.max(1, historyCurrentPage - 2);
+      let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+      if (endPage - startPage < maxButtons - 1) {
+        startPage = Math.max(1, endPage - maxButtons + 1);
+      }
+
+      for (let p = startPage; p <= endPage; p++) {
+        if (p === historyCurrentPage) {
+          pageBtnsHtml += `<button class="btn history-page-btn active">${p}</button>`;
+        } else {
+          pageBtnsHtml += `<button class="btn history-page-btn inactive" onclick="setHistoryPage(${p})">${p}</button>`;
+        }
+      }
+
+      const prevDisabled = historyCurrentPage === 1 
+        ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' 
+        : `onclick="changeHistoryPage(-1)"`;
+      
+      const nextDisabled = historyCurrentPage === totalPages 
+        ? 'disabled style="opacity: 0.4; cursor: not-allowed;"' 
+        : `onclick="changeHistoryPage(1)"`;
+
+      paginationContainer.innerHTML = `
+        <div class="history-pagination-info">
+          <span>แสดง <strong>${currentStart} - ${currentEnd}</strong> จากทั้งหมด <strong>${totalHistoryCount}</strong> รายการ</span>
+          <span class="history-page-badge">หน้า <strong>${historyCurrentPage}</strong> / <strong>${totalPages}</strong></span>
+        </div>
+        <div class="history-pagination-controls">
+          <button class="btn btn-secondary history-nav-btn" ${prevDisabled}>◀ ก่อนหน้า</button>
+          <div class="history-page-numbers">
+            ${pageBtnsHtml}
+          </div>
+          <button class="btn btn-secondary history-nav-btn" ${nextDisabled}>ถัดไป ▶</button>
+        </div>
+      `;
+    }
+  }
 
   updateStats();
 }
@@ -2698,10 +2827,12 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
   canvas.addEventListener('touchmove', draw, { passive: false });
   window.addEventListener('touchend', stopDraw);
 
-  clearBtn.addEventListener('click', () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (placeholder) placeholder.style.display = 'flex';
-  });
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (placeholder) placeholder.style.display = 'flex';
+    });
+  }
 
   return {
     isEmpty: () => {
@@ -2717,7 +2848,103 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
   };
 }
 
+async function autoDrawApproverSignature() {
+  const canvas = document.getElementById('canvas-approver-signature');
+  const placeholder = document.getElementById('approver-sig-placeholder');
+  if (!canvas || !currentUser) return;
+
+  const uName = (currentUser.username || '').toLowerCase();
+  const uEmail = (currentUser.email || '').toLowerCase();
+  const uNameThai = (currentUser.name || '').replace(/\s+/g, '');
+  
+  // 1. ALWAYS load fresh users.json before resolving signature
+  try {
+    const resp = await fetch('users.json?t=' + Date.now());
+    if (resp.ok) {
+      usersList = await resp.json();
+    }
+  } catch(e) {
+    console.warn("Signature fetch usersList error:", e);
+  }
+
+  // 2. Find target user in fresh usersList
+  let targetSign = '';
+  if (usersList && Array.isArray(usersList)) {
+    const dbU = usersList.find(u => 
+      (u.username && u.username.toLowerCase() === uName) ||
+      (u.email && u.email.toLowerCase() === uEmail) ||
+      (u.name && u.name.replace(/\s+/g, '') === uNameThai) ||
+      (currentUser.role === 'executive' && u.username === 'piyawan.k') ||
+      (userHasApproveLevel(currentUser, 4) && u.username === 'piyawan.k') ||
+      (userHasApproveLevel(currentUser, 3) && u.username === 'saisunee.p') ||
+      (userHasApproveLevel(currentUser, 2) && u.username === 'chalong.c') ||
+      (userHasApproveLevel(currentUser, 1) && u.username === 'prathum.c')
+    );
+    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 30) {
+      targetSign = dbU.sign.trim().replace(/[\r\n]/g, '');
+      currentUser.sign = targetSign;
+      try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
+    }
+  }
+
+  // 3. Fallback to currentUser.sign if usersList didn't have it
+  if (!targetSign && currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 30) {
+    targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
+  }
+
+  // 4. For L0 and L1 (or users without a saved signature image), keep canvas blank by default
+  if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (placeholder) placeholder.style.display = 'flex';
+    return;
+  }
+
+  // Hide placeholder if valid signature image exists
+  if (placeholder) placeholder.style.display = 'none';
+
+  // 5. Ensure canvas width/height match parent box dimensions
+  const parent = canvas.parentElement || canvas.parentNode;
+  const parentWidth = parent ? parent.clientWidth : 500;
+  canvas.width = parentWidth > 100 ? parentWidth : 500;
+  canvas.height = 150;
+
+  // 6. Load and draw targetSign onto canvas using Blob URL (prevents ERR_INVALID_URL)
+  const blob = dataURItoBlob(targetSign);
+  const objectUrl = blob ? URL.createObjectURL(blob) : targetSign;
+
+  const img = new Image();
+  img.onload = () => {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const hRatio = canvas.width / img.width;
+    const vRatio = canvas.height / img.height;
+    const ratio = Math.min(hRatio, vRatio);
+    const x = (canvas.width - img.width * ratio) / 2;
+    const y = (canvas.height - img.height * ratio) / 2;
+    ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
+    if (placeholder) placeholder.style.display = 'none';
+    if (blob) URL.revokeObjectURL(objectUrl);
+  };
+  img.onerror = (err) => {
+    console.error("Failed to load signature image:", err);
+    if (blob) URL.revokeObjectURL(objectUrl);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (placeholder) placeholder.style.display = 'flex';
+  };
+  img.src = objectUrl;
+}
+
 // Open Approval Details Modal
+function formatDateTimeForInput(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 async function openApprovalModal(bookingId) {
   if (!bookingId) return;
 
@@ -2747,18 +2974,12 @@ async function openApprovalModal(bookingId) {
   }
 
   // Strict Permission Guard: Access limited to L2 (Fleet Admin), Booking Owner (L0), Manager (L1), and assigned Approvers
-  const isL2 = currentUser && (
-    currentUser.role === 'fleet_admin' || 
-    (currentUser.canApprove && currentUser.canApprove.includes(2))
-  );
+  const isL2 = currentUser && userHasApproveLevel(currentUser, 2);
   const isOwner = currentUser && (
     (booking.requester && currentUser.name && booking.requester.trim() === currentUser.name.trim()) ||
     (booking.requesterEmail && currentUser.email && booking.requesterEmail.toLowerCase() === currentUser.email.toLowerCase())
   );
-  const isApproverForThisBooking = currentUser && currentUser.canApprove && (
-    currentUser.canApprove.includes(booking.currentApprovalLevel) ||
-    currentUser.role === 'director' || currentUser.role === 'executive'
-  );
+  const isApproverForThisBooking = currentUser && userHasApproveLevel(currentUser, booking.currentApprovalLevel);
   const isManagerOrApprover = checkIsManagerOrApprover(booking, currentUser);
 
   if (!currentUser) {
@@ -2880,118 +3101,97 @@ async function openApprovalModal(bookingId) {
   
   // Clear modal inputs
   document.getElementById('approval-comment').value = '';
-  // Resize canvas and then load/draw user signature after modal is displayed
-  setTimeout(() => {
-    if (approverSig) {
-      approverSig.resize();
-      approverSig.clear();
-      if (currentUser && currentUser.sign && currentUser.sign.startsWith('data:image')) {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.getElementById('canvas-approver-signature');
-          if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const hRatio = canvas.width / img.width;
-            const vRatio = canvas.height / img.height;
-            const ratio = Math.min(hRatio, vRatio);
-            const x = (canvas.width - img.width * ratio) / 2;
-            const y = (canvas.height - img.height * ratio) / 2;
-            ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
-            
-            const placeholder = document.getElementById('approver-sig-placeholder');
-            if (placeholder) placeholder.style.display = 'none';
-          }
-        };
-        img.src = currentUser.sign;
-      }
-    }
-  }, 100);
   fleetAssignBox.style.display = 'none';
   const fleetEditPanel = document.getElementById('fleet-admin-edit-panel');
   if (fleetEditPanel) fleetEditPanel.style.display = 'none';
 
   let isMyTurn = false;
-  if (booking.status === 'pending' && currentUser && !booking.waitingForRequesterInput) {
+  if ((booking.status === 'pending' || booking.status.startsWith('pending')) && currentUser && !booking.waitingForRequesterInput) {
     const lvl = booking.currentApprovalLevel;
-    const canApproveThisLevel = currentUser.canApprove && currentUser.canApprove.includes(lvl);
-    
-    if (canApproveThisLevel) {
-      if (lvl === 1) {
-        // กรองเฉพาะงานที่ส่งถึง Manager ตามอีเมล
-        const mEmail = resolveManagerEmail(booking).toLowerCase();
-        const cEmail = (currentUser.email || '').toLowerCase();
-        if (mEmail === cEmail || ((mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c')) {
-          isMyTurn = true;
-        }
-      }
-      else if (lvl === 2) {
-        isMyTurn = true;
-        fleetAssignBox.style.display = 'block';
-        
-        const carSelectGroup = document.getElementById('fleet-admin-car-select-group');
-        const driverGroup = document.getElementById('fleet-admin-driver-group');
-        
-        if (carSelectGroup) carSelectGroup.style.display = 'block';
-        
-        const carSelect = document.getElementById('assign-car');
-        carSelect.innerHTML = `
-          <option value="">-- กรุณาเลือกรถยนต์ --</option>
-          <option value="taxi">🚕 รถแท็กซี่ (TAXI)</option>
-        `;
-        cars.forEach(car => {
-          const hasConflict = hasBookingConflict(car.id, booking.startDate, booking.endDate, booking.id);
-          const now = new Date();
-          const isBusyNow = bookings.some(b => {
-            const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
-            if (b.id === booking.id || !isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
-            return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
-          });
 
-          let statusText = '';
-          if (hasConflict) {
-            statusText = ' (ไม่ว่างช่วงที่ขอ)';
-          } else {
-            statusText = isBusyNow ? ' (ไม่ว่างขณะนี้/ว่างช่วงที่ขอ)' : ' (ว่าง)';
-          }
-
-          const disabled = hasConflict ? ' disabled style="color:var(--text-muted);"' : '';
-          carSelect.innerHTML += `<option value="${car.id}"${disabled}>${car.name} (${car.plate})${statusText}</option>`;
-        });
-        
-        const driverInput = document.getElementById('assign-driver');
-        
-        if (booking.travelType === 'public_car') {
-          carSelect.value = 'taxi';
-          if (driverGroup) driverGroup.style.display = 'block';
-          if (driverInput) {
-            driverInput.value = '-';
-            driverInput.disabled = true;
-          }
-        } else {
-          if (driverGroup) driverGroup.style.display = 'block';
-          if (driverInput) {
-            driverInput.value = booking.driverName || (booking.controlUnit === 'รถสวัสดิการ' ? booking.requester : 'นายดีเลิศ สมใจ');
-            driverInput.disabled = false;
-          }
-          carSelect.value = booking.carId || '';
-        }
-      }
-      else if (lvl === 3) {
-        isMyTurn = true;
-      }
-      else if (lvl === 4) {
+    if (lvl === 1) {
+      // ✅ ใช้ userHasApproveLevel L1 ซึ่งครอบคลุม role supervisor, canApprove[1], managerEmail
+      const mEmail = resolveManagerEmail(booking).toLowerCase();
+      const cEmail = (currentUser.email || '').toLowerCase();
+      const isL1ByRole = userHasApproveLevel(currentUser, 1);
+      const isL1ByEmail = mEmail && mEmail === cEmail;
+      const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+      if (isL1ByRole || isL1ByEmail || isL1Fallback) {
         isMyTurn = true;
       }
     }
+    else if (lvl === 2 && userHasApproveLevel(currentUser, 2)) {
+      isMyTurn = true;
+      fleetAssignBox.style.display = 'block';
+      
+      const carSelectGroup = document.getElementById('fleet-admin-car-select-group');
+      const driverGroup = document.getElementById('fleet-admin-driver-group');
+      
+      if (carSelectGroup) carSelectGroup.style.display = 'block';
+      
+      const carSelect = document.getElementById('assign-car');
+      carSelect.innerHTML = `
+          <option value="">-- กรุณาเลือกรถยนต์ --</option>
+          <option value="taxi">🚕 รถแท็กซี่ (TAXI)</option>
+        `;
+      cars.forEach(car => {
+        const hasConflict = hasBookingConflict(car.id, booking.startDate, booking.endDate, booking.id);
+        const now = new Date();
+        const isBusyNow = bookings.some(b => {
+          const isAssigned = b.status === 'approved' || (b.status.startsWith('pending') && b.currentApprovalLevel >= 3);
+          if (b.id === booking.id || !isAssigned || b.returnedEarly || b.travelType !== 'fmo_car' || b.carId !== car.id) return false;
+          return new Date(b.startDate) <= now && new Date(b.endDate) >= now;
+        });
+
+        let statusText = '';
+        if (hasConflict) {
+          statusText = ' (ไม่ว่างช่วงที่ขอ)';
+        } else {
+          statusText = isBusyNow ? ' (ไม่ว่างขณะนี้/ว่างช่วงที่ขอ)' : ' (ว่าง)';
+        }
+
+        const disabled = hasConflict ? ' disabled style="color:var(--text-muted);"' : '';
+        carSelect.innerHTML += `<option value="${car.id}"${disabled}>${car.name} (${car.plate})${statusText}</option>`;
+      });
+      
+      const driverInput = document.getElementById('assign-driver');
+      
+      if (booking.travelType === 'public_car') {
+        carSelect.value = 'taxi';
+        if (driverGroup) driverGroup.style.display = 'block';
+        if (driverInput) {
+          driverInput.value = '-';
+          driverInput.disabled = true;
+        }
+      } else {
+        if (driverGroup) driverGroup.style.display = 'block';
+        if (driverInput) {
+          driverInput.value = booking.driverName || (booking.controlUnit === 'รถสวัสดิการ' ? booking.requester : 'นายดีเลิศ สมใจ');
+          driverInput.disabled = false;
+        }
+        carSelect.value = booking.carId || '';
+      }
+    }
+    else if (lvl === 3 && userHasApproveLevel(currentUser, 3)) {
+      isMyTurn = true;
+    }
+    else if (lvl === 4 && userHasApproveLevel(currentUser, 4)) {
+      isMyTurn = true;
+    }
   }
 
+
+
+
   const showEditPanel = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2) && 
-                        (booking.status === 'approved' || (booking.status === 'pending' && booking.currentApprovalLevel > 2));
+                        (booking.status === 'approved' || ((booking.status === 'pending' || booking.status.startsWith('pending')) && booking.currentApprovalLevel > 2));
 
   if (isMyTurn) {
     actionPanel.classList.remove('hidden');
     activeBookingIdForApproval = booking.id;
+    setTimeout(async () => {
+      await autoDrawApproverSignature();
+    }, 150);
   } else {
     actionPanel.classList.add('hidden');
     if (showEditPanel) {
@@ -3099,7 +3299,7 @@ async function openApprovalModal(bookingId) {
           cancellationPanel.style.display = 'block';
           document.getElementById('cancel-reason-group').style.display = 'block'; // Reason required
           document.getElementById('cancel-reason-label').textContent = 'ระบุเหตุผลในการขอร้องเรียนยกเลิกใบขอจองรถยนต์ (ส่งแอดมินพิจารณา)';
-          document.getElementById('btn-confirm-cancel-booking').textContent = '🟡 ส่งคำขอร้องเรียนยกเลิก';
+          document.getElementById('btn-confirm-cancel-booking').textContent = '🟠 ส่งคำขอร้องเรียนยกเลิก';
         } else if (isFleetAdmin) {
           cancellationPanel.style.display = 'block';
           document.getElementById('cancel-reason-group').style.display = 'block'; // Reason optional/recommended
@@ -3197,14 +3397,26 @@ function renderApprovalPipeline(booking) {
       statusText = 'อนุมัติแล้ว';
       const timeStr = formatThaiDateTime(sig.timestamp);
       const sigImg = getSignatureImg(step.level, sig.signature, sig.approverName);
+      
+      let carAssignedText = '';
+      if (step.level === 2) {
+        if (booking.travelType === 'public_car' || booking.carId === 'taxi') {
+          carAssignedText = 'รถรับจ้างสาธารณะ (TAXI)';
+        } else if (booking.carId) {
+          const carObj = cars.find(c => c.id === booking.carId);
+          carAssignedText = carObj ? `${carObj.name} (ทะเบียน: ${carObj.plate})` : booking.carId;
+        }
+      }
+
       detailsHtml = `
         <div class="pipeline-details" style="margin-top:0.4rem; padding-left:1.5rem; font-size:0.8rem; line-height:1.4;">
           <span>ลงนามโดย: <strong>${sig.approverName}</strong></span><br>
           <span>เมื่อ: ${timeStr}</span><br>
           ${sig.comment ? `<span>ความเห็น: "${sig.comment}"</span><br>` : ''}
-          ${sig.driverName ? `<span style="color:var(--primary); font-weight:bold;">จัดพนักงานขับรถ: ${sig.driverName}${getDriverPhoneByName(sig.driverName) ? ` (โทร. ${getDriverPhoneByName(sig.driverName)})` : ''}</span><br>` : ''}
+          ${carAssignedText ? `<span style="color:var(--primary); font-weight:bold;">🚘 จัดรถยนต์: ${carAssignedText}</span><br>` : ''}
+          ${(step.level === 2 || sig.driverName) ? `<span style="color:var(--primary); font-weight:bold;">👤 จัดพนักงานขับรถ: ${sig.driverName || booking.driverName || '-'}${getDriverPhoneByName(sig.driverName || booking.driverName) ? ` (โทร. ${getDriverPhoneByName(sig.driverName || booking.driverName)})` : ''}</span><br>` : ''}
           <div style="margin-top:0.25rem;">
-            <img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">
+            ${(sigImg && sigImg.length > 30) ? `<img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">` : ''}
           </div>
         </div>
       `;
@@ -3220,7 +3432,7 @@ function renderApprovalPipeline(booking) {
           <span>เมื่อ: ${timeStr}</span><br>
           <span style="color:var(--danger);">เหตุผล: "${sig.comment || 'ไม่มีการระบุเหตุผล'}"</span><br>
           <div style="margin-top:0.25rem;">
-            <img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">
+            ${(sigImg && sigImg.length > 30) ? `<img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">` : ''}
           </div>
         </div>
       `;
@@ -3244,15 +3456,23 @@ function renderApprovalPipeline(booking) {
 
 // Handle Approve / Reject Actions
 async function handleApprovalAction(isApproved) {
-  if (!activeBookingIdForApproval) return;
+  console.log('[handleApprovalAction] called, isApproved=', isApproved, 'activeBookingIdForApproval=', activeBookingIdForApproval);
+  if (!activeBookingIdForApproval) {
+    console.warn('[handleApprovalAction] No active booking ID. Aborting.');
+    return;
+  }
   
-  if (approverSig.isEmpty()) {
+  // Guard: approverSig อาจยัง null ถ้า canvas ยังไม่ถูก initialize
+  if (!approverSig || approverSig.isEmpty()) {
     showToast("กรุณาเซ็นชื่อลงในกระดานลงนามดิจิทัลก่อนกดยืนยันการทำรายการ", "warning");
     return;
   }
 
   const booking = bookings.find(b => b.id === activeBookingIdForApproval);
-  if (!booking) return;
+  if (!booking) {
+    console.warn('[handleApprovalAction] Booking not found:', activeBookingIdForApproval);
+    return;
+  }
 
   const comment = document.getElementById('approval-comment').value;
   const level = booking.currentApprovalLevel;
@@ -4815,11 +5035,13 @@ function setupEventListeners() {
   });
 
   document.getElementById('history-status-filter')?.addEventListener('change', () => {
+    historyCurrentPage = 1;
     updateStats();
     renderBookingsLists();
   });
 
   document.getElementById('history-search-input')?.addEventListener('input', () => {
+    historyCurrentPage = 1;
     renderBookingsLists();
   });
 
@@ -5606,7 +5828,7 @@ function autoGenerateMissingEmailLogs() {
   const deletedLogs = JSON.parse(localStorage.getItem('deleted_email_logs') || '[]');
   
   bookings.forEach(b => {
-    if ((b.status === 'pending' || b.status === 'pending_l1') && !b.waitingForRequesterInput) {
+    if ((b.status === 'pending' || b.status.startsWith('pending')) && !b.waitingForRequesterInput) {
       const lvl = b.currentApprovalLevel;
       let isForCurrentUser = false;
       let targetEmail = '';
@@ -5789,17 +6011,45 @@ function updateEmailInboxUI() {
   autoGenerateMissingEmailLogs();
   const badge = document.getElementById('email-inbox-badge');
   const list = document.getElementById('email-logs-list');
-  if (!list) return;
 
-  // กรองเฉพาะข้อความแจ้งเตือนที่ยังค้างดำเนินการอยู่สำหรับผู้ใช้งานปัจจุบัน
-  const filteredLogs = getActiveEmailLogs();
-  const count = filteredLogs.length;
-  if (badge) {
-    badge.textContent = count;
-    badge.style.display = count > 0 ? 'inline-block' : 'none';
+  // 🔔 คำนวณจำนวนงานรออนุมัติจริงของผู้ใช้ปัจจุบัน เพื่อแสดงตัวเลขสีแดงบนกระดิ่ง
+  let pCount = 0;
+  if (currentUser && Array.isArray(bookings)) {
+    const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+    bookings.forEach(b => {
+      const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser.canApprove && currentUser.canApprove.includes(2);
+      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel || (b.status === 'cancellation_requested' && activeLevel === 'all'));
+      if ((b.status.startsWith('pending') || isCancellationRequestForL2) && !b.waitingForRequesterInput) {
+        const canApproveThisLevel = userHasApproveLevel(currentUser, b.currentApprovalLevel) || isCancellationRequestForL2;
+        const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
+          s.level === b.currentApprovalLevel && s.status === 'approved' &&
+          (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
+        );
+        if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
+          if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
+            const mEmail = resolveManagerEmail(b).toLowerCase();
+            const cEmail = (currentUser.email || '').toLowerCase();
+            const isL1ByEmail = mEmail && mEmail === cEmail;
+            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+            if (isL1ByEmail || isL1Fallback) pCount++;
+          } else {
+            pCount++;
+          }
+        }
+      }
+    });
   }
 
-  if (count === 0) {
+  const filteredLogs = getActiveEmailLogs();
+  const bellCount = pCount > 0 ? pCount : filteredLogs.length;
+  if (badge) {
+    badge.textContent = bellCount;
+    badge.style.display = bellCount > 0 ? 'inline-flex' : 'none';
+  }
+
+  if (!list) return;
+
+  if (filteredLogs.length === 0) {
     list.innerHTML = `
       <div style="text-align: center; color: var(--text-muted); padding: 2rem 0;">
         ยังไม่มีข้อความแจ้งเตือนสำหรับคุณในเซสชันนี้
@@ -6419,10 +6669,30 @@ window.returnWelfareCar = async function(bookingId) {
   renderBookingsLists();
 };
 
+function setHistoryPage(pageNum) {
+  historyCurrentPage = pageNum;
+  renderBookingsLists();
+  const container = document.getElementById('all-history-container');
+  if (container) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function changeHistoryPage(delta) {
+  historyCurrentPage += delta;
+  renderBookingsLists();
+  const container = document.getElementById('all-history-container');
+  if (container) {
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 // Expose globals for inline attributes or testing
 window.openApprovalModal = openApprovalModal;
 window.openReportView = openReportView;
 window.renderMonthCalendar = renderMonthCalendar;
+window.setHistoryPage = setHistoryPage;
+window.changeHistoryPage = changeHistoryPage;
 
 // Global Capture-Phase Event Delegation for Calendar Event Badges & Booking Click Elements
 document.addEventListener('click', function(e) {

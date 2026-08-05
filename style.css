@@ -2734,3 +2734,149 @@ span.flatpickr-weekday {
   align-items: stretch !important;
   width: 100% !important;
 }
+
+/* Executive Modern History Pagination Styles */
+#history-pagination-container {
+  margin-top: 1.25rem;
+  background: var(--bg-card);
+  padding: 0.85rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.history-pagination-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.history-page-badge {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--primary);
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid rgba(79, 70, 229, 0.15);
+}
+
+.history-pagination-controls {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap !important;
+  gap: 0.5rem !important;
+}
+
+.history-page-numbers {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 0.35rem !important;
+}
+
+.history-page-btn {
+  min-width: 36px !important;
+  height: 34px !important;
+  padding: 0 0.5rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  transition: var(--transition-smooth);
+}
+
+.history-page-btn.active {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+.history-page-btn.inactive {
+  background: var(--bg-card) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.history-page-btn.inactive:hover {
+  background: var(--primary-light) !important;
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+.history-nav-btn {
+  height: 34px !important;
+  padding: 0 0.85rem !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  border-radius: 8px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  width: auto !important;
+  transition: var(--transition-smooth);
+}
+
+@media (max-width: 640px) {
+  #history-pagination-container {
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem 0.25rem !important;
+  }
+  
+  .history-pagination-info {
+    flex-direction: column !important;
+    gap: 0.2rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .history-pagination-controls {
+    width: 100% !important;
+    justify-content: center !important;
+    gap: 0.15rem !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    padding: 2px 0 !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .history-page-numbers {
+    gap: 0.15rem !important;
+  }
+
+  .history-nav-btn {
+    padding: 0 0.4rem !important;
+    font-size: 0.75rem !important;
+    height: 30px !important;
+    border-radius: 6px !important;
+  }
+
+  .history-page-btn {
+    min-width: 26px !important;
+    height: 30px !important;
+    padding: 0 0.2rem !important;
+    font-size: 0.75rem !important;
+    border-radius: 6px !important;
+  }
+}
