@@ -2491,6 +2491,56 @@ function renderBookingsLists() {
   const finalPendingBookingsList = dedupeList(pendingBookingsList);
   const cleanAllBookingsList = dedupeList(allBookingsList);
 
+  // 🎯 Sort Pending Approvals list by earliest departure date (startDate ascending)
+  finalPendingBookingsList.sort((a, b) => {
+    const dateA = new Date(a.booking.startDate || a.booking.id || 0).getTime();
+    const dateB = new Date(b.booking.startDate || b.booking.id || 0).getTime();
+    return dateA - dateB; // Earliest scheduled trip comes first!
+  });
+
+  // Handle Date & Search Filtering for Pending Approvals List
+  const pendingDateSelect = document.getElementById('pending-date-filter');
+  const pendingSearchInput = document.getElementById('pending-search-input');
+  const pDateFilter = pendingDateSelect ? pendingDateSelect.value : 'earliest_first';
+  const pSearchVal = pendingSearchInput ? pendingSearchInput.value.trim().toLowerCase() : '';
+
+  const filteredPendingBookingsList = finalPendingBookingsList.filter(item => {
+    const b = item.booking;
+    let matchDate = true;
+    if (b.startDate && pDateFilter !== 'all' && pDateFilter !== 'earliest_first') {
+      const bDate = new Date(b.startDate);
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+      if (pDateFilter === 'today') {
+        matchDate = bDate >= todayStart && bDate <= todayEnd;
+      } else if (pDateFilter === 'this_week') {
+        const firstDayOfWeek = new Date(todayStart);
+        firstDayOfWeek.setDate(todayStart.getDate() - todayStart.getDay());
+        const lastDayOfWeek = new Date(firstDayOfWeek);
+        lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+        lastDayOfWeek.setHours(23, 59, 59);
+        matchDate = bDate >= firstDayOfWeek && bDate <= lastDayOfWeek;
+      } else if (pDateFilter === 'this_month') {
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        matchDate = bDate >= firstDayOfMonth && bDate <= lastDayOfMonth;
+      }
+    }
+
+    let matchSearch = true;
+    if (pSearchVal) {
+      const idStr = (b.id || '').toLowerCase();
+      const reqStr = (b.requester || '').toLowerCase();
+      const purpStr = (b.purpose || '').toLowerCase();
+      const destStr = (b.destination || '').toLowerCase();
+      matchSearch = idStr.includes(pSearchVal) || reqStr.includes(pSearchVal) || purpStr.includes(pSearchVal) || destStr.includes(pSearchVal);
+    }
+
+    return matchDate && matchSearch;
+  });
+
   // 🎯 Sort history list by Booking ID descending (newest requests at the top)
   cleanAllBookingsList.sort((a, b) => {
     const numA = parseInt((a.booking.id || '').replace(/\D/g, ''), 10) || 0;
@@ -2612,7 +2662,7 @@ function renderBookingsLists() {
 
   renderToContainer(
     pendingContainer,
-    finalPendingBookingsList,
+    filteredPendingBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📋</div>
@@ -5116,6 +5166,14 @@ function setupEventListeners() {
 
   document.getElementById('history-search-input')?.addEventListener('input', () => {
     historyCurrentPage = 1;
+    renderBookingsLists();
+  });
+
+  document.getElementById('pending-date-filter')?.addEventListener('change', () => {
+    renderBookingsLists();
+  });
+
+  document.getElementById('pending-search-input')?.addEventListener('input', () => {
     renderBookingsLists();
   });
 
