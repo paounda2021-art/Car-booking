@@ -606,6 +606,8 @@ function getSignatureImg(level, signatureVal, approverName) {
     if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
       return u.sign.trim().replace(/[\r\n]/g, '');
     }
+  }
+  
   if (level === 0 || level === 1) {
     return '';
   }
@@ -743,6 +745,7 @@ async function initDatabase() {
           } catch(e) {}
         }
 
+        dbBookings = deduplicateBookings(dbBookings);
         localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
         bookings = dbBookings;
         dbBookingsLoaded = true;
@@ -979,6 +982,36 @@ async function initDatabase() {
   checkSystemActivation();
 }
 
+function deduplicateBookings(list) {
+  if (!Array.isArray(list)) return [];
+  const map = new Map();
+  list.forEach(item => {
+    if (!item || !item.id) return;
+    const cleanId = String(item.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
+    if (!cleanId || cleanId === 'SYSTEM_CONFIG') return;
+
+    if (!map.has(cleanId)) {
+      map.set(cleanId, item);
+    } else {
+      const existing = map.get(cleanId);
+      const existingCompleted = (existing.status === 'approved' || existing.status === 'rejected' || existing.status === 'cancelled');
+      const itemCompleted = (item.status === 'approved' || item.status === 'rejected' || item.status === 'cancelled');
+
+      const existingSigs = Array.isArray(existing.signatures) ? existing.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length : 0;
+      const itemSigs = Array.isArray(item.signatures) ? item.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length : 0;
+
+      if (itemCompleted && !existingCompleted) {
+        map.set(cleanId, item);
+      } else if (itemSigs > existingSigs) {
+        map.set(cleanId, item);
+      } else if ((item.currentApprovalLevel || 0) > (existing.currentApprovalLevel || 0)) {
+        map.set(cleanId, item);
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
 // ==========================================
 // 1. ฟังก์ชันบันทึกข้อมูล (เซฟลงเครื่องเพียวๆ 100%)
 // ==========================================
@@ -987,6 +1020,9 @@ async function saveBookings() {
     console.warn("🛑 บล็อกการทำงาน: ป้องกันการเซฟ 0 รายการทับข้อมูลเดิม!");
     return;
   }
+
+  // 🛡️ Deduplicate bookings before saving
+  bookings = deduplicateBookings(bookings);
 
   // 🚀 บันทึก localStorage ทันที (พร้อมระบบป้องกัน QuotaExceededError)
   try {
@@ -2344,7 +2380,10 @@ function renderBookingsLists() {
   const pendingBookingsList = [];
   const allBookingsList = [];
 
-  bookings.forEach(b => {
+  // 🛡️ Deduplicate bookings list before building UI lists
+  const cleanBookingsList = deduplicateBookings(bookings);
+
+  cleanBookingsList.forEach(b => {
     const isMyRequest = checkIsMyRequest(b, currentUser);
     
     let isPendingForMe = false;
@@ -2407,18 +2446,16 @@ function renderBookingsLists() {
     const isL2OrL3 = (isL2User || isL3User) && !isL4Active;
 
     if (isMyRequest) {
-      // 🎯 1. เจ้าของคำขอ (L0) จะเห็นเฉพาะงานที่ตนเองเป็นคนเสนอขอเท่านั้น
-      canShowInHistory = true;
-    } else if (isManagerOrApprover) {
-      // 🎯 2. หัวหน้างาน (L1) หรือผู้ที่เกี่ยวข้องกับสายอนุมัติใบนี้ จะเห็นเฉพาะงานของลูกน้องในสังกัด
       canShowInHistory = true;
     } else if (isL4Active) {
-      // 🎯 3. สำหรับ L4: แสดงเฉพาะเคสที่อนุมัติเสร็จสิ้นแล้วเท่านั้น (และไม่ใช่ของตนเอง)
+      // 🎯 สำหรับ L4: แสดงเฉพาะเคสที่อนุมัติเสร็จสิ้นเท่านั้น (status === 'approved')
       if (b.status === 'approved') {
         canShowInHistory = true;
       }
-    } else if (isL2OrL3 || canSeeAll) {
-      // 🎯 4. สำหรับ L2, L3 หรือแอดมิน: แสดงทุกสถานะเพื่อการจัดการ
+    } else if (isL2OrL3 || canSeeAll || isManagerOrApprover) {
+      // 🎯 สำหรับ L2 และ L3: แสดงทุกสถานะ
+      canShowInHistory = true;
+    } else if (b.status === 'approved') {
       canShowInHistory = true;
     }
 
@@ -2427,8 +2464,33 @@ function renderBookingsLists() {
     }
   });
 
+  // 🛡️ Strict Deduplication on UI Lists by Booking ID
+  const dedupeList = (arr) => {
+    const m = new Map();
+    arr.forEach(item => {
+      if (item && item.booking && item.booking.id) {
+        const k = String(item.booking.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
+        if (!m.has(k)) {
+          m.set(k, item);
+        } else {
+          const existing = m.get(k);
+          const existingComp = (existing.booking.status === 'approved' || existing.booking.status === 'rejected' || existing.booking.status === 'cancelled');
+          const itemComp = (item.booking.status === 'approved' || item.booking.status === 'rejected' || item.booking.status === 'cancelled');
+          if (itemComp && !existingComp) {
+            m.set(k, item);
+          }
+        }
+      }
+    });
+    return Array.from(m.values());
+  };
+
+  const finalMyBookingsList = dedupeList(myBookingsList);
+  const finalPendingBookingsList = dedupeList(pendingBookingsList);
+  const cleanAllBookingsList = dedupeList(allBookingsList);
+
   // 🎯 Sort history list by Booking ID descending (newest requests at the top)
-  allBookingsList.sort((a, b) => {
+  cleanAllBookingsList.sort((a, b) => {
     const numA = parseInt((a.booking.id || '').replace(/\D/g, ''), 10) || 0;
     const numB = parseInt((b.booking.id || '').replace(/\D/g, ''), 10) || 0;
     return numB - numA;
@@ -2440,7 +2502,7 @@ function renderBookingsLists() {
   const historyStatusSelect = document.getElementById('history-status-filter');
   const historySearchInput = document.getElementById('history-search-input');
   
-  let filteredAllBookingsList = allBookingsList;
+  let filteredAllBookingsList = cleanAllBookingsList;
 
   const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
   const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
@@ -2536,7 +2598,7 @@ function renderBookingsLists() {
 
   renderToContainer(
     myContainer,
-    myBookingsList,
+    finalMyBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📁</div>
@@ -2548,7 +2610,7 @@ function renderBookingsLists() {
 
   renderToContainer(
     pendingContainer,
-    pendingBookingsList,
+    finalPendingBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📋</div>
@@ -2870,16 +2932,26 @@ async function autoDrawApproverSignature() {
   // 2. Find target user in fresh usersList
   let targetSign = '';
   if (usersList && Array.isArray(usersList)) {
-    const dbU = usersList.find(u => 
-      (u.username && u.username.toLowerCase() === uName) ||
-      (u.email && u.email.toLowerCase() === uEmail) ||
-      (u.name && u.name.replace(/\s+/g, '') === uNameThai) ||
-      (currentUser.role === 'executive' && u.username === 'piyawan.k') ||
-      (userHasApproveLevel(currentUser, 4) && u.username === 'piyawan.k') ||
-      (userHasApproveLevel(currentUser, 3) && u.username === 'saisunee.p') ||
-      (userHasApproveLevel(currentUser, 2) && u.username === 'chalong.c') ||
-      (userHasApproveLevel(currentUser, 1) && u.username === 'prathum.c')
-    );
+    let dbU = usersList.find(u => u.username && u.username.toLowerCase() === uName);
+    if (!dbU && uEmail) {
+      dbU = usersList.find(u => u.email && u.email.toLowerCase() === uEmail);
+    }
+    if (!dbU && uNameThai) {
+      dbU = usersList.find(u => u.name && u.name.replace(/\s+/g, '') === uNameThai);
+    }
+    if (!dbU) {
+      const activeLvl = sessionStorage.getItem('activeApprovalLevel') || 'all';
+      if (activeLvl === '4' || userHasApproveLevel(currentUser, 4)) {
+        dbU = usersList.find(u => u.username === 'piyawan.k' || u.username === 'supbhachart.c');
+      } else if (activeLvl === '3' || userHasApproveLevel(currentUser, 3)) {
+        dbU = usersList.find(u => u.username === 'saisunee.p');
+      } else if (activeLvl === '2' || userHasApproveLevel(currentUser, 2)) {
+        dbU = usersList.find(u => u.username === 'chalong.c');
+      } else if (activeLvl === '1' || userHasApproveLevel(currentUser, 1)) {
+        dbU = usersList.find(u => u.username === 'prathum.c');
+      }
+    }
+
     if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 30) {
       targetSign = dbU.sign.trim().replace(/[\r\n]/g, '');
       currentUser.sign = targetSign;
