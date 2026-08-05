@@ -1204,24 +1204,38 @@ const server = http.createServer((req, res) => {
                 if (event.type === 'message' && event.message && event.message.type === 'text') {
                   const text = (event.message.text || '').trim();
                   const lowerText = text.toLowerCase();
-                  
+                  const isLongMessage = text.length > 25;
+
+                  // 1. Explicit command keywords (Strict phrases only)
+                  const explicitCmds = ['เช็คงาน', 'เช็กงาน', 'คิวงาน', 'งานวันนี้', 'คิวงานวันนี้', 'เช็กรถ', 'เช็ครถ', 'คำขอ', 'jobs', 'status'];
+                  const hasExplicitCmd = explicitCmds.some(kw => lowerText.includes(kw));
+
+                  // 2. Car ID extraction (only if short query or explicitly prefixed)
                   let requestedCarId = null;
-                  const carMatch = lowerText.match(/(?:@|รถ\s*|งาน\s*|^)([a-d]|taxi)(?:\s*|$)/i);
+                  const carMatch = lowerText.match(/(?:^|@|รถ\s*|งาน\s*)([a-d]|taxi)(?=$|\s)/i);
                   if (carMatch) {
-                    requestedCarId = carMatch[1].toUpperCase();
+                    if (!isLongMessage || lowerText.startsWith('@') || lowerText.startsWith('รถ') || lowerText.startsWith('งาน')) {
+                      requestedCarId = carMatch[1].toUpperCase();
+                    }
                   }
 
+                  // 3. Driver Name extraction (only if short query or explicitly prefixed)
                   let requestedDriverName = null;
                   const knownDrivers = ['ชลาดล', 'สันติ', 'คมกฤษ'];
                   for (const dName of knownDrivers) {
-                    if (lowerText.includes(dName.toLowerCase())) {
+                    const isDriverMatch = lowerText.includes(dName.toLowerCase()) &&
+                                          (!isLongMessage || lowerText.startsWith('@') || lowerText.startsWith('งาน') || lowerText.startsWith('คิว'));
+                    if (isDriverMatch) {
                       requestedDriverName = dName;
                       break;
                     }
                   }
 
-                  const isJobQuery = ['เช็คงาน', 'คิวงาน', 'งานวันนี้', 'คำขอ', 'jobs', 'status', 'งาน', 'รถ'].some(kw => lowerText.includes(kw)) ||
-                                     text.startsWith('@') || requestedCarId !== null || requestedDriverName !== null;
+                  // 4. Short exact word match
+                  const isShortExactWord = !isLongMessage && ['งาน', 'รถ', 'คิว', 'เช็คงาน', 'คิวงาน'].includes(lowerText);
+
+                  // 5. Final Trigger Decision: Only reply when explicitly querying jobs
+                  const isJobQuery = text.startsWith('@') || hasExplicitCmd || requestedCarId !== null || requestedDriverName !== null || isShortExactWord;
                                      
                   if (isJobQuery && event.replyToken && accessToken) {
                     console.log(`LINE Webhook: Text query received -> "${text}" (Car: ${requestedCarId || 'ALL'}, Driver: ${requestedDriverName || 'ALL'})`);
