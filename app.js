@@ -2505,29 +2505,6 @@ function renderBookingsLists() {
     return numB - numA;
   });
 
-  // 🎯 2. Handle Departure Date Filtering for Pending Approvals (L2 Vehicle Dispatcher Only)
-  const pendingL2FilterBar = document.getElementById('pending-l2-filter-bar');
-  const pendingDateFilterInput = document.getElementById('pending-departure-date-filter');
-
-  const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
-  const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
-  const isL4UserNow = currentUser && userHasApproveLevel(currentUser, 4);
-
-  // Show pending date filter bar ONLY for L2 Vehicle Dispatchers
-  if (pendingL2FilterBar) {
-    pendingL2FilterBar.style.display = isL2UserNow ? 'flex' : 'none';
-  }
-
-  let filteredPendingBookingsList = finalPendingBookingsList;
-  const selectedPendingDate = (pendingDateFilterInput && isL2UserNow) ? pendingDateFilterInput.value : '';
-
-  if (isL2UserNow && selectedPendingDate) {
-    filteredPendingBookingsList = finalPendingBookingsList.filter(item => {
-      const startD = (item.booking.startDate || '').slice(0, 10);
-      return startD === selectedPendingDate;
-    });
-  }
-
   // Handle Status & Search Filtering for History List
   const historyFilterBar = document.getElementById('history-filter-bar');
   const historyStatusLabel = document.getElementById('history-status-label');
@@ -2535,6 +2512,10 @@ function renderBookingsLists() {
   const historySearchInput = document.getElementById('history-search-input');
   
   let filteredAllBookingsList = cleanAllBookingsList;
+
+  const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
+  const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
+  const isL4UserNow = currentUser && userHasApproveLevel(currentUser, 4);
   const activeLvlNow = sessionStorage.getItem('activeApprovalLevel') || 'all';
   const isL4ActiveNow = isL4UserNow && (activeLvlNow === '4' || (!isL2UserNow && !isL3UserNow));
 
@@ -2638,7 +2619,7 @@ function renderBookingsLists() {
 
   renderToContainer(
     pendingContainer,
-    filteredPendingBookingsList,
+    finalPendingBookingsList,
     `
       <div class="empty-state-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 1rem; width: 100%; text-align: center; color: var(--text-muted);">
         <div style="font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.65;">📋</div>
@@ -5142,16 +5123,6 @@ function setupEventListeners() {
 
   document.getElementById('history-search-input')?.addEventListener('input', () => {
     historyCurrentPage = 1;
-    renderBookingsLists();
-  });
-
-  document.getElementById('pending-departure-date-filter')?.addEventListener('change', () => {
-    renderBookingsLists();
-  });
-
-  document.getElementById('btn-clear-pending-date-filter')?.addEventListener('click', () => {
-    const input = document.getElementById('pending-departure-date-filter');
-    if (input) input.value = '';
     renderBookingsLists();
   });
 
