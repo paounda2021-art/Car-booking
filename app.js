@@ -2498,9 +2498,68 @@ function renderBookingsLists() {
     return dateA - dateB; // Earliest scheduled trip comes first!
   });
 
-  // Handle Date & Search Filtering for Pending Approvals List
+  // Handle Date & Search Filtering for Pending Approvals List (L2 Vehicle Scheduling & Approvers)
+  const pendingFilterBar = document.getElementById('pending-filter-bar');
   const pendingDateSelect = document.getElementById('pending-date-filter');
   const pendingSearchInput = document.getElementById('pending-search-input');
+
+  if (pendingFilterBar) {
+    const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
+    const isL1UserNow = currentUser && userHasApproveLevel(currentUser, 1);
+    const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
+    const isL4UserNow = currentUser && userHasApproveLevel(currentUser, 4);
+    const isCanSeeAll = currentUser && checkCanSeeAll(currentUser);
+    
+    // Explicitly show filter bar for L2 (Vehicle Scheduling), L1, L3, L4 & Admin users
+    pendingFilterBar.style.display = (isL2UserNow || isL1UserNow || isL3UserNow || isL4UserNow || isCanSeeAll) ? 'flex' : 'none';
+  }
+
+  // Dynamic populate available departure dates for pending approvals filter
+  if (pendingDateSelect) {
+    const selectedVal = pendingDateSelect.value || 'earliest_first';
+    
+    // Extract unique YYYY-MM-DD dates from pending items
+    const dateCounts = {};
+    finalPendingBookingsList.forEach(item => {
+      if (item.booking && item.booking.startDate) {
+        const dStr = String(item.booking.startDate).slice(0, 10);
+        if (dStr) {
+          dateCounts[dStr] = (dateCounts[dStr] || 0) + 1;
+        }
+      }
+    });
+
+    const sortedDates = Object.keys(dateCounts).sort();
+
+    let optionsHTML = `
+      <option value="earliest_first">⏳ เรียงจากคิวไปก่อนสุด (Earliest Departure)</option>
+      <option value="today">📆 คิวเดินทางวันนี้</option>
+      <option value="this_week">🗓️ คิวเดินทางสัปดาห์นี้</option>
+      <option value="this_month">📅 คิวเดินทางเดือนนี้</option>
+    `;
+
+    if (sortedDates.length > 0) {
+      optionsHTML += `<optgroup label="📅 เลือกตามวันที่ออกเดินทางจริง (Available Dates)">`;
+      sortedDates.forEach(dStr => {
+        const formattedDate = formatThaiDate(dStr);
+        const count = dateCounts[dStr];
+        optionsHTML += `<option value="date_${dStr}">📅 ${formattedDate} (${count} รายการ)</option>`;
+      });
+      optionsHTML += `</optgroup>`;
+    }
+
+    optionsHTML += `<option value="all">📋 คิวรออนุมัติทั้งหมด</option>`;
+    
+    const datesKey = JSON.stringify(sortedDates);
+    if (pendingDateSelect.getAttribute('data-loaded-dates') !== datesKey) {
+      pendingDateSelect.innerHTML = optionsHTML;
+      pendingDateSelect.setAttribute('data-loaded-dates', datesKey);
+      if ([...pendingDateSelect.options].some(o => o.value === selectedVal)) {
+        pendingDateSelect.value = selectedVal;
+      }
+    }
+  }
+
   const pDateFilter = pendingDateSelect ? pendingDateSelect.value : 'earliest_first';
   const pSearchVal = pendingSearchInput ? pendingSearchInput.value.trim().toLowerCase() : '';
 
@@ -2509,11 +2568,15 @@ function renderBookingsLists() {
     let matchDate = true;
     if (b.startDate && pDateFilter !== 'all' && pDateFilter !== 'earliest_first') {
       const bDate = new Date(b.startDate);
+      const bDateStr = String(b.startDate).slice(0, 10);
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
 
-      if (pDateFilter === 'today') {
+      if (pDateFilter.startsWith('date_')) {
+        const targetDateStr = pDateFilter.replace('date_', '');
+        matchDate = bDateStr === targetDateStr;
+      } else if (pDateFilter === 'today') {
         matchDate = bDate >= todayStart && bDate <= todayEnd;
       } else if (pDateFilter === 'this_week') {
         const firstDayOfWeek = new Date(todayStart);
