@@ -2505,13 +2505,8 @@ function renderBookingsLists() {
 
   if (pendingFilterBar) {
     const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
-    const isL1UserNow = currentUser && userHasApproveLevel(currentUser, 1);
-    const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
-    const isL4UserNow = currentUser && userHasApproveLevel(currentUser, 4);
-    const isCanSeeAll = currentUser && checkCanSeeAll(currentUser);
-    
-    // Explicitly show filter bar for L2 (Vehicle Scheduling), L1, L3, L4 & Admin users
-    pendingFilterBar.style.display = (isL2UserNow || isL1UserNow || isL3UserNow || isL4UserNow || isCanSeeAll) ? 'flex' : 'none';
+    // 🎯 Grant filtering permission EXCLUSIVELY to L2 Vehicle Dispatchers (ผู้จัดรถ)
+    pendingFilterBar.style.display = isL2UserNow ? 'flex' : 'none';
   }
 
   // Dynamic populate available departure dates for pending approvals filter
