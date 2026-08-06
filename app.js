@@ -2491,112 +2491,11 @@ function renderBookingsLists() {
   const finalPendingBookingsList = dedupeList(pendingBookingsList);
   const cleanAllBookingsList = dedupeList(allBookingsList);
 
-  // 🎯 Sort Pending Approvals list by earliest departure date (startDate ascending)
+  // 🎯 1. Sort Pending Approvals list by earliest departure date ascending (earliest trips going first)
   finalPendingBookingsList.sort((a, b) => {
-    const dateA = new Date(a.booking.startDate || a.booking.id || 0).getTime();
-    const dateB = new Date(b.booking.startDate || b.booking.id || 0).getTime();
-    return dateA - dateB; // Earliest scheduled trip comes first!
-  });
-
-  // Handle Date & Search Filtering for Pending Approvals List (L2 Vehicle Scheduling & Approvers)
-  const pendingFilterBar = document.getElementById('pending-filter-bar');
-  const pendingDateSelect = document.getElementById('pending-date-filter');
-  const pendingSearchInput = document.getElementById('pending-search-input');
-
-  if (pendingFilterBar) {
-    const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
-    // 🎯 Grant filtering permission EXCLUSIVELY to L2 Vehicle Dispatchers (ผู้จัดรถ)
-    pendingFilterBar.style.display = isL2UserNow ? 'flex' : 'none';
-  }
-
-  // Dynamic populate available departure dates for pending approvals filter
-  if (pendingDateSelect) {
-    const selectedVal = pendingDateSelect.value || 'earliest_first';
-    
-    // Extract unique YYYY-MM-DD dates from pending items
-    const dateCounts = {};
-    finalPendingBookingsList.forEach(item => {
-      if (item.booking && item.booking.startDate) {
-        const dStr = String(item.booking.startDate).slice(0, 10);
-        if (dStr) {
-          dateCounts[dStr] = (dateCounts[dStr] || 0) + 1;
-        }
-      }
-    });
-
-    const sortedDates = Object.keys(dateCounts).sort();
-
-    let optionsHTML = `
-      <option value="earliest_first">⏳ เรียงจากคิวไปก่อนสุด (Earliest Departure)</option>
-      <option value="today">📆 คิวเดินทางวันนี้</option>
-      <option value="this_week">🗓️ คิวเดินทางสัปดาห์นี้</option>
-      <option value="this_month">📅 คิวเดินทางเดือนนี้</option>
-    `;
-
-    if (sortedDates.length > 0) {
-      optionsHTML += `<optgroup label="📅 เลือกตามวันที่ออกเดินทางจริง (Available Dates)">`;
-      sortedDates.forEach(dStr => {
-        const formattedDate = formatThaiDate(dStr);
-        const count = dateCounts[dStr];
-        optionsHTML += `<option value="date_${dStr}">📅 ${formattedDate} (${count} รายการ)</option>`;
-      });
-      optionsHTML += `</optgroup>`;
-    }
-
-    optionsHTML += `<option value="all">📋 คิวรออนุมัติทั้งหมด</option>`;
-    
-    const datesKey = JSON.stringify(sortedDates);
-    if (pendingDateSelect.getAttribute('data-loaded-dates') !== datesKey) {
-      pendingDateSelect.innerHTML = optionsHTML;
-      pendingDateSelect.setAttribute('data-loaded-dates', datesKey);
-      if ([...pendingDateSelect.options].some(o => o.value === selectedVal)) {
-        pendingDateSelect.value = selectedVal;
-      }
-    }
-  }
-
-  const pDateFilter = pendingDateSelect ? pendingDateSelect.value : 'earliest_first';
-  const pSearchVal = pendingSearchInput ? pendingSearchInput.value.trim().toLowerCase() : '';
-
-  const filteredPendingBookingsList = finalPendingBookingsList.filter(item => {
-    const b = item.booking;
-    let matchDate = true;
-    if (b.startDate && pDateFilter !== 'all' && pDateFilter !== 'earliest_first') {
-      const bDate = new Date(b.startDate);
-      const bDateStr = String(b.startDate).slice(0, 10);
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
-      if (pDateFilter.startsWith('date_')) {
-        const targetDateStr = pDateFilter.replace('date_', '');
-        matchDate = bDateStr === targetDateStr;
-      } else if (pDateFilter === 'today') {
-        matchDate = bDate >= todayStart && bDate <= todayEnd;
-      } else if (pDateFilter === 'this_week') {
-        const firstDayOfWeek = new Date(todayStart);
-        firstDayOfWeek.setDate(todayStart.getDate() - todayStart.getDay());
-        const lastDayOfWeek = new Date(firstDayOfWeek);
-        lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
-        lastDayOfWeek.setHours(23, 59, 59);
-        matchDate = bDate >= firstDayOfWeek && bDate <= lastDayOfWeek;
-      } else if (pDateFilter === 'this_month') {
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-        matchDate = bDate >= firstDayOfMonth && bDate <= lastDayOfMonth;
-      }
-    }
-
-    let matchSearch = true;
-    if (pSearchVal) {
-      const idStr = (b.id || '').toLowerCase();
-      const reqStr = (b.requester || '').toLowerCase();
-      const purpStr = (b.purpose || '').toLowerCase();
-      const destStr = (b.destination || '').toLowerCase();
-      matchSearch = idStr.includes(pSearchVal) || reqStr.includes(pSearchVal) || purpStr.includes(pSearchVal) || destStr.includes(pSearchVal);
-    }
-
-    return matchDate && matchSearch;
+    const timeA = new Date(a.booking.startDate).getTime() || 0;
+    const timeB = new Date(b.booking.startDate).getTime() || 0;
+    return timeA - timeB;
   });
 
   // 🎯 Sort history list by Booking ID descending (newest requests at the top)
@@ -2606,6 +2505,29 @@ function renderBookingsLists() {
     return numB - numA;
   });
 
+  // 🎯 2. Handle Departure Date Filtering for Pending Approvals (L2 Vehicle Dispatcher Only)
+  const pendingL2FilterBar = document.getElementById('pending-l2-filter-bar');
+  const pendingDateFilterInput = document.getElementById('pending-departure-date-filter');
+
+  const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
+  const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
+  const isL4UserNow = currentUser && userHasApproveLevel(currentUser, 4);
+
+  // Show pending date filter bar ONLY for L2 Vehicle Dispatchers
+  if (pendingL2FilterBar) {
+    pendingL2FilterBar.style.display = isL2UserNow ? 'flex' : 'none';
+  }
+
+  let filteredPendingBookingsList = finalPendingBookingsList;
+  const selectedPendingDate = (pendingDateFilterInput && isL2UserNow) ? pendingDateFilterInput.value : '';
+
+  if (isL2UserNow && selectedPendingDate) {
+    filteredPendingBookingsList = finalPendingBookingsList.filter(item => {
+      const startD = (item.booking.startDate || '').slice(0, 10);
+      return startD === selectedPendingDate;
+    });
+  }
+
   // Handle Status & Search Filtering for History List
   const historyFilterBar = document.getElementById('history-filter-bar');
   const historyStatusLabel = document.getElementById('history-status-label');
@@ -2613,10 +2535,6 @@ function renderBookingsLists() {
   const historySearchInput = document.getElementById('history-search-input');
   
   let filteredAllBookingsList = cleanAllBookingsList;
-
-  const isL2UserNow = currentUser && userHasApproveLevel(currentUser, 2);
-  const isL3UserNow = currentUser && userHasApproveLevel(currentUser, 3);
-  const isL4UserNow = currentUser && userHasApproveLevel(currentUser, 4);
   const activeLvlNow = sessionStorage.getItem('activeApprovalLevel') || 'all';
   const isL4ActiveNow = isL4UserNow && (activeLvlNow === '4' || (!isL2UserNow && !isL3UserNow));
 
@@ -5227,11 +5145,13 @@ function setupEventListeners() {
     renderBookingsLists();
   });
 
-  document.getElementById('pending-date-filter')?.addEventListener('change', () => {
+  document.getElementById('pending-departure-date-filter')?.addEventListener('change', () => {
     renderBookingsLists();
   });
 
-  document.getElementById('pending-search-input')?.addEventListener('input', () => {
+  document.getElementById('btn-clear-pending-date-filter')?.addEventListener('click', () => {
+    const input = document.getElementById('pending-departure-date-filter');
+    if (input) input.value = '';
     renderBookingsLists();
   });
 
