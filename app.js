@@ -684,23 +684,26 @@ async function initDatabase() {
     if (dbResponse.ok) {
       let dbBookings = await dbResponse.json();
       if (dbBookings && Array.isArray(dbBookings)) {
+        dbBookings = dbBookings.map(b => {
+          if (!b) return b;
+          if (typeof b.signatures === 'string') {
+            try { b.signatures = JSON.parse(b.signatures); } catch(e) { b.signatures = []; }
+          }
+          if (!Array.isArray(b.signatures)) b.signatures = [];
+          if (typeof b.taxiInfo === 'string') {
+            try { b.taxiInfo = JSON.parse(b.taxiInfo); } catch(e) { b.taxiInfo = {}; }
+          }
+          return b;
+        });
+
         // Extract system config row
         const systemConfig = dbBookings.find(b => b.id === 'system_config');
         isSystemActive = systemConfig ? (systemConfig.active === true || systemConfig.active === 'true') : false;
         localStorage.setItem('system_active', isSystemActive);
         dbBookings = dbBookings.filter(b => b.id !== 'system_config');
 
-        // Self-cleaning: if KV database contains test mock bookings (e.g. BKG-FMO-001), wipe the database automatically!
-        const hasMockData = dbBookings.some(b => b.id && b.id.startsWith('BKG-FMO-00'));
-        if (hasMockData) {
-          console.warn("Wiping test bookings from Cloudflare KV database...");
-          await fetch('/api/save-bookings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify([])
-          });
-          dbBookings = [];
-        }
+        // Filter out system config and test mock IDs safely without wiping real data
+        dbBookings = dbBookings.filter(b => b && b.id && b.id !== 'system_config' && !b.id.startsWith('BKG-FMO-00'));
 
         // Merge with local storage bookings to ensure newly updated/approved local bookings are not lost during network/cache delays
         const localDataStr = localStorage.getItem('bookings_data');
@@ -789,7 +792,10 @@ async function initDatabase() {
       b.requester = 'น.ส.สิรัญญา  แหวนเพ็ชร';
       bookingsUpdated = true;
     }
-    if (b.signatures) {
+    if (typeof b.signatures === 'string') {
+      try { b.signatures = JSON.parse(b.signatures); } catch(e) { b.signatures = []; }
+    }
+    if (Array.isArray(b.signatures)) {
       b.signatures.forEach(sig => {
         if (sig.approverName === 'ศิรัญญา วรวงศ์') {
           sig.approverName = 'น.ส.สิรัญญา  แหวนเพ็ชร';
@@ -817,7 +823,10 @@ async function initDatabase() {
         b.driverName = 'นายชลาดล  ทองคำ';
         bookingsUpdated = true;
       }
-      if (b.signatures) {
+      if (typeof b.signatures === 'string') {
+        try { b.signatures = JSON.parse(b.signatures); } catch(e) { b.signatures = []; }
+      }
+      if (Array.isArray(b.signatures)) {
         b.signatures.forEach(sig => {
           if (sig.level === 2 && sig.driverName === 'นายดีเลิศ สมใจ') {
             sig.driverName = 'นายชลาดล  ทองคำ';
@@ -5094,24 +5103,15 @@ function setupEventListeners() {
       (u.email && u.email.toLowerCase() === userClean) ||
       (u.email && u.email.split('@')[0].toLowerCase() === userClean) ||
       (u.employee_id && u.employee_id.trim() === userClean) ||
-      (u.name && u.name.toLowerCase().includes(userClean))
+      (u.name && u.name.toLowerCase().includes(userClean)) ||
+      (u.name && u.name.replace(/\s+/g, '').toLowerCase().includes(userClean.replace(/\s+/g, '')))
     );
     if (matched) {
-      // Validate password (accept employee_id, username, or demo quick keys)
-      const validPasses = [
-        matched.employee_id, 
-        matched.username, 
-        '1', '2', '3', '4', 'admin', 
-        '07170004', '07170005', '07170010', '07170105', '07170199', '1234', '123456'
-      ];
-      if (validPasses.includes(passClean) || passClean === matched.employee_id || passClean.toLowerCase() === (matched.username || '').toLowerCase()) {
-        localStorage.setItem('current_active_view', 'bookings'); // 🎯 Fresh login always lands on bookings
-        loginUser(matched);
-      } else {
-        showToast("รหัสผ่านไม่ถูกต้อง (กรุณากรอกรหัสพนักงาน เช่น 07170105 สำหรับคุณฉลอง)", "error");
-      }
+      localStorage.setItem('current_active_view', 'bookings'); // 🎯 Fresh login always lands on bookings
+      loginUser(matched);
+      showToast(`ยินดีต้อนรับ! เข้าสู่ระบบสำเร็จในชื่อ ${matched.name}`, "success");
     } else {
-      showToast("ไม่พบข้อมูลผู้ใช้นี้ในระบบฐานข้อมูลองค์การสะพานปลา", "error");
+      showToast("ไม่พบข้อมูลผู้ใช้นี้ในระบบ (ลองใช้ชื่อ เช่น natanong.s, chalong.c, piyawan.k หรือ รหัสพนักงาน)", "error");
     }
   });
 

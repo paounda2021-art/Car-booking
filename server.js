@@ -420,6 +420,11 @@ const server = http.createServer((req, res) => {
       try {
         const rawList = JSON.parse(body);
         if (Array.isArray(rawList)) {
+          if (rawList.length === 0) {
+            console.warn("🛑 Prevented writing empty array [] to database in /api/save-bookings!");
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ status: 'ok', message: 'Skipped empty array save' }));
+          }
           const map = new Map();
           rawList.forEach(item => {
             if (!item || !item.id) return;
