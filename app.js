@@ -2551,7 +2551,9 @@ function renderBookingsLists() {
   const searchVal = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
 
   if (isL2OrL3OrL4) {
-    filteredAllBookingsList = allBookingsList.filter(item => {
+    const numSearch = parseInt(searchVal, 10);
+
+    filteredAllBookingsList = cleanAllBookingsList.filter((item, idx) => {
       const b = item.booking;
       const st = b.status;
       let matchStatus = true;
@@ -2566,11 +2568,21 @@ function renderBookingsLists() {
 
       let matchSearch = true;
       if (searchVal) {
-        const idStr = (b.id || '').toLowerCase();
-        const reqStr = (b.requester || '').toLowerCase();
-        const purpStr = (b.purpose || '').toLowerCase();
-        const destStr = (b.destination || '').toLowerCase();
-        matchSearch = idStr.includes(searchVal) || reqStr.includes(searchVal) || purpStr.includes(searchVal) || destStr.includes(searchVal);
+        const searchFields = [
+          b.id, b.requester, b.purpose, b.destination, b.ref,
+          b.driverName, b.carId, b.department, b.office, b.division,
+          b.position, b.passengers, b.startDate, b.endDate, b.status
+        ].map(v => (v || '').toString().toLowerCase());
+
+        matchSearch = searchFields.some(f => f.includes(searchVal));
+
+        if (!matchSearch && !isNaN(numSearch) && numSearch > 0) {
+          // Check 1-based index or sequential count
+          if ((idx + 1) === numSearch || (cleanAllBookingsList.length - idx) === numSearch) matchSearch = true;
+          // Check numeric suffix of booking ID (e.g. BGK-6908-052 -> 52)
+          const lastNum = parseInt((b.id || '').split('-').pop(), 10);
+          if (!isNaN(lastNum) && lastNum === numSearch) matchSearch = true;
+        }
       }
 
       return matchStatus && matchSearch;

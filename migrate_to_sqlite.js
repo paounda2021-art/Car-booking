@@ -11,13 +11,8 @@ console.log("Starting SQLite database migration...");
 const db = new DatabaseSync(dbPath);
 
 try {
-  // 2. Drop existing tables if any
-  db.exec("DROP TABLE IF EXISTS bookings");
-  db.exec("DROP TABLE IF EXISTS cars");
-  db.exec("DROP TABLE IF EXISTS users");
-
-  // 3. Create tables
-  console.log("Creating tables...");
+  // 2. Ensure tables exist without dropping existing data
+  console.log("Creating tables (if not exist)...");
   
   // Table: users
   db.exec(`
@@ -153,7 +148,7 @@ try {
   // 7. Populate bookings
   console.log(`Migrating ${bookingsList.length} bookings...`);
   const insertBooking = db.prepare(`
-    INSERT INTO bookings (
+    INSERT OR REPLACE INTO bookings (
       id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
       driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince,
       purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price,

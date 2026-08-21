@@ -46,18 +46,11 @@ try {
     git update-index --no-assume-unchanged bookings.json
 } catch {}
 
-# 4. Remove old sqlite db so it auto-rebuilds cleanly
-$dbFile = Join-Path $rootDir "database.db"
-if (Test-Path $dbFile) {
-    Remove-Item -Path $dbFile -Force -ErrorAction SilentlyContinue
-}
-
-# 5. Pull updated code and database from GitHub
-Write-Host "Pulling latest codebase and database from GitHub..." -ForegroundColor Yellow
+# 4. Pull updated codebase from GitHub without deleting local database.db
+Write-Host "Pulling latest codebase from GitHub..." -ForegroundColor Yellow
 git config user.email "admin@fishmarket.co.th"
 git config user.name "Administrator"
-git fetch origin
-git reset --hard origin/main
+git pull origin main
 
 # 6. Restart server in PM2
 Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Yellow

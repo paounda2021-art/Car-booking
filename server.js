@@ -158,7 +158,6 @@ function sqliteGetBookings() {
 
 function sqliteSaveBookings(bookingsList) {
   try {
-    db.exec("DELETE FROM bookings");
     const insertBooking = db.prepare(`
       INSERT OR REPLACE INTO bookings (
         id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
@@ -238,11 +237,39 @@ try {
   const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
   if (fs.existsSync(bookingsJsonPath)) {
     const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
-    const fileBookings = JSON.parse(rawJson);
-    if (fileBookings && fileBookings.length > 0) {
-      console.log(`[Startup Auto-Sync] Syncing ${fileBookings.length} records from bookings.json to SQLite database...`);
-      sqliteSaveBookings(fileBookings);
-    }
+    const fileBookings = JSON.parse(rawJson) || [];
+    const dbBookings = sqliteGetBookings() || [];
+
+    const masterMap = new Map();
+    // 🛡️ Bi-directional Merge: Load DB records first, then file records
+    dbBookings.forEach(b => {
+      if (!b || !b.id) return;
+      const cleanId = String(b.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
+      if (cleanId && cleanId !== 'SYSTEM_CONFIG') masterMap.set(cleanId, b);
+    });
+
+    fileBookings.forEach(b => {
+      if (!b || !b.id) return;
+      const cleanId = String(b.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
+      if (!cleanId || cleanId === 'SYSTEM_CONFIG') return;
+      if (!masterMap.has(cleanId)) {
+        masterMap.set(cleanId, b);
+      } else {
+        const existing = masterMap.get(cleanId);
+        const existingComp = (existing.status === 'approved' || existing.status === 'rejected' || existing.status === 'cancelled');
+        const itemComp = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
+        if (itemComp && !existingComp) {
+          masterMap.set(cleanId, b);
+        } else if ((b.currentApprovalLevel || 0) >= (existing.currentApprovalLevel || 0)) {
+          masterMap.set(cleanId, b);
+        }
+      }
+    });
+
+    const masterList = Array.from(masterMap.values());
+    console.log(`[Startup Auto-Sync] Bi-directional Sync completed. Total Master Bookings: ${masterList.length} records.`);
+    sqliteSaveBookings(masterList);
+    safeWriteJsonFile(bookingsJsonPath, JSON.stringify(masterList, null, 2));
   }
 } catch(e) {
   console.error("[Startup Auto-Sync] Error during database sync:", e);
@@ -426,6 +453,14 @@ const server = http.createServer((req, res) => {
             return res.end(JSON.stringify({ status: 'ok', message: 'Skipped empty array save' }));
           }
           const map = new Map();
+          // 🛡️ Load existing bookings first to prevent non-admin clients from overwriting/truncating the database
+          const existingDB = sqliteGetBookings() || [];
+          existingDB.forEach(item => {
+            if (!item || !item.id) return;
+            const cleanId = String(item.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
+            if (cleanId && cleanId !== 'SYSTEM_CONFIG') map.set(cleanId, item);
+          });
+
           rawList.forEach(item => {
             if (!item || !item.id) return;
             const cleanId = String(item.id).replace(/[\s\u200b\u00a0]/g, '').toUpperCase();
@@ -438,7 +473,7 @@ const server = http.createServer((req, res) => {
               const itemComp = (item.status === 'approved' || item.status === 'rejected' || item.status === 'cancelled');
               if (itemComp && !existingComp) {
                 map.set(cleanId, item);
-              } else if ((item.currentApprovalLevel || 0) > (existing.currentApprovalLevel || 0)) {
+              } else if ((item.currentApprovalLevel || 0) >= (existing.currentApprovalLevel || 0)) {
                 map.set(cleanId, item);
               }
             }
