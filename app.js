@@ -4657,6 +4657,21 @@ function openReportView(bookingId) {
   reportContainer.innerHTML = buildReportHTMLContent(b);
 }
 
+// Helper to wait for all <img> elements inside a container to finish loading
+async function preloadImagesInElement(elem) {
+  if (!elem) return;
+  const imgs = Array.from(elem.querySelectorAll('img'));
+  const promises = imgs.map(img => {
+    if (img.complete && img.naturalWidth !== 0) return Promise.resolve();
+    return new Promise(resolve => {
+      img.onload = resolve;
+      img.onerror = resolve;
+      setTimeout(resolve, 800);
+    });
+  });
+  await Promise.all(promises);
+}
+
 // Automatically convert report HTML to PDF and save to Report/ directory on server
 async function autoGenerateAndSavePDF(bookingId) {
   if (!bookingId) return null;
@@ -4686,13 +4701,14 @@ async function autoGenerateAndSavePDF(bookingId) {
       tempContainer.innerHTML = buildReportHTMLContent(b);
       document.body.appendChild(tempContainer);
       targetElem = tempContainer;
-
-      // Wait 300ms for images (logo, signatures) and layout paint
-      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     // Apply pdf-mode for 1-page A4 fitting
     if (targetElem) targetElem.classList.add('pdf-mode');
+
+    // Wait for all img tags (logo, base64 signatures) to finish loading completely
+    await preloadImagesInElement(targetElem);
+    await new Promise(resolve => setTimeout(resolve, 200));
 
     const opt = {
       margin:       [4, 4, 4, 4],
