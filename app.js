@@ -2299,6 +2299,8 @@ function renderBookingsLists() {
 
     const startDateStr = formatThaiDateTime(b.startDate);
     const endDateStr = formatThaiDateTime(b.endDate);
+    const createdRaw = b.createdAt || (b.signatures && b.signatures[0] && b.signatures[0].timestamp) || b.createdDate || '';
+    const createdDateStr = createdRaw ? formatThaiDateTime(createdRaw) : '-';
     
     let infoStr = '';
     if (b.travelType === 'fmo_car') {
@@ -2367,9 +2369,10 @@ function renderBookingsLists() {
         <span class="badge ${statusClass}">${statusText}</span>
       </div>
       <div class="booking-card-body">
+        <p class="booking-created-at" style="font-size: 0.8rem; color: var(--primary); margin-bottom: 0.35rem; font-weight: 600;">📝 วันที่เขียนใบจอง: ${createdDateStr}</p>
         <p class="booking-purpose">ราชการเรื่อง: <strong>${b.purpose}</strong></p>
         <p class="booking-car-info">${infoStr} ${directionStr}</p>
-        <p class="booking-time">⏰ ${startDateStr} - ${endDateStr} (${b.trips} เที่ยว)</p>
+        <p class="booking-time">⏰ วันที่เดินทาง: ${startDateStr} - ${endDateStr} (${b.trips} เที่ยว)</p>
       </div>
       <div class="booking-card-footer">
         <div class="approval-steps-indicator">${stepsDots}</div>
@@ -3108,6 +3111,12 @@ async function openApprovalModal(bookingId) {
   // Fill details table
   document.getElementById('detail-title').textContent = `ใบขออนุญาตใช้รถยนต์ เลขที่ ${booking.id}`;
   document.getElementById('detail-requester').textContent = booking.requester;
+
+  const createdRawModal = booking.createdAt || (booking.signatures && booking.signatures[0] && booking.signatures[0].timestamp) || booking.createdDate || '';
+  const createdDateDisplayModal = createdRawModal ? formatThaiDateTime(createdRawModal) : '-';
+  const createdAtEl = document.getElementById('detail-created-at');
+  if (createdAtEl) createdAtEl.textContent = createdDateDisplayModal;
+
   document.getElementById('detail-office').textContent = `${booking.position} / แผนก ${booking.department} ฝ่าย ${booking.division} สังกัด ${booking.office}`;
   let travelTypeLabel = '🚐 รถรับจ้างสาธารณะ';
   if (booking.travelType === 'fmo_car') {
