@@ -3022,10 +3022,16 @@ async function autoDrawApproverSignature() {
   canvas.width = parentWidth > 100 ? parentWidth : 500;
   canvas.height = 150;
 
-  // 6. Load and draw targetSign onto canvas using Blob URL (prevents ERR_INVALID_URL)
+  // 6. Load and draw targetSign onto canvas using Blob URL ONLY (eliminates ERR_INVALID_URL)
   const blob = dataURItoBlob(targetSign);
-  const objectUrl = blob ? URL.createObjectURL(blob) : targetSign;
+  if (!blob) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (placeholder) placeholder.style.display = 'flex';
+    return;
+  }
 
+  const objectUrl = URL.createObjectURL(blob);
   const img = new Image();
   img.onload = () => {
     const ctx = canvas.getContext('2d');
@@ -3037,35 +3043,13 @@ async function autoDrawApproverSignature() {
     const y = (canvas.height - img.height * ratio) / 2;
     ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
     if (placeholder) placeholder.style.display = 'none';
-    if (blob) URL.revokeObjectURL(objectUrl);
+    URL.revokeObjectURL(objectUrl);
   };
   img.onerror = () => {
-    if (blob) {
-      URL.revokeObjectURL(objectUrl);
-      // Retry with direct data URI string
-      const img2 = new Image();
-      img2.onload = () => {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const hRatio = canvas.width / img2.width;
-        const vRatio = canvas.height / img2.height;
-        const ratio = Math.min(hRatio, vRatio);
-        const x = (canvas.width - img2.width * ratio) / 2;
-        const y = (canvas.height - img2.height * ratio) / 2;
-        ctx.drawImage(img2, x, y, img2.width * ratio, img2.height * ratio);
-        if (placeholder) placeholder.style.display = 'none';
-      };
-      img2.onerror = () => {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (placeholder) placeholder.style.display = 'flex';
-      };
-      img2.src = targetSign;
-    } else {
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (placeholder) placeholder.style.display = 'flex';
-    }
+    URL.revokeObjectURL(objectUrl);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (placeholder) placeholder.style.display = 'flex';
   };
   img.src = objectUrl;
 }
