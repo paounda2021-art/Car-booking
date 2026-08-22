@@ -2973,23 +2973,23 @@ async function autoDrawApproverSignature() {
   // 2. Find target user in fresh usersList
   let targetSign = '';
   if (usersList && Array.isArray(usersList)) {
-    let dbU = usersList.find(u => u.username && u.username.toLowerCase() === uName);
+    let dbU = usersList.find(u => u.username && u.username.toLowerCase() === uName && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
     if (!dbU && uEmail) {
-      dbU = usersList.find(u => u.email && u.email.toLowerCase() === uEmail);
+      dbU = usersList.find(u => u.email && u.email.toLowerCase() === uEmail && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
     }
     if (!dbU && uNameThai) {
-      dbU = usersList.find(u => u.name && u.name.replace(/\s+/g, '') === uNameThai);
+      dbU = usersList.find(u => u.name && u.name.replace(/\s+/g, '') === uNameThai && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
     }
     if (!dbU) {
       const activeLvl = sessionStorage.getItem('activeApprovalLevel') || 'all';
       if (activeLvl === '4' || userHasApproveLevel(currentUser, 4)) {
-        dbU = usersList.find(u => u.username === 'piyawan.k' || u.username === 'supbhachart.c');
+        dbU = usersList.find(u => (u.username === 'piyawan.k' || u.username === 'supbhachart.c' || (u.name && u.name.includes('ปิยวรรณ'))) && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
       } else if (activeLvl === '3' || userHasApproveLevel(currentUser, 3)) {
-        dbU = usersList.find(u => u.username === 'saisunee.p');
+        dbU = usersList.find(u => (u.username === 'saisunee.p' || (u.name && u.name.includes('สายสุนีย์'))) && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
       } else if (activeLvl === '2' || userHasApproveLevel(currentUser, 2)) {
-        dbU = usersList.find(u => u.username === 'chalong.c');
+        dbU = usersList.find(u => (u.username === 'chalong.c' || (u.name && u.name.includes('ฉลอง'))) && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
       } else if (activeLvl === '1' || userHasApproveLevel(currentUser, 1)) {
-        dbU = usersList.find(u => u.username === 'prathum.c');
+        dbU = usersList.find(u => (u.username === 'prathum.c' || (u.name && u.name.includes('ประทุม'))) && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
       }
     }
 
