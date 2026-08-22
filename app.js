@@ -3898,7 +3898,7 @@ function buildReportHTMLContent(b) {
   const carPlate = car ? car.plate : '-';
 
   if (b.controlUnit === 'รถสวัสดิการ') {
-    reportContainer.innerHTML = `
+    return `
     <!-- PAGE 1: WELFARE CAR REQUEST FORM -->
     <div class="welfare-car-report" style="font-family: 'Sarabun', 'TH Sarabun PSK', sans-serif; font-size: 13px; line-height: 1.5; color: #000; padding: 10px 0;">
       <!-- Header -->
@@ -4349,10 +4349,9 @@ function buildReportHTMLContent(b) {
       </table>
     </div>
     `;
-    return;
   }
 
-  reportContainer.innerHTML = `
+  return `
     <!-- HEADER SECTION -->
     <div class="fmo-header-block">
       <div class="fmo-header-left">
