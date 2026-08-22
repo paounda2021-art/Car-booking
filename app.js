@@ -4666,9 +4666,10 @@ async function autoGenerateAndSavePDF(bookingId) {
   try {
     const reportContainer = document.createElement('div');
     reportContainer.id = 'pdf-render-temp-' + Date.now();
-    reportContainer.style.position = 'fixed';
-    reportContainer.style.left = '-9999px';
-    reportContainer.style.top = '-9999px';
+    reportContainer.style.position = 'absolute';
+    reportContainer.style.left = '0px';
+    reportContainer.style.top = '0px';
+    reportContainer.style.zIndex = '-9999';
     reportContainer.style.width = '790px';
     reportContainer.style.backgroundColor = '#ffffff';
     reportContainer.style.color = '#000000';
@@ -4683,7 +4684,7 @@ async function autoGenerateAndSavePDF(bookingId) {
       margin:       [8, 8, 8, 8],
       filename:     `Report_${b.id}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      html2canvas:  { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 800 },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
