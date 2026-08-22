@@ -395,6 +395,8 @@ const server = http.createServer((req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
+  const urlPath = url.pathname;
+
   // API: generate-pdf-server (Generate high-res 1-page A4 PDF using Puppeteer on server)
   if (urlPath === '/api/generate-pdf-server' && req.method === 'POST') {
     let chunks = [];
