@@ -3849,7 +3849,6 @@ function buildReportHTMLContent(b) {
   const l2Sig = b.signatures.find(s => s.level === 2) || {};
   const l3Sig = b.signatures.find(s => s.level === 3) || {};
   const l4Sig = b.signatures.find(s => s.level === 4) || {};
-  const l4Sig = b.signatures.find(s => s.level === 4) || {};
 
   const l0SigImg = (l0Sig.status === 'approved') ? getSignatureImg(0, l0Sig.signature, b.requester) : '';
   const l1SigImg = (l1Sig.status === 'approved') ? getSignatureImg(1, l1Sig.signature, l1Sig.approverName) : '';
