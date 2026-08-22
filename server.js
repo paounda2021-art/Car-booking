@@ -418,8 +418,11 @@ const server = http.createServer((req, res) => {
           fs.mkdirSync(reportDir, { recursive: true });
         }
 
-        const base64Clean = pdfData.replace(/^data:application\/pdf;base64,/, '');
-        const pdfBuffer = Buffer.from(base64Clean, 'base64');
+        let base64Clean = pdfData;
+        if (base64Clean.includes('base64,')) {
+          base64Clean = base64Clean.split('base64,')[1];
+        }
+        const pdfBuffer = Buffer.from(base64Clean.trim(), 'base64');
         const fileName = `Report_${bookingId}.pdf`;
         const filePath = path.join(reportDir, fileName);
 
