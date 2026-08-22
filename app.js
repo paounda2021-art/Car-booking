@@ -3758,8 +3758,8 @@ async function handleApprovalAction(isApproved) {
       `;
       sendEmailNotification(reqEmail, subject, body);
 
-      // Trigger LINE Notification to Driver Group
-      if (booking.travelType === 'fmo_car' || booking.controlUnit === 'รถสวัสดิการ') {
+      // Trigger LINE Notification to Driver Group for all non-taxi bookings
+      if (booking.travelType !== 'public_car' && booking.travelType !== 'taxi' && booking.carId !== 'taxi') {
         triggerLineNotification(booking, carPlate);
       }
     } else {

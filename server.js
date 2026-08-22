@@ -780,6 +780,37 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+function sendLineNotifyFallback(token, messageText) {
+  if (!token) return;
+  try {
+    const querystring = require('querystring');
+    const postData = querystring.stringify({ message: messageText });
+    const options = {
+      hostname: 'notify-api.line.me',
+      port: 443,
+      path: '/api/notify',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Bearer ${token}`,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', d => body += d);
+      res.on('end', () => {
+        console.log('LINE Notify Fallback Status:', res.statusCode, body);
+      });
+    });
+    req.on('error', e => console.error('LINE Notify Fallback Error:', e));
+    req.write(postData);
+    req.end();
+  } catch(e) {
+    console.error('LINE Notify Fallback Execution Error:', e);
+  }
+}
+
   // API: notify-driver-group
   if (urlPath === '/api/notify-driver-group' && req.method === 'POST') {
     let chunks = [];
@@ -799,11 +830,13 @@ const server = http.createServer((req, res) => {
         fs.readFile(lineConfigPath, 'utf8', (err, configData) => {
           let accessToken = '';
           let groupId = '';
+          let lineNotifyToken = '';
           if (!err) {
             try {
               const cfg = JSON.parse(configData);
               accessToken = cfg.channelAccessToken || '';
               groupId = cfg.groupId || '';
+              lineNotifyToken = cfg.lineNotifyToken || '';
             } catch (e) {
               console.error('Error parsing line_config.json:', e);
             }
@@ -1187,7 +1220,18 @@ const server = http.createServer((req, res) => {
                   const errObj = JSON.parse(resBody);
                   if (errObj.message) errMsg = errObj.message;
                 } catch(e){}
-                console.error(`LINE Push Failed [${lineRes.statusCode}]: ${errMsg}`);
+
+                if (lineRes.statusCode === 429) {
+                  errMsg = 'โควตาข้อความ LINE Official Account ฟรีเต็มแล้วประจำเดือนนี้ (429: You have reached your monthly limit)';
+                  console.error(`⚠️ LINE Quota Limit Reached [429]: ${errMsg}`);
+                  if (lineNotifyToken) {
+                    console.log('Sending via LINE Notify API Fallback...');
+                    sendLineNotifyFallback(lineNotifyToken, `🔔 [ใบสั่งงาน พขร. เลขที่ ${payload.bookingId}]\n- พขร.: ${payload.driverName || '-'}\n- ยานพาหนะ: ${payload.carInfo || '-'}\n- ปลายทาง: ${payload.destination || '-'}\n- วันเวลา: ${payload.dateTime || '-'}\n- ผู้ขอ: ${payload.passenger || '-'}\nดูรายละเอียด: https://car-booking.fishmarket.co.th`);
+                  }
+                } else {
+                  console.error(`LINE Push Failed [${lineRes.statusCode}]: ${errMsg}`);
+                }
+
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 res.end(JSON.stringify({ status: 'error', statusCode: lineRes.statusCode, message: errMsg, response: resBody }));
               }
