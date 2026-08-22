@@ -757,9 +757,29 @@ async function initDatabase() {
         }
 
         dbBookings = deduplicateBookings(dbBookings);
-        localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
         bookings = dbBookings;
         dbBookingsLoaded = true;
+
+        try {
+          localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
+        } catch (err) {
+          console.warn("⚠️ LocalStorage quota exceeded during initDatabase. Saving optimized cache...", err);
+          try {
+            const optimizedBookings = dbBookings.map(b => {
+              if (!b.signatures || !Array.isArray(b.signatures)) return b;
+              const cleanSigs = b.signatures.map(s => {
+                if (s.signature && s.signature.length > 500) {
+                  return { ...s, signature: 'db_ref' };
+                }
+                return s;
+              });
+              return { ...b, signatures: cleanSigs };
+            });
+            localStorage.setItem('bookings_data', JSON.stringify(optimizedBookings));
+          } catch (e2) {
+            console.warn("⚠️ LocalStorage full, skipping local cache.", e2);
+          }
+        }
       }
     }
   } catch (error) {
