@@ -426,6 +426,22 @@ const server = http.createServer((req, res) => {
         const fileName = `Report_${bookingId}.pdf`;
         const filePath = path.join(reportDir, fileName);
 
+        if (pdfBuffer.length < 5000 && fs.existsSync(filePath)) {
+          const existingStat = fs.statSync(filePath);
+          if (existingStat.size > 10000) {
+            console.warn(`Skipping overwrite: retained existing valid PDF (${existingStat.size} bytes) over smaller new PDF (${pdfBuffer.length} bytes)`);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({
+              status: 'success',
+              message: 'Retained existing valid PDF',
+              filename: fileName,
+              path: `Report/${fileName}`,
+              url: `/Report/${fileName}`
+            }));
+            return;
+          }
+        }
+
         fs.writeFileSync(filePath, pdfBuffer);
         console.log(`PDF Report saved automatically: ${filePath} (${pdfBuffer.length} bytes, header: ${pdfBuffer.slice(0, 4).toString()})`);
 

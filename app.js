@@ -4686,6 +4686,9 @@ async function autoGenerateAndSavePDF(bookingId) {
       tempContainer.innerHTML = buildReportHTMLContent(b);
       document.body.appendChild(tempContainer);
       targetElem = tempContainer;
+
+      // Wait 300ms for images (logo, signatures) and layout paint
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
 
     // Apply pdf-mode for 1-page A4 fitting
