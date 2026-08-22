@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
+const { generatePDFReportServerSide } = require('./server_pdf.js');
 
 const PORT = process.env.PORT || 8080;
 const ROOT_DIR = __dirname;
@@ -394,7 +395,35 @@ const server = http.createServer((req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const urlPath = url.pathname;
+  // API: generate-pdf-server (Generate high-res 1-page A4 PDF using Puppeteer on server)
+  if (urlPath === '/api/generate-pdf-server' && req.method === 'POST') {
+    let chunks = [];
+    req.on('data', chunk => { chunks.push(chunk); });
+    req.on('end', async () => {
+      try {
+        const body = Buffer.concat(chunks).toString('utf8');
+        const payload = JSON.parse(body);
+        const bookingId = (payload.bookingId || '').trim();
+        if (!bookingId) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ status: 'error', message: 'Missing bookingId' }));
+          return;
+        }
+        const result = await generatePDFReportServerSide(bookingId);
+        if (result && result.status === 'success') {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(result));
+        } else {
+          res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ status: 'error', message: 'Failed to generate PDF on server' }));
+        }
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ status: 'error', message: e.message }));
+      }
+    });
+    return;
+  }
 
   // API: save-report-pdf (Save PDF report automatically to Report/ directory)
   if (urlPath === '/api/save-report-pdf' && req.method === 'POST') {
@@ -590,6 +619,20 @@ const server = http.createServer((req, res) => {
           } catch(sqliteErr) {
             console.error("SQLite Dual-Write failed:", sqliteErr);
           }
+
+          // Automatic Server-Side Puppeteer PDF generation for fully approved bookings
+          list.forEach(b => {
+            if (b.id && b.status === 'approved') {
+              setTimeout(async () => {
+                try {
+                  await generatePDFReportServerSide(b.id);
+                } catch(pdfErr) {
+                  console.error(`Automatic server PDF generation error for ${b.id}:`, pdfErr);
+                }
+              }, 500);
+            }
+          });
+
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'success', message: 'Bookings saved successfully' }));
         }

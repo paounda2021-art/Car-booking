@@ -4692,71 +4692,26 @@ async function preloadImagesInElement(elem) {
   await Promise.all(promises);
 }
 
-// Automatically convert report HTML to PDF and save to Report/ directory on server
+// Automatically request high-res server-side Puppeteer PDF generation and save to Report/ directory
 async function autoGenerateAndSavePDF(bookingId) {
   if (!bookingId) return null;
-  const b = bookings.find(x => x.id === bookingId);
-  if (!b) return null;
-
+  console.log(`[Client] Requesting server-side Puppeteer PDF generation for: ${bookingId}...`);
   try {
-    // Create top-level div appended directly to document.body (bypasses any parent section .hidden display:none)
-    const pdfRenderDiv = document.createElement('div');
-    pdfRenderDiv.id = 'pdf-render-temp-' + Date.now();
-    pdfRenderDiv.className = 'report-sheet pdf-mode';
-    pdfRenderDiv.style.position = 'absolute';
-    pdfRenderDiv.style.left = '0px';
-    pdfRenderDiv.style.top = '0px';
-    pdfRenderDiv.style.zIndex = '999999';
-    pdfRenderDiv.style.backgroundColor = '#ffffff';
-    pdfRenderDiv.style.width = '790px';
-    pdfRenderDiv.style.boxSizing = 'border-box';
-    pdfRenderDiv.style.margin = '0';
-    pdfRenderDiv.style.padding = '10px 20px';
-    pdfRenderDiv.style.visibility = 'visible';
-    pdfRenderDiv.style.display = 'block';
-    pdfRenderDiv.innerHTML = buildReportHTMLContent(b);
-
-    document.body.appendChild(pdfRenderDiv);
-
-    // Wait for all img tags (logo, base64 signatures) to finish loading completely inside top-level div
-    await preloadImagesInElement(pdfRenderDiv);
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    const opt = {
-      margin:       [4, 4, 4, 4],
-      filename:     `Report_${b.id}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-
-    let pdfDataUri = '';
-    if (typeof html2pdf !== 'undefined') {
-      pdfDataUri = await html2pdf().set(opt).from(pdfRenderDiv).output('datauristring');
-    }
-
-    // Safely remove top-level rendering element after capture completes
-    if (document.body.contains(pdfRenderDiv)) {
-      document.body.removeChild(pdfRenderDiv);
-    }
-
-    if (pdfDataUri && pdfDataUri.length > 500) {
-      const res = await fetch('/api/save-report-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId: b.id, pdfData: pdfDataUri })
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        console.log(`PDF report generated & saved: ${data.path}`);
-        if (typeof showToast === 'function') {
-          showToast(`📄 ออกรายงานและบันทึกไฟล์ PDF (${data.filename}) ลงโฟลเดอร์ Report อัตโนมัติเรียบร้อยแล้ว`, 'success');
-        }
-        return data;
+    const res = await fetch('/api/generate-pdf-server', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId: bookingId })
+    });
+    const data = await res.json();
+    if (data && data.status === 'success') {
+      console.log(`✅ PDF report generated & saved via Server Puppeteer: ${data.path} (${data.size} bytes)`);
+      if (typeof showToast === 'function') {
+        showToast(`📄 ออกรายงานและบันทึกไฟล์ PDF (${data.filename}) ลงโฟลเดอร์ Report อัตโนมัติเรียบร้อยแล้ว`, 'success');
       }
+      return data;
     }
   } catch (e) {
-    console.error('Error auto-generating PDF report:', e);
+    console.error('Error requesting server PDF generation:', e);
   }
   return null;
 }
@@ -4766,12 +4721,12 @@ async function downloadReportPDF(bookingId) {
   const idToUse = bookingId || activeReportBookingId;
   if (!idToUse) return;
   if (typeof showToast === 'function') {
-    showToast("กำลังสร้างและจัดเก็บไฟล์ PDF รายงาน...", "info");
+    showToast("กำลังสร้างและจัดเก็บไฟล์ PDF รายงานความละเอียดสูง...", "info");
   }
   const data = await autoGenerateAndSavePDF(idToUse);
   if (data && data.url) {
     const link = document.createElement('a');
-    link.href = data.url;
+    link.href = data.url + '?t=' + Date.now();
     link.download = data.filename;
     document.body.appendChild(link);
     link.click();
