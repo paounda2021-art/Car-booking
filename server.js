@@ -427,7 +427,7 @@ const server = http.createServer((req, res) => {
         const filePath = path.join(reportDir, fileName);
 
         fs.writeFileSync(filePath, pdfBuffer);
-        console.log(`PDF Report saved automatically: ${filePath}`);
+        console.log(`PDF Report saved automatically: ${filePath} (${pdfBuffer.length} bytes, header: ${pdfBuffer.slice(0, 4).toString()})`);
 
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({

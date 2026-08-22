@@ -4688,8 +4688,7 @@ async function autoGenerateAndSavePDF(bookingId) {
     };
 
     if (typeof html2pdf !== 'undefined') {
-      const worker = html2pdf().set(opt).from(reportContainer);
-      const pdfDataUri = await worker.toPdf().output('datauristring');
+      const pdfDataUri = await html2pdf().set(opt).from(reportContainer).output('datauristring');
       if (document.body.contains(reportContainer)) {
         document.body.removeChild(reportContainer);
       }
