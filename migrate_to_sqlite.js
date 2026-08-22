@@ -149,13 +149,13 @@ try {
   console.log(`Migrating ${bookingsList.length} bookings...`);
   const insertBooking = db.prepare(`
     INSERT OR REPLACE INTO bookings (
-      id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
+      id, createdAt, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
       driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince,
       purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price,
       goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures,
       waitingForRequesterInput, taxiInfo, active
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?, ?,
@@ -176,8 +176,11 @@ try {
     const signaturesStr = b.signatures ? JSON.stringify(b.signatures) : '[]';
     const taxiInfoStr = b.taxiInfo ? JSON.stringify(b.taxiInfo) : '{}';
 
+    const createdDateVal = b.createdAt || (b.signatures && b.signatures[0] && b.signatures[0].timestamp) || b.startDate || '';
+
     insertBooking.run(
       b.id || '',
+      createdDateVal,
       b.requester || '',
       b.requesterEmail || '',
       b.managerEmail || '',

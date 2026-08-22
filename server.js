@@ -53,6 +53,7 @@ function safeWriteJsonFile(filePath, data, callback) {
 db.exec(`
   CREATE TABLE IF NOT EXISTS bookings (
     id TEXT PRIMARY KEY,
+    createdAt TEXT,
     requester TEXT,
     requesterEmail TEXT,
     managerEmail TEXT,
@@ -122,7 +123,8 @@ db.exec(`
   );
 `);
 
-// Ensure schema is updated with active column for system_config
+// Ensure schema is updated with active column for system_config and createdAt for bookings
+try { db.exec("ALTER TABLE bookings ADD COLUMN createdAt TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE bookings ADD COLUMN active INTEGER DEFAULT 0;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN name TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN icon TEXT;"); } catch(e) {}
@@ -160,13 +162,13 @@ function sqliteSaveBookings(bookingsList) {
   try {
     const insertBooking = db.prepare(`
       INSERT OR REPLACE INTO bookings (
-        id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
+        id, createdAt, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
         driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince,
         purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price,
         goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures,
         waitingForRequesterInput, taxiInfo, active
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?,
@@ -175,8 +177,10 @@ function sqliteSaveBookings(bookingsList) {
     `);
     
     bookingsList.forEach(b => {
+      const createdDateVal = b.createdAt || (b.signatures && b.signatures[0] && b.signatures[0].timestamp) || b.startDate || '';
       insertBooking.run(
         b.id || '',
+        createdDateVal,
         b.requester || '',
         b.requesterEmail || '',
         b.managerEmail || '',
