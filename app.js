@@ -4688,8 +4688,11 @@ async function autoGenerateAndSavePDF(bookingId) {
       targetElem = tempContainer;
     }
 
+    // Apply pdf-mode for 1-page A4 fitting
+    if (targetElem) targetElem.classList.add('pdf-mode');
+
     const opt = {
-      margin:       [5, 5, 5, 5],
+      margin:       [4, 4, 4, 4],
       filename:     `Report_${b.id}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
@@ -4698,6 +4701,8 @@ async function autoGenerateAndSavePDF(bookingId) {
 
     if (typeof html2pdf !== 'undefined') {
       const pdfDataUri = await html2pdf().set(opt).from(targetElem).output('datauristring');
+      
+      if (targetElem) targetElem.classList.remove('pdf-mode');
 
       if (tempContainer && document.body.contains(tempContainer)) {
         document.body.removeChild(tempContainer);

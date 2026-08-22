@@ -1686,6 +1686,69 @@ body {
   }
 }
 
+/* PDF Generation Mode (Compact Single Page A4 Fit) */
+.report-sheet.pdf-mode {
+  padding: 10px 20px !important;
+  font-size: 11.5px !important;
+  line-height: 1.35 !important;
+  box-shadow: none !important;
+  border: none !important;
+  max-width: 100% !important;
+  width: 790px !important;
+  box-sizing: border-box !important;
+}
+
+.report-sheet.pdf-mode .fmo-logo {
+  width: 55px !important;
+  height: 55px !important;
+}
+
+.report-sheet.pdf-mode .fmo-header-block {
+  margin-bottom: 0.25rem !important;
+}
+
+.report-sheet.pdf-mode .fmo-divider-title {
+  margin: 0.4rem 0 !important;
+  padding: 0.15rem 0 !important;
+  font-size: 13.5px !important;
+}
+
+.report-sheet.pdf-mode .fmo-line {
+  margin-bottom: 0.25rem !important;
+  line-height: 1.35 !important;
+}
+
+.report-sheet.pdf-mode .fmo-subject-block {
+  font-size: 12px !important;
+}
+
+.report-sheet.pdf-mode .fmo-decision-grid {
+  margin-top: 0.4rem !important;
+}
+
+.report-sheet.pdf-mode .fmo-column {
+  padding: 0.35rem !important;
+  font-size: 11.5px !important;
+}
+
+.report-sheet.pdf-mode .fmo-column div,
+.report-sheet.pdf-mode .fmo-column span {
+  line-height: 1.35 !important;
+}
+
+.report-sheet.pdf-mode .fmo-column div[style*="margin-top: 0.8rem"] {
+  margin-top: 0.35rem !important;
+}
+
+.report-sheet.pdf-mode .fmo-column div[style*="margin-top:0.8rem"] {
+  margin-top: 0.35rem !important;
+}
+
+.report-sheet.pdf-mode .fmo-column div[style*="border-top"] {
+  margin-top: 0.35rem !important;
+  padding-top: 0.25rem !important;
+}
+
 /* ========================================================
    Glassmorphism Overrides & Decorative Background Blobs
    ======================================================== */
