@@ -4664,34 +4664,43 @@ async function autoGenerateAndSavePDF(bookingId) {
   if (!b) return null;
 
   try {
-    const reportContainer = document.createElement('div');
-    reportContainer.id = 'pdf-render-temp-' + Date.now();
-    reportContainer.style.position = 'absolute';
-    reportContainer.style.left = '0px';
-    reportContainer.style.top = '0px';
-    reportContainer.style.zIndex = '-9999';
-    reportContainer.style.width = '790px';
-    reportContainer.style.backgroundColor = '#ffffff';
-    reportContainer.style.color = '#000000';
-    reportContainer.style.padding = '20px';
-    reportContainer.style.boxSizing = 'border-box';
+    let targetElem = document.getElementById('report-sheet-content');
+    let tempContainer = null;
 
-    const htmlContent = buildReportHTMLContent(b);
-    reportContainer.innerHTML = htmlContent;
-    document.body.appendChild(reportContainer);
+    const reportView = document.getElementById('view-report');
+    const isVisible = reportView && !reportView.classList.contains('hidden') && targetElem && targetElem.innerHTML.trim().length > 100 && activeReportBookingId === b.id;
+
+    if (!isVisible) {
+      tempContainer = document.createElement('div');
+      tempContainer.id = 'pdf-render-temp-' + Date.now();
+      tempContainer.className = 'report-sheet';
+      tempContainer.style.position = 'fixed';
+      tempContainer.style.left = '0px';
+      tempContainer.style.top = '0px';
+      tempContainer.style.zIndex = '99999';
+      tempContainer.style.backgroundColor = '#ffffff';
+      tempContainer.style.width = '790px';
+      tempContainer.style.boxSizing = 'border-box';
+      tempContainer.style.margin = '0';
+      tempContainer.style.padding = '20px';
+      tempContainer.innerHTML = buildReportHTMLContent(b);
+      document.body.appendChild(tempContainer);
+      targetElem = tempContainer;
+    }
 
     const opt = {
-      margin:       [8, 8, 8, 8],
+      margin:       [5, 5, 5, 5],
       filename:     `Report_${b.id}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0, windowWidth: 800 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
     if (typeof html2pdf !== 'undefined') {
-      const pdfDataUri = await html2pdf().set(opt).from(reportContainer).output('datauristring');
-      if (document.body.contains(reportContainer)) {
-        document.body.removeChild(reportContainer);
+      const pdfDataUri = await html2pdf().set(opt).from(targetElem).output('datauristring');
+
+      if (tempContainer && document.body.contains(tempContainer)) {
+        document.body.removeChild(tempContainer);
       }
 
       const res = await fetch('/api/save-report-pdf', {
@@ -4708,8 +4717,8 @@ async function autoGenerateAndSavePDF(bookingId) {
         return data;
       }
     } else {
-      if (document.body.contains(reportContainer)) {
-        document.body.removeChild(reportContainer);
+      if (tempContainer && document.body.contains(tempContainer)) {
+        document.body.removeChild(tempContainer);
       }
     }
   } catch (e) {
