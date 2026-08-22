@@ -4679,36 +4679,34 @@ async function autoGenerateAndSavePDF(bookingId) {
   if (!b) return null;
 
   try {
-    let targetElem = document.getElementById('report-sheet-content');
-    let tempContainer = null;
+    let reportSheet = document.getElementById('report-sheet-content');
+    if (!reportSheet) return null;
 
     const reportView = document.getElementById('view-report');
-    const isVisible = reportView && !reportView.classList.contains('hidden') && targetElem && targetElem.innerHTML.trim().length > 100 && activeReportBookingId === b.id;
+    const wasHidden = !reportView || reportView.classList.contains('hidden') || activeReportBookingId !== b.id;
 
-    if (!isVisible) {
-      tempContainer = document.createElement('div');
-      tempContainer.id = 'pdf-render-temp-' + Date.now();
-      tempContainer.className = 'report-sheet';
-      tempContainer.style.position = 'fixed';
-      tempContainer.style.left = '0px';
-      tempContainer.style.top = '0px';
-      tempContainer.style.zIndex = '99999';
-      tempContainer.style.backgroundColor = '#ffffff';
-      tempContainer.style.width = '790px';
-      tempContainer.style.boxSizing = 'border-box';
-      tempContainer.style.margin = '0';
-      tempContainer.style.padding = '20px';
-      tempContainer.innerHTML = buildReportHTMLContent(b);
-      document.body.appendChild(tempContainer);
-      targetElem = tempContainer;
+    // Save previous HTML and populate reportSheet with target booking report HTML
+    const originalHTML = reportSheet.innerHTML;
+    reportSheet.innerHTML = buildReportHTMLContent(b);
+
+    // If view-report was hidden or viewing another booking, style reportSheet temporarily as absolute for html2canvas
+    if (wasHidden) {
+      reportSheet.style.position = 'absolute';
+      reportSheet.style.left = '0px';
+      reportSheet.style.top = '0px';
+      reportSheet.style.zIndex = '99999';
+      reportSheet.style.backgroundColor = '#ffffff';
+      reportSheet.style.width = '790px';
+      reportSheet.style.visibility = 'visible';
+      reportSheet.style.display = 'block';
     }
 
-    // Apply pdf-mode for 1-page A4 fitting
-    if (targetElem) targetElem.classList.add('pdf-mode');
+    // Apply pdf-mode for compact 1-page A4 fitting
+    reportSheet.classList.add('pdf-mode');
 
     // Wait for all img tags (logo, base64 signatures) to finish loading completely
-    await preloadImagesInElement(targetElem);
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await preloadImagesInElement(reportSheet);
+    await new Promise(resolve => setTimeout(resolve, 250));
 
     const opt = {
       margin:       [4, 4, 4, 4],
@@ -4718,15 +4716,26 @@ async function autoGenerateAndSavePDF(bookingId) {
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
+    let pdfDataUri = '';
     if (typeof html2pdf !== 'undefined') {
-      const pdfDataUri = await html2pdf().set(opt).from(targetElem).output('datauristring');
-      
-      if (targetElem) targetElem.classList.remove('pdf-mode');
+      pdfDataUri = await html2pdf().set(opt).from(reportSheet).output('datauristring');
+    }
 
-      if (tempContainer && document.body.contains(tempContainer)) {
-        document.body.removeChild(tempContainer);
-      }
+    // Clean up temporary styles and restore original state if was hidden
+    reportSheet.classList.remove('pdf-mode');
+    if (wasHidden) {
+      reportSheet.style.position = '';
+      reportSheet.style.left = '';
+      reportSheet.style.top = '';
+      reportSheet.style.zIndex = '';
+      reportSheet.style.backgroundColor = '';
+      reportSheet.style.width = '';
+      reportSheet.style.visibility = '';
+      reportSheet.style.display = '';
+      reportSheet.innerHTML = originalHTML;
+    }
 
+    if (pdfDataUri && pdfDataUri.length > 500) {
       const res = await fetch('/api/save-report-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4739,10 +4748,6 @@ async function autoGenerateAndSavePDF(bookingId) {
           showToast(`📄 ออกรายงานและบันทึกไฟล์ PDF (${data.filename}) ลงโฟลเดอร์ Report อัตโนมัติเรียบร้อยแล้ว`, 'success');
         }
         return data;
-      }
-    } else {
-      if (tempContainer && document.body.contains(tempContainer)) {
-        document.body.removeChild(tempContainer);
       }
     }
   } catch (e) {
