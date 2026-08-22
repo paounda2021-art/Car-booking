@@ -4699,34 +4699,28 @@ async function autoGenerateAndSavePDF(bookingId) {
   if (!b) return null;
 
   try {
-    let reportSheet = document.getElementById('report-sheet-content');
-    if (!reportSheet) return null;
+    // Create top-level div appended directly to document.body (bypasses any parent section .hidden display:none)
+    const pdfRenderDiv = document.createElement('div');
+    pdfRenderDiv.id = 'pdf-render-temp-' + Date.now();
+    pdfRenderDiv.className = 'report-sheet pdf-mode';
+    pdfRenderDiv.style.position = 'absolute';
+    pdfRenderDiv.style.left = '0px';
+    pdfRenderDiv.style.top = '0px';
+    pdfRenderDiv.style.zIndex = '999999';
+    pdfRenderDiv.style.backgroundColor = '#ffffff';
+    pdfRenderDiv.style.width = '790px';
+    pdfRenderDiv.style.boxSizing = 'border-box';
+    pdfRenderDiv.style.margin = '0';
+    pdfRenderDiv.style.padding = '10px 20px';
+    pdfRenderDiv.style.visibility = 'visible';
+    pdfRenderDiv.style.display = 'block';
+    pdfRenderDiv.innerHTML = buildReportHTMLContent(b);
 
-    const reportView = document.getElementById('view-report');
-    const wasHidden = !reportView || reportView.classList.contains('hidden') || activeReportBookingId !== b.id;
+    document.body.appendChild(pdfRenderDiv);
 
-    // Save previous HTML and populate reportSheet with target booking report HTML
-    const originalHTML = reportSheet.innerHTML;
-    reportSheet.innerHTML = buildReportHTMLContent(b);
-
-    // If view-report was hidden or viewing another booking, style reportSheet temporarily as absolute for html2canvas
-    if (wasHidden) {
-      reportSheet.style.position = 'absolute';
-      reportSheet.style.left = '0px';
-      reportSheet.style.top = '0px';
-      reportSheet.style.zIndex = '99999';
-      reportSheet.style.backgroundColor = '#ffffff';
-      reportSheet.style.width = '790px';
-      reportSheet.style.visibility = 'visible';
-      reportSheet.style.display = 'block';
-    }
-
-    // Apply pdf-mode for compact 1-page A4 fitting
-    reportSheet.classList.add('pdf-mode');
-
-    // Wait for all img tags (logo, base64 signatures) to finish loading completely
-    await preloadImagesInElement(reportSheet);
-    await new Promise(resolve => setTimeout(resolve, 250));
+    // Wait for all img tags (logo, base64 signatures) to finish loading completely inside top-level div
+    await preloadImagesInElement(pdfRenderDiv);
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     const opt = {
       margin:       [4, 4, 4, 4],
@@ -4738,21 +4732,12 @@ async function autoGenerateAndSavePDF(bookingId) {
 
     let pdfDataUri = '';
     if (typeof html2pdf !== 'undefined') {
-      pdfDataUri = await html2pdf().set(opt).from(reportSheet).output('datauristring');
+      pdfDataUri = await html2pdf().set(opt).from(pdfRenderDiv).output('datauristring');
     }
 
-    // Clean up temporary styles and restore original state if was hidden
-    reportSheet.classList.remove('pdf-mode');
-    if (wasHidden) {
-      reportSheet.style.position = '';
-      reportSheet.style.left = '';
-      reportSheet.style.top = '';
-      reportSheet.style.zIndex = '';
-      reportSheet.style.backgroundColor = '';
-      reportSheet.style.width = '';
-      reportSheet.style.visibility = '';
-      reportSheet.style.display = '';
-      reportSheet.innerHTML = originalHTML;
+    // Safely remove top-level rendering element after capture completes
+    if (document.body.contains(pdfRenderDiv)) {
+      document.body.removeChild(pdfRenderDiv);
     }
 
     if (pdfDataUri && pdfDataUri.length > 500) {
