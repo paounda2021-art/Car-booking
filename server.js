@@ -378,7 +378,8 @@ const MIME_TYPES = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon'
+  '.ico': 'image/x-icon',
+  '.pdf': 'application/pdf'
 };
 
 const server = http.createServer((req, res) => {
@@ -394,6 +395,75 @@ const server = http.createServer((req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host}`);
   const urlPath = url.pathname;
+
+  // API: save-report-pdf (Save PDF report automatically to Report/ directory)
+  if (urlPath === '/api/save-report-pdf' && req.method === 'POST') {
+    let chunks = [];
+    req.on('data', chunk => { chunks.push(chunk); });
+    req.on('end', () => {
+      try {
+        const body = Buffer.concat(chunks).toString('utf8');
+        const payload = JSON.parse(body);
+        const bookingId = (payload.bookingId || '').trim();
+        const pdfData = payload.pdfData || '';
+
+        if (!bookingId || !pdfData) {
+          res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ status: 'error', message: 'Missing bookingId or pdfData' }));
+          return;
+        }
+
+        const reportDir = path.join(ROOT_DIR, 'Report');
+        if (!fs.existsSync(reportDir)) {
+          fs.mkdirSync(reportDir, { recursive: true });
+        }
+
+        const base64Clean = pdfData.replace(/^data:application\/pdf;base64,/, '');
+        const pdfBuffer = Buffer.from(base64Clean, 'base64');
+        const fileName = `Report_${bookingId}.pdf`;
+        const filePath = path.join(reportDir, fileName);
+
+        fs.writeFileSync(filePath, pdfBuffer);
+        console.log(`PDF Report saved automatically: ${filePath}`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          status: 'success',
+          message: 'PDF Report saved successfully',
+          filename: fileName,
+          path: `Report/${fileName}`,
+          url: `/Report/${fileName}`
+        }));
+      } catch (e) {
+        console.error('Error saving PDF Report:', e);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ status: 'error', message: e.message }));
+      }
+    });
+    return;
+  }
+
+  // API: list-reports
+  if (urlPath === '/api/list-reports' && req.method === 'GET') {
+    const reportDir = path.join(ROOT_DIR, 'Report');
+    let files = [];
+    if (fs.existsSync(reportDir)) {
+      files = fs.readdirSync(reportDir)
+        .filter(f => f.toLowerCase().endsWith('.pdf'))
+        .map(f => {
+          const stat = fs.statSync(path.join(reportDir, f));
+          return {
+            filename: f,
+            url: `/Report/${f}`,
+            size: stat.size,
+            mtime: stat.mtime
+          };
+        });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify(files));
+    return;
+  }
 
   // API: force-resync (Force sync bookings.json to SQLite DB)
   if (urlPath === '/api/force-resync') {

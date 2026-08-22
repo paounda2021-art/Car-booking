@@ -3762,6 +3762,9 @@ async function handleApprovalAction(isApproved) {
       if (booking.travelType !== 'public_car' && booking.travelType !== 'taxi' && booking.carId !== 'taxi') {
         triggerLineNotification(booking, carPlate);
       }
+
+      // Automatically generate and save official PDF report file to Report/ folder
+      autoGenerateAndSavePDF(booking.id);
     } else {
       const nextLevel = booking.currentApprovalLevel;
       if (nextLevel === 2) {
@@ -3835,31 +3838,17 @@ function formatThaiDate(isoString) {
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear() + 543}`;
 }
 
-// Generate HTML Content inside FMO Report Sheet template
-function openReportView(bookingId) {
-  const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
-  if (!isAdmin) {
-    showToast("ขออภัย! สิทธิ์การเข้าถึงรายงานเบิกจ่ายเฉพาะผู้ดูแลระบบและผู้อนุมัติฝ่ายยานพาหนะเท่านั้น", "error");
-    return;
-  }
-  
-  const b = bookings.find(x => x.id === bookingId);
-  if (!b) return;
+let activeReportBookingId = '';
 
-  if (b.status !== 'approved') {
-    showToast("ขออภัย! สามารถออกรายงานได้เฉพาะรายการจองที่อนุมัติเบิกจ่ายเสร็จสมบูรณ์แล้วเท่านั้น", "warning");
-    return;
-  }
-
-  showView('report');
-
-  const reportContainer = document.getElementById('report-sheet-content');
-  if (!reportContainer) return;
+// Generate HTML Content string inside FMO Report Sheet template
+function buildReportHTMLContent(b) {
+  if (!b) return '';
 
   const l0Sig = b.signatures.find(s => s.level === 0) || {};
   const l1Sig = b.signatures.find(s => s.level === 1) || {};
   const l2Sig = b.signatures.find(s => s.level === 2) || {};
   const l3Sig = b.signatures.find(s => s.level === 3) || {};
+  const l4Sig = b.signatures.find(s => s.level === 4) || {};
   const l4Sig = b.signatures.find(s => s.level === 4) || {};
 
   const l0SigImg = (l0Sig.status === 'approved') ? getSignatureImg(0, l0Sig.signature, b.requester) : '';
@@ -4633,6 +4622,110 @@ function openReportView(bookingId) {
   `;
 }
 
+function openReportView(bookingId) {
+  const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
+  if (!isAdmin) {
+    showToast("ขออภัย! สิทธิ์การเข้าถึงรายงานเบิกจ่ายเฉพาะผู้ดูแลระบบและผู้อนุมัติฝ่ายยานพาหนะเท่านั้น", "error");
+    return;
+  }
+  
+  const b = bookings.find(x => x.id === bookingId);
+  if (!b) return;
+
+  if (b.status !== 'approved') {
+    showToast("ขออภัย! สามารถออกรายงานได้เฉพาะรายการจองที่อนุมัติเบิกจ่ายเสร็จสมบูรณ์แล้วเท่านั้น", "warning");
+    return;
+  }
+
+  activeReportBookingId = b.id;
+  showView('report');
+
+  const reportContainer = document.getElementById('report-sheet-content');
+  if (!reportContainer) return;
+
+  reportContainer.innerHTML = buildReportHTMLContent(b);
+}
+
+// Automatically convert report HTML to PDF and save to Report/ directory on server
+async function autoGenerateAndSavePDF(bookingId) {
+  if (!bookingId) return null;
+  const b = bookings.find(x => x.id === bookingId);
+  if (!b) return null;
+
+  try {
+    const reportContainer = document.createElement('div');
+    reportContainer.id = 'pdf-render-temp-' + Date.now();
+    reportContainer.style.position = 'fixed';
+    reportContainer.style.left = '-9999px';
+    reportContainer.style.top = '-9999px';
+    reportContainer.style.width = '790px';
+    reportContainer.style.backgroundColor = '#ffffff';
+    reportContainer.style.color = '#000000';
+    reportContainer.style.padding = '20px';
+    reportContainer.style.boxSizing = 'border-box';
+
+    const htmlContent = buildReportHTMLContent(b);
+    reportContainer.innerHTML = htmlContent;
+    document.body.appendChild(reportContainer);
+
+    const opt = {
+      margin:       [8, 8, 8, 8],
+      filename:     `Report_${b.id}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    if (typeof html2pdf !== 'undefined') {
+      const pdfDataUri = await html2pdf().set(opt).from(reportContainer).outputPdf('datauristring');
+      if (document.body.contains(reportContainer)) {
+        document.body.removeChild(reportContainer);
+      }
+
+      const res = await fetch('/api/save-report-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: b.id, pdfData: pdfDataUri })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        console.log(`PDF report generated & saved: ${data.path}`);
+        if (typeof showToast === 'function') {
+          showToast(`📄 ออกรายงานและบันทึกไฟล์ PDF (${data.filename}) ลงโฟลเดอร์ Report อัตโนมัติเรียบร้อยแล้ว`, 'success');
+        }
+        return data;
+      }
+    } else {
+      if (document.body.contains(reportContainer)) {
+        document.body.removeChild(reportContainer);
+      }
+    }
+  } catch (e) {
+    console.error('Error auto-generating PDF report:', e);
+  }
+  return null;
+}
+
+// Client-side PDF Download handler
+async function downloadReportPDF(bookingId) {
+  const idToUse = bookingId || activeReportBookingId;
+  if (!idToUse) return;
+  if (typeof showToast === 'function') {
+    showToast("กำลังสร้างและจัดเก็บไฟล์ PDF รายงาน...", "info");
+  }
+  const data = await autoGenerateAndSavePDF(idToUse);
+  if (data && data.url) {
+    const link = document.createElement('a');
+    link.href = data.url;
+    link.download = data.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } else {
+    window.print();
+  }
+}
+
 // Set up UI Event Listeners
 function setupEventListeners() {
   // Dynamic Trips update based on checkboxes
@@ -5263,6 +5356,13 @@ function setupEventListeners() {
   document.getElementById('btn-report-print').addEventListener('click', () => {
     window.print();
   });
+
+  const btnDownloadPdf = document.getElementById('btn-report-download-pdf');
+  if (btnDownloadPdf) {
+    btnDownloadPdf.addEventListener('click', () => {
+      downloadReportPDF();
+    });
+  }
 
   // Calendar monthly controls
   document.getElementById('btn-cal-prev').addEventListener('click', () => {
