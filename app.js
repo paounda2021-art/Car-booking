@@ -567,7 +567,16 @@ function dataURItoBlob(dataURI) {
     const cleanURI = dataURI.trim().replace(/[\r\n]/g, '');
     const parts = cleanURI.split(',');
     if (parts.length < 2) return null;
-    const byteString = atob(parts[1]);
+    let b64 = parts[1].trim().replace(/\s/g, '+');
+    try {
+      if (b64.includes('%')) {
+        b64 = decodeURIComponent(b64);
+      }
+    } catch(err) {}
+    while (b64.length % 4 !== 0) {
+      b64 += '=';
+    }
+    const byteString = atob(b64);
     const mimeString = parts[0].split(':')[1].split(';')[0];
     const ab = new ArrayBuffer(byteString.length);
     const ia = new Uint8Array(ab);
@@ -576,7 +585,6 @@ function dataURItoBlob(dataURI) {
     }
     return new Blob([ab], { type: mimeString });
   } catch (e) {
-    console.error("dataURItoBlob error:", e);
     return null;
   }
 }
@@ -3031,12 +3039,33 @@ async function autoDrawApproverSignature() {
     if (placeholder) placeholder.style.display = 'none';
     if (blob) URL.revokeObjectURL(objectUrl);
   };
-  img.onerror = (err) => {
-    console.error("Failed to load signature image:", err);
-    if (blob) URL.revokeObjectURL(objectUrl);
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (placeholder) placeholder.style.display = 'flex';
+  img.onerror = () => {
+    if (blob) {
+      URL.revokeObjectURL(objectUrl);
+      // Retry with direct data URI string
+      const img2 = new Image();
+      img2.onload = () => {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const hRatio = canvas.width / img2.width;
+        const vRatio = canvas.height / img2.height;
+        const ratio = Math.min(hRatio, vRatio);
+        const x = (canvas.width - img2.width * ratio) / 2;
+        const y = (canvas.height - img2.height * ratio) / 2;
+        ctx.drawImage(img2, x, y, img2.width * ratio, img2.height * ratio);
+        if (placeholder) placeholder.style.display = 'none';
+      };
+      img2.onerror = () => {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (placeholder) placeholder.style.display = 'flex';
+      };
+      img2.src = targetSign;
+    } else {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (placeholder) placeholder.style.display = 'flex';
+    }
   };
   img.src = objectUrl;
 }
