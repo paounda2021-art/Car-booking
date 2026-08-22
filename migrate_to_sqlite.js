@@ -16,7 +16,7 @@ try {
   
   // Table: users
   db.exec(`
-    CREATE TABLE users (
+    CREATE TABLE IF NOT EXISTS users (
       employee_id TEXT PRIMARY KEY,
       username TEXT UNIQUE,
       email TEXT,
@@ -33,7 +33,7 @@ try {
 
   // Table: cars
   db.exec(`
-    CREATE TABLE cars (
+    CREATE TABLE IF NOT EXISTS cars (
       id TEXT PRIMARY KEY,
       name TEXT,
       type TEXT,
@@ -50,7 +50,7 @@ try {
 
   // Table: bookings
   db.exec(`
-    CREATE TABLE bookings (
+    CREATE TABLE IF NOT EXISTS bookings (
       id TEXT PRIMARY KEY,
       requester TEXT,
       requesterEmail TEXT,
