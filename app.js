@@ -1189,6 +1189,9 @@ function updateSidebarPermissions() {
   const itemAdminSettings = document.getElementById('nav-item-admin-settings');
   const panelActingSetup = document.getElementById('sidebar-acting-setup');
 
+  const btnLogout = document.getElementById('btn-logout');
+  const btnTopLogin = document.getElementById('btn-top-login');
+
   if (!currentUser) {
     // 🔴 1. หน้าแรกก่อนเข้าระบบ: ซ่อน แดชบอร์ดภาพรวม และ รายการจอง & อนุมัติ (แสดงเฉพาะ ปฏิทินจองใช้รถ)
     if (itemDashboard) itemDashboard.classList.add('hidden');
@@ -1197,8 +1200,14 @@ function updateSidebarPermissions() {
     if (itemDriverReport) itemDriverReport.classList.add('hidden');
     if (itemAdminSettings) itemAdminSettings.classList.add('hidden');
     if (panelActingSetup) panelActingSetup.classList.add('hidden');
+
+    if (btnLogout) btnLogout.classList.add('hidden');
+    if (btnTopLogin) btnTopLogin.classList.remove('hidden');
     return;
   }
+
+  if (btnLogout) btnLogout.classList.remove('hidden');
+  if (btnTopLogin) btnTopLogin.classList.add('hidden');
 
   // 🟢 2. เมื่อผู้ใช้งานเข้าสู่ระบบแล้ว: แสดงเมนูตามสิทธิ์ของผู้ใช้แต่ละระดับ (L0, L1, L2, L3, L4)
   const canApproveList = Array.isArray(currentUser.canApprove) ? currentUser.canApprove : [];
@@ -1477,8 +1486,6 @@ const logoutBtn = document.getElementById('btn-logout');
 if (logoutBtn) {
   // ใช้ onclick เพื่อบังคับทับคำสั่งเก่า ป้องกันการกดแล้วทำงานซ้อนกัน
   logoutBtn.onclick = function() {
-    
-    // 1. ล้างข้อมูลผู้ใช้ออกจากหน่วยความจำเบราว์เซอร์
     localStorage.removeItem('current_user');
     localStorage.removeItem('current_active_view');
     sessionStorage.removeItem('activeApprovalLevel');
@@ -1486,28 +1493,12 @@ if (logoutBtn) {
     sessionStorage.removeItem('user_selected_booking_tab');
     currentUser = null;
 
-    // 2. สั่งซ่อนโปรไฟล์และกล่อง Dropdown ทันที (ให้หน้าจอสะอาดที่สุด)
-    const headerProfile = document.getElementById('header-user-profile');
-    if (headerProfile) {
-      headerProfile.classList.add('hidden');
+    if (typeof checkLoginStatus === 'function') {
+      checkLoginStatus();
     }
-    
-    const approvalContainer = document.getElementById('approval-level-container');
-    if (approvalContainer) {
-      approvalContainer.style.display = 'none';
-      approvalContainer.classList.add('hidden');
+    if (typeof showToast === 'function') {
+      showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
     }
-
-    // 3. อัปเดตสถานะหน้าจอแบบเรียลไทม์ทันทีใน 0 วินาที โดยไม่ต้องรีเฟรชหน้าเว็บค้างนาน
-    const topLoginBtn = document.getElementById('btn-top-login');
-    if (topLoginBtn) topLoginBtn.classList.remove('hidden');
-
-    if (typeof updateSidebarPermissions === 'function') updateSidebarPermissions();
-    if (typeof updateStats === 'function') updateStats();
-    if (typeof renderDashboard === 'function') renderDashboard();
-    if (typeof renderMonthCalendar === 'function') renderMonthCalendar();
-    if (typeof renderBookingsLists === 'function') renderBookingsLists();
-    if (typeof showToast === 'function') showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
   };
 }
 
@@ -5314,33 +5305,20 @@ function setupEventListeners() {
 
   // Logout button
   function logoutUser() {
-  // 1. ล้างข้อมูลผู้ใช้งานออกจากระบบทั้งหมด
-  currentUser = null;
-  localStorage.removeItem('current_user');
-  sessionStorage.removeItem('activeApprovalLevel'); // ล้างค่า Dropdown ที่อาจจะเลือกค้างไว้
+    currentUser = null;
+    localStorage.removeItem('current_user');
+    localStorage.removeItem('current_active_view');
+    sessionStorage.removeItem('activeApprovalLevel');
+    sessionStorage.removeItem('is_fresh_login');
+    sessionStorage.removeItem('user_selected_booking_tab');
 
-  // 2. ซ่อนกล่องโปรไฟล์และกล่อง Dropdown ทันที
-  const headerProfile = document.getElementById('header-user-profile');
-  if (headerProfile) {
-    headerProfile.classList.add('hidden');
+    if (typeof checkLoginStatus === 'function') {
+      checkLoginStatus();
+    }
+    if (typeof showToast === 'function') {
+      showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
+    }
   }
-  
-  const approvalContainer = document.getElementById('approval-level-container');
-  if (approvalContainer) {
-    approvalContainer.classList.add('hidden');
-  }
-
-  // 3. อัปเดตสถานะหน้าจอแบบเรียลไทม์ทันทีใน 0 วินาที โดยไม่ต้องรีเฟรชหน้าเว็บค้างนาน
-  const topLoginBtn = document.getElementById('btn-top-login');
-  if (topLoginBtn) topLoginBtn.classList.remove('hidden');
-
-  if (typeof updateSidebarPermissions === 'function') updateSidebarPermissions();
-  if (typeof updateStats === 'function') updateStats();
-  if (typeof renderDashboard === 'function') renderDashboard();
-  if (typeof renderMonthCalendar === 'function') renderMonthCalendar();
-  if (typeof renderBookingsLists === 'function') renderBookingsLists();
-  if (typeof showToast === 'function') showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
-}
 
   // Review Approvals action panel buttons
   document.getElementById('btn-approve-request').addEventListener('click', () => handleApprovalAction(true));
