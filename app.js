@@ -3236,8 +3236,9 @@ async function openApprovalModal(bookingId) {
   document.getElementById('detail-passengers').textContent = booking.passengers;
   document.getElementById('detail-purpose').textContent = booking.purpose || '-';
 
-  // Render Visual Pipeline
+  // Render Visual Pipeline & Signature Verification Box
   renderApprovalPipeline(booking);
+  renderSignatureVerificationBox(booking);
 
   // Toggle Action Box conditional display
   const actionPanel = document.getElementById('approval-action-panel');
@@ -3596,6 +3597,55 @@ function renderApprovalPipeline(booking) {
     `;
     container.appendChild(stepDiv);
   });
+}
+
+// Render Signature Verification & Matcher Box for L0 (Requester) and L1 (Supervisor)
+function renderSignatureVerificationBox(booking) {
+  const box = document.getElementById('signature-verification-box');
+  if (!box) return;
+
+  const l0Container = document.getElementById('l0-sig-img-container');
+  const l0Meta = document.getElementById('l0-sig-meta');
+  const l1Container = document.getElementById('l1-sig-img-container');
+  const l1Meta = document.getElementById('l1-sig-meta');
+
+  box.style.display = 'block';
+
+  // L0 Signature
+  const l0SigObj = (booking.signatures && booking.signatures[0]) || {};
+  const l0Sig = l0SigObj.signature || booking.requesterSignature;
+  const l0Time = l0SigObj.timestamp ? formatThaiDateTime(l0SigObj.timestamp) : (booking.createdAt ? formatThaiDateTime(booking.createdAt) : '-');
+
+  if (l0Sig && l0Sig.length > 20) {
+    let l0Src = l0Sig;
+    if (!l0Sig.startsWith('data:') && !l0Sig.startsWith('http') && !l0Sig.startsWith('/')) {
+      l0Src = `/signatures/SIG_L0_${booking.id}.png`;
+    }
+    l0Container.innerHTML = `<img src="${l0Src}" style="max-height: 65px; max-width: 100%; object-fit: contain;">`;
+    l0Meta.innerHTML = `<strong>${booking.requester || '-'}</strong><br><span style="color:#10b981; font-weight:600;">📅 ลงนามเมื่อ: ${l0Time}</span>`;
+  } else {
+    const l0FileSrc = `/signatures/SIG_L0_${booking.id}.png`;
+    l0Container.innerHTML = `<img src="${l0FileSrc}" onerror="this.parentNode.innerHTML='<span style=\\'font-size:0.75rem; color:var(--text-muted);\\'>- ไม่พบไฟล์ลายเซ็น L0 -</span>'" style="max-height: 65px; max-width: 100%; object-fit: contain;">`;
+    l0Meta.innerHTML = `<strong>${booking.requester || '-'}</strong><br><span>📅 ลงนามเมื่อ: ${l0Time}</span>`;
+  }
+
+  // L1 Signature
+  const l1SigObj = booking.signatures && booking.signatures.find(s => s.level === 1);
+  if (l1SigObj && l1SigObj.status === 'approved' && l1SigObj.signature) {
+    const l1Time = l1SigObj.timestamp ? formatThaiDateTime(l1SigObj.timestamp) : '-';
+    let l1Src = l1SigObj.signature;
+    if (!l1Src.startsWith('data:') && !l1Src.startsWith('http') && !l1Src.startsWith('/')) {
+      l1Src = `/signatures/SIG_L1_${booking.id}.png`;
+    }
+    l1Container.innerHTML = `<img src="${l1Src}" style="max-height: 65px; max-width: 100%; object-fit: contain;">`;
+    l1Meta.innerHTML = `<strong>${l1SigObj.approverName || 'หัวหน้างาน (L1)'}</strong><br><span style="color:#10b981; font-weight:600;">📅 อนุมัติเมื่อ: ${l1Time}</span>${l1SigObj.comment ? `<br><em style="color:var(--text-muted);">"${l1SigObj.comment}"</em>` : ''}`;
+  } else {
+    const l1FileSrc = `/signatures/SIG_L1_${booking.id}.png`;
+    l1Container.innerHTML = `
+      <img src="${l1FileSrc}" onerror="this.parentNode.innerHTML='<span style=\\'font-size:0.75rem; color:var(--text-muted);\\'>- รอการลงนามอนุมัติจาก L1 -</span>'" style="max-height: 65px; max-width: 100%; object-fit: contain;">
+    `;
+    l1Meta.innerHTML = `<strong>${(l1SigObj && l1SigObj.approverName) ? l1SigObj.approverName : 'หัวหน้างาน (L1)'}</strong><br><span style="color:var(--text-muted);">⏳ สถานะ: รออนุมัติ</span>`;
+  }
 }
 
 // Handle Approve / Reject Actions

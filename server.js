@@ -369,6 +369,46 @@ function sqliteSaveUsers(usersList) {
     console.error("SQLite Write error (users):", e);
     return false;
   }
+// Function to export & store signature PNG images for L0 (requester) and L1 (supervisor)
+function saveSignatureImages(list) {
+  if (!Array.isArray(list)) return;
+  const sigDir = path.join(ROOT_DIR, 'signatures');
+  if (!fs.existsSync(sigDir)) {
+    try { fs.mkdirSync(sigDir, { recursive: true }); } catch(e) {}
+  }
+
+  list.forEach(b => {
+    if (!b || !b.id) return;
+    
+    // Save L0 Signature (Requester)
+    const l0SigData = (b.signatures && b.signatures[0] && b.signatures[0].signature) || b.requesterSignature;
+    if (l0SigData && typeof l0SigData === 'string' && l0SigData.startsWith('data:image')) {
+      const match = l0SigData.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (match) {
+        const buffer = Buffer.from(match[2], 'base64');
+        const fileName = `SIG_L0_${b.id}.png`;
+        const filePath = path.join(sigDir, fileName);
+        if (!fs.existsSync(filePath)) {
+          try { fs.writeFileSync(filePath, buffer); } catch(e) {}
+        }
+      }
+    }
+
+    // Save L1 Signature (Supervisor / Approver)
+    const l1SigObj = b.signatures && b.signatures.find(s => s.level === 1);
+    const l1SigData = l1SigObj ? l1SigObj.signature : null;
+    if (l1SigData && typeof l1SigData === 'string' && l1SigData.startsWith('data:image')) {
+      const match = l1SigData.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (match) {
+        const buffer = Buffer.from(match[2], 'base64');
+        const fileName = `SIG_L1_${b.id}.png`;
+        const filePath = path.join(sigDir, fileName);
+        if (!fs.existsSync(filePath)) {
+          try { fs.writeFileSync(filePath, buffer); } catch(e) {}
+        }
+      }
+    }
+  });
 }
 
 const MIME_TYPES = {
@@ -618,6 +658,7 @@ const server = http.createServer((req, res) => {
           // Dual-Write 2: SQLite database
           try {
             sqliteSaveBookings(list);
+            saveSignatureImages(list);
           } catch(sqliteErr) {
             console.error("SQLite Dual-Write failed:", sqliteErr);
           }
