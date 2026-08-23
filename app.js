@@ -5328,6 +5328,8 @@ function setupEventListeners() {
   const approvalContainer = document.getElementById('approval-level-container');
   if (approvalContainer) {
     approvalContainer.classList.add('hidden');
+  }
+
   // 3. อัปเดตสถานะหน้าจอแบบเรียลไทม์ทันทีใน 0 วินาที โดยไม่ต้องรีเฟรชหน้าเว็บค้างนาน
   const topLoginBtn = document.getElementById('btn-top-login');
   if (topLoginBtn) topLoginBtn.classList.remove('hidden');
