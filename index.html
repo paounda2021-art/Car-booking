@@ -818,36 +818,7 @@
               <td style="padding:0.25rem 0; color:var(--text-muted);">ที่อยู่ผู้ขอใช้รถ:</td>
               <td id="detail-welfare-address" style="padding:0.25rem 0;">-</td>
             </tr>
-        </div>
-
-        <!-- Signature Verification & Matcher Box (For L0 & L1 Signature Verification) -->
-        <div id="signature-verification-box" style="display:none; background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
-          <h4 style="margin: 0 0 0.75rem 0; color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem;">
-            🔍 ตรวจสอบภาพลายเซ็นแนบ (L0 ผู้เสนอขอ vs L1 หัวหน้าอนุมัติ)
-          </h4>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <!-- L0 Signature Card -->
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; text-align: center;">
-              <div style="font-size: 0.8rem; font-weight: bold; color: var(--text-main); margin-bottom: 0.5rem;">
-                👨‍💼 ลายเซ็น L0 (ผู้เสนอขอจอง)
-              </div>
-              <div id="l0-sig-img-container" style="min-height: 70px; display: flex; align-items: center; justify-content: center; background: white; border: 1px dashed var(--border-color); border-radius: 4px; padding: 0.25rem;">
-                <span style="font-size: 0.75rem; color: var(--text-muted);">- ไม่มีข้อมูล -</span>
-              </div>
-              <div id="l0-sig-meta" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.3;">-</div>
-            </div>
-
-            <!-- L1 Signature Card -->
-            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem; text-align: center;">
-              <div style="font-size: 0.8rem; font-weight: bold; color: var(--text-main); margin-bottom: 0.5rem;">
-                👔 ลายเซ็น L1 (หัวหน้าอนุมัติ)
-              </div>
-              <div id="l1-sig-img-container" style="min-height: 70px; display: flex; align-items: center; justify-content: center; background: white; border: 1px dashed var(--border-color); border-radius: 4px; padding: 0.25rem;">
-                <span style="font-size: 0.75rem; color: var(--text-muted);">- รอการลงนาม L1 -</span>
-              </div>
-              <div id="l1-sig-meta" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.3;">-</div>
-            </div>
-          </div>
+          </table>
         </div>
 
         <!-- Approval pipeline history visual -->
@@ -1206,6 +1177,6 @@
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
   <script src="html2pdf.bundle.min.js?v=1.0"></script>
-  <script src="app.js?v=39.3_l0_l1_signature_storage"></script>
+  <script src="app.js?v=39.4_backend_sig_storage_only"></script>
 </body>
 </html>

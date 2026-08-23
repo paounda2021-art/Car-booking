@@ -3236,9 +3236,8 @@ async function openApprovalModal(bookingId) {
   document.getElementById('detail-passengers').textContent = booking.passengers;
   document.getElementById('detail-purpose').textContent = booking.purpose || '-';
 
-  // Render Visual Pipeline & Signature Verification Box
+  // Render Visual Pipeline
   renderApprovalPipeline(booking);
-  renderSignatureVerificationBox(booking);
 
   // Toggle Action Box conditional display
   const actionPanel = document.getElementById('approval-action-panel');
