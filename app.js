@@ -6457,8 +6457,18 @@ window.toggleEmailBody = function(index) {
 };
 
 // Document Load entrypoint
-document.addEventListener('DOMContentLoaded', async () => {
-  await initDatabase();
+document.addEventListener('DOMContentLoaded', () => {
+  // 🟢 1. Render instant UI from local storage cache immediately (0ms)
+  try {
+    const cachedCars = localStorage.getItem('cars_data');
+    if (cachedCars) cars = JSON.parse(cachedCars);
+    else cars = DEFAULT_CARS;
+  } catch(e) { cars = DEFAULT_CARS; }
+
+  try {
+    const cachedBookings = localStorage.getItem('bookings_data');
+    if (cachedBookings) bookings = JSON.parse(cachedBookings);
+  } catch(e) {}
 
   // Initialize Canvas Signature pads
   requesterSig = setupSignaturePad('canvas-requester-signature', 'btn-clear-requester-sig', 'requester-sig-placeholder');
@@ -6469,6 +6479,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   handleSignatureUpload('upload-approver-sig', approverSig, 'canvas-approver-signature', 'approver-sig-placeholder');
 
   setupEventListeners();
+  checkLoginStatus();
+
+  // 🟢 2. Sync fresh database from server asynchronously in background without blocking initial page render
+  initDatabase().then(() => {
+    populateCarsDropdown();
+    updateStats();
+    renderMonthCalendar();
+    renderBookingsLists();
+  }).catch(err => console.warn("Background initDatabase error:", err));
 
   // Initialize Flatpickr for booking dates
   try {
