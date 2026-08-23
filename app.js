@@ -1728,10 +1728,15 @@ function checkIsMyRequest(b, userObj) {
 // Helper to check if a user is allowed to see all bookings in the system
 function checkCanSeeAll(userObj) {
   if (!userObj) return false;
-  return userObj.role === 'fleet_admin' || 
-         userObj.role === 'director' || 
-         userObj.role === 'executive' ||
-         (userObj.canApprove && (userObj.canApprove.includes(2) || userObj.canApprove.includes(3) || userObj.canApprove.includes(4)));
+  const uRole = (userObj.role || '').toLowerCase();
+  const uName = (userObj.username || '').toLowerCase();
+  if (uRole === 'admin' || uRole === 'administrator' || uName === 'admin' || uName === 'administrator' || uRole === 'fleet_admin' || uRole === 'director' || uRole === 'executive') {
+    return true;
+  }
+  if (userObj.canApprove && Array.isArray(userObj.canApprove) && userObj.canApprove.length > 0) {
+    return true;
+  }
+  return false;
 }
 
 // Helper to check if a supervisor is the manager or approver for a subordinate's booking
@@ -2486,18 +2491,13 @@ function renderBookingsLists() {
     const isL2OrL3 = (isL2User || isL3User) && !isL4Active;
 
     if (isMyRequest) {
-      // 🎯 1. เจ้าของคำขอ (L0) จะเห็นเฉพาะงานที่ตนเองเป็นคนเสนอขอเท่านั้น
+      // 🎯 1. เจ้าของคำขอ (L0) เห็นเฉพาะงานของตนเอง
       canShowInHistory = true;
     } else if (isManagerOrApprover) {
-      // 🎯 2. หัวหน้างาน (L1) หรือผู้ที่เกี่ยวข้องกับสายอนุมัติใบนี้ จะเห็นเฉพาะงานของลูกน้องในสังกัด
+      // 🎯 2. หัวหน้างาน (L1) เห็นเฉพาะงานของลูกน้องในสังกัด
       canShowInHistory = true;
-    } else if (isL4Active) {
-      // 🎯 3. สำหรับ L4: แสดงเฉพาะเคสที่อนุมัติเสร็จสิ้นแล้วเท่านั้น (และไม่ใช่ของตนเอง)
-      if (b.status === 'approved') {
-        canShowInHistory = true;
-      }
-    } else if (isL2OrL3 || canSeeAll) {
-      // 🎯 4. สำหรับ L2, L3 หรือแอดมิน: แสดงทุกสถานะเพื่อการจัดการ
+    } else if (canSeeAll || isL1User || isL2User || isL3User || isL4User || (currentUser && (currentUser.role === 'admin' || currentUser.username === 'admin'))) {
+      // 🎯 3. สำหรับ Admin, L2, L3, L4 และผู้ดูแลระบบ: แสดงทุกรายการทุกสถานะเพื่อการตรวจสอบและจัดการ (154 เคส)
       canShowInHistory = true;
     }
 
