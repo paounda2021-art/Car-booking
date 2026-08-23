@@ -622,16 +622,19 @@ const server = http.createServer((req, res) => {
             console.error("SQLite Dual-Write failed:", sqliteErr);
           }
 
-          // Automatic Server-Side Puppeteer PDF generation for fully approved bookings
+          // Automatic Server-Side Puppeteer PDF generation for newly approved bookings
           list.forEach(b => {
             if (b.id && b.status === 'approved') {
-              setTimeout(async () => {
-                try {
-                  await generatePDFReportServerSide(b.id);
-                } catch(pdfErr) {
-                  console.error(`Automatic server PDF generation error for ${b.id}:`, pdfErr);
-                }
-              }, 500);
+              const pdfFile = path.join(ROOT_DIR, 'Report', `Report_${b.id}.pdf`);
+              if (!fs.existsSync(pdfFile)) {
+                setTimeout(async () => {
+                  try {
+                    await generatePDFReportServerSide(b.id);
+                  } catch(pdfErr) {
+                    console.error(`Automatic server PDF generation error for ${b.id}:`, pdfErr);
+                  }
+                }, 500);
+              }
             }
           });
 

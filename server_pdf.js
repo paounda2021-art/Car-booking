@@ -906,14 +906,24 @@ async function generatePDFReportServerSide(bookingId) {
     const page = await browser.newPage();
     let pdfBuffer;
     try {
-      await page.setContent(fullHTML, { waitUntil: 'networkidle0' });
+      page.setDefaultNavigationTimeout(10000);
+      page.setDefaultTimeout(10000);
+
+      try {
+        await page.setContent(fullHTML, { waitUntil: 'domcontentloaded', timeout: 8000 });
+      } catch (e) {
+        console.warn(`[Puppeteer] setContent warning for ${b.id}:`, e.message);
+      }
+
+      await new Promise(r => setTimeout(r, 200));
+
       pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
         margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' }
       });
     } finally {
-      await page.close();
+      try { await page.close(); } catch(e) {}
     }
 
     const fileName = `Report_${b.id}.pdf`;
