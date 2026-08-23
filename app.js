@@ -1,5 +1,24 @@
-// FMO Car Booking Application Controller
-// Helper to format Date/Time to Thai format with 24h time and " น." suffix
+function openLoginModal() {
+  const modal = document.getElementById('login-screen');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    modal.style.zIndex = '999999';
+    const userField = document.getElementById('login-username');
+    if (userField) setTimeout(() => userField.focus(), 100);
+  }
+}
+
+function closeLoginModal() {
+  const modal = document.getElementById('login-screen');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+}
+
+window.openLoginModal = openLoginModal;
+window.closeLoginModal = closeLoginModal;
 function formatThaiDateTime(dateInput) {
   if (!dateInput) return '';
   const d = new Date(dateInput);
@@ -4918,13 +4937,37 @@ function setupEventListeners() {
     });
   }
 
+  function openLoginModal() {
+    const modal = document.getElementById('login-screen');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+      modal.style.zIndex = '999999';
+      const userField = document.getElementById('login-username');
+      if (userField) setTimeout(() => userField.focus(), 100);
+    }
+  }
+
+  function closeLoginModal() {
+    const modal = document.getElementById('login-screen');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  }
+
+  window.openLoginModal = openLoginModal;
+  window.closeLoginModal = closeLoginModal;
+
   // Modal open/close actions
-  document.getElementById('btn-top-login').addEventListener('click', () => {
-    document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('btn-top-login')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openLoginModal();
   });
 
-  document.getElementById('btn-close-login').addEventListener('click', () => {
-    document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('btn-close-login')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    closeLoginModal();
   });
 
   // Quick Login Buttons Event Delegation
