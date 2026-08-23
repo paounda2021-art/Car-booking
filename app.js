@@ -1498,8 +1498,16 @@ if (logoutBtn) {
       approvalContainer.classList.add('hidden');
     }
 
-    // 3. ท่าไม้ตาย: สั่งรีเฟรชหน้าเว็บเพื่อกลับสู่หน้าแรก (บุคคลทั่วไป)
-    window.location.reload();
+    // 3. อัปเดตสถานะหน้าจอแบบเรียลไทม์ทันทีใน 0 วินาที โดยไม่ต้องรีเฟรชหน้าเว็บค้างนาน
+    const topLoginBtn = document.getElementById('btn-top-login');
+    if (topLoginBtn) topLoginBtn.classList.remove('hidden');
+
+    if (typeof updateSidebarPermissions === 'function') updateSidebarPermissions();
+    if (typeof updateStats === 'function') updateStats();
+    if (typeof renderDashboard === 'function') renderDashboard();
+    if (typeof renderMonthCalendar === 'function') renderMonthCalendar();
+    if (typeof renderBookingsLists === 'function') renderBookingsLists();
+    if (typeof showToast === 'function') showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
   };
 }
 
@@ -5320,10 +5328,16 @@ function setupEventListeners() {
   const approvalContainer = document.getElementById('approval-level-container');
   if (approvalContainer) {
     approvalContainer.classList.add('hidden');
-  }
+  // 3. อัปเดตสถานะหน้าจอแบบเรียลไทม์ทันทีใน 0 วินาที โดยไม่ต้องรีเฟรชหน้าเว็บค้างนาน
+  const topLoginBtn = document.getElementById('btn-top-login');
+  if (topLoginBtn) topLoginBtn.classList.remove('hidden');
 
-  // 3. รีโหลดหน้าเว็บ 1 ครั้ง เพื่อเคลียร์ข้อมูลตารางงานและกลับสู่หน้าจอเริ่มต้น (บุคคลทั่วไป)
-  window.location.reload(); 
+  if (typeof updateSidebarPermissions === 'function') updateSidebarPermissions();
+  if (typeof updateStats === 'function') updateStats();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderMonthCalendar === 'function') renderMonthCalendar();
+  if (typeof renderBookingsLists === 'function') renderBookingsLists();
+  if (typeof showToast === 'function') showToast("ออกจากระบบเรียบร้อยแล้ว", "info");
 }
 
   // Review Approvals action panel buttons
