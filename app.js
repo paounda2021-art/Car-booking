@@ -1733,8 +1733,8 @@ function checkCanSeeAll(userObj) {
   if (uRole === 'admin' || uRole === 'administrator' || uName === 'admin' || uName === 'administrator' || uRole === 'fleet_admin' || uRole === 'director' || uRole === 'executive') {
     return true;
   }
-  if (userObj.canApprove && Array.isArray(userObj.canApprove) && userObj.canApprove.length > 0) {
-    return true;
+  if (userObj.canApprove && Array.isArray(userObj.canApprove)) {
+    return userObj.canApprove.includes(2) || userObj.canApprove.includes(3);
   }
   return false;
 }
@@ -2496,8 +2496,13 @@ function renderBookingsLists() {
     } else if (isManagerOrApprover) {
       // 🎯 2. หัวหน้างาน (L1) เห็นเฉพาะงานของลูกน้องในสังกัด
       canShowInHistory = true;
-    } else if (canSeeAll || isL1User || isL2User || isL3User || isL4User || (currentUser && (currentUser.role === 'admin' || currentUser.username === 'admin'))) {
-      // 🎯 3. สำหรับ Admin, L2, L3, L4 และผู้ดูแลระบบ: แสดงทุกรายการทุกสถานะเพื่อการตรวจสอบและจัดการ (154 เคส)
+    } else if (isL4Active) {
+      // 🎯 3. สำหรับ L4: แสดงเฉพาะเคสที่อนุมัติเสร็จสิ้นแล้วเท่านั้นตามโค้ดเดิม
+      if (b.status === 'approved') {
+        canShowInHistory = true;
+      }
+    } else if (isL2OrL3 || canSeeAll) {
+      // 🎯 4. สำหรับ L2, L3 หรือแอดมิน: แสดงทุกสถานะเพื่อการจัดการ
       canShowInHistory = true;
     }
 
