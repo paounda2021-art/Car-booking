@@ -194,4 +194,12 @@ if (fs.existsSync(path.join(ROOT_DIR, 'cars.json'))) {
   console.log(`Populated ${cars.length} cars.`);
 }
 
-console.log("Database schema successfully rebuilt.");
+try { db.close(); } catch(e) {}
+
+try {
+  fs.copyFileSync(tempDbPath, dbPath);
+  try { fs.unlinkSync(tempDbPath); } catch(e) {}
+  console.log("Database schema successfully rebuilt and saved directly to database.db.");
+} catch(copyErr) {
+  console.error("Error copying temp db to database.db:", copyErr);
+}
