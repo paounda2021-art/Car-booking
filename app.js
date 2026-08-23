@@ -1675,6 +1675,10 @@ function showView(viewName) {
     }
   });
 
+  if (viewName === 'calendar' && typeof renderMonthCalendar === 'function') {
+    renderMonthCalendar();
+  }
+
   if (viewName === 'admin-settings') {
     // Control tabs visibility based on user
     const btnTabUsers = document.getElementById('btn-tab-users-settings');
