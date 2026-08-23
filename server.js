@@ -369,6 +369,8 @@ function sqliteSaveUsers(usersList) {
     console.error("SQLite Write error (users):", e);
     return false;
   }
+}
+
 // Function to export & store signature PNG images for L0 (requester) and L1 (supervisor)
 function saveSignatureImages(list) {
   if (!Array.isArray(list)) return;
