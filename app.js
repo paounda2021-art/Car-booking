@@ -1636,7 +1636,9 @@ function populateCarsDropdown() {
 // Navigation / View management
 const views = ['dashboard', 'bookings', 'calendar', 'report', 'driver-report', 'admin-settings'];
 function showView(viewName) {
-  if (!viewName || viewName === 'null' || viewName === 'undefined' || !views.includes(viewName)) {
+  if (!currentUser) {
+    viewName = 'calendar';
+  } else if (!viewName || viewName === 'null' || viewName === 'undefined' || !views.includes(viewName)) {
     viewName = 'bookings';
   }
 
