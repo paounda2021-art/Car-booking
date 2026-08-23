@@ -279,6 +279,33 @@ function buildReportHTMLContent(b, usersList, carsList) {
   `;
 }
 
+let sharedBrowser = null;
+
+async function getSharedBrowser() {
+  if (sharedBrowser && sharedBrowser.isConnected()) {
+    return sharedBrowser;
+  }
+  try {
+    sharedBrowser = await puppeteer.launch({
+      headless: 'new',
+      windowsHide: true,
+      pipe: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-default-browser-check'
+      ]
+    });
+    return sharedBrowser;
+  } catch(e) {
+    console.error('Error launching shared Puppeteer browser:', e);
+    return null;
+  }
+}
+
 async function generatePDFReportServerSide(bookingId) {
   if (!bookingId) return null;
   console.log(`🚀 Starting Server-Side Puppeteer PDF generation for booking: ${bookingId}...`);
@@ -343,21 +370,21 @@ async function generatePDFReportServerSide(bookingId) {
       </html>
     `;
 
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
+    const browser = await getSharedBrowser();
+    if (!browser) return null;
 
     const page = await browser.newPage();
-    await page.setContent(fullHTML, { waitUntil: 'networkidle0' });
-
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' }
-    });
-
-    await browser.close();
+    let pdfBuffer;
+    try {
+      await page.setContent(fullHTML, { waitUntil: 'networkidle0' });
+      pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' }
+      });
+    } finally {
+      await page.close();
+    }
 
     const fileName = `Report_${b.id}.pdf`;
     const filePath = path.join(reportDir, fileName);
