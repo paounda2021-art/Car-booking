@@ -3710,53 +3710,66 @@ async function handleApprovalAction(isApproved) {
     }
     
     if (assignedCarId === 'taxi') {
-      booking.travelType = 'public_car';
-      booking.carId = '';
-      booking.driverName = '-';
-      assignedDriver = '-';
-      booking.waitingForRequesterInput = true;
-      booking.status = 'pending';
-      booking.currentApprovalLevel = 1; // 🎯 ย้อนกลับไปให้ L0 ระบุค่าพาหนะ แล้วส่งตามลำดับ L1 ➔ L2 ➔ L3 ➔ L4
-      
-      // Reset signatures from L1 onwards
-      booking.signatures.forEach(sig => {
-        if (sig.level >= 1) {
-          sig.approverName = '';
-          sig.status = 'pending';
-          sig.comment = '';
-          sig.timestamp = '';
-          sig.signature = '';
-          if (sig.level === 2) {
-            sig.driverName = '';
+      const hasFareInfo = (booking.price && booking.price > 0) && (booking.distance && booking.distance > 0);
+      const isAlreadyTaxiWorkflow = booking.travelType === 'public_car' && hasFareInfo && !booking.waitingForRequesterInput;
+
+      if (!isAlreadyTaxiWorkflow) {
+        // 🎯 Pass 1: First time L2 assigns TAXI (no fare info yet), bounce back to L0 to fill fare amount
+        booking.travelType = 'public_car';
+        booking.carId = '';
+        booking.driverName = '-';
+        assignedDriver = '-';
+        booking.waitingForRequesterInput = true;
+        booking.status = 'pending';
+        booking.currentApprovalLevel = 1; // ย้อนกลับไปให้ L0 ระบุค่าพาหนะ แล้วเริ่มอนุมัติตามลำดับ L1 ➔ L2 ➔ L3 ➔ L4
+        
+        // Reset signatures from L1 onwards
+        booking.signatures.forEach(sig => {
+          if (sig.level >= 1) {
+            sig.approverName = '';
+            sig.status = 'pending';
+            sig.comment = '';
+            sig.timestamp = '';
+            sig.signature = '';
+            if (sig.level === 2) {
+              sig.driverName = '';
+            }
           }
-        }
-      });
+        });
 
-      await saveBookings();
-      document.getElementById('modal-approval').classList.remove('active');
-      
-      // Re-render UI views
-      updateStats();
-      renderDashboard();
-      renderBookingsLists();
-      renderMonthCalendar();
+        await saveBookings();
+        document.getElementById('modal-approval').classList.remove('active');
+        
+        // Re-render UI views
+        updateStats();
+        renderDashboard();
+        renderBookingsLists();
+        renderMonthCalendar();
 
-      // Trigger email notification to L0 asking to fill vehicle fare
-      const reqEmail = resolveRequesterEmail(booking);
-      const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
-      const body = `
-        <p>เรียน คุณ ${booking.requester},</p>
-        <p>ใบขออนุญาตใช้ยานพาหนะเลขที่ <strong>${booking.id}</strong> ของท่าน ได้รับความเห็นในการจัดสรรพาหนะเดินทางแบบ <strong>รถรับจ้างสาธารณะ (TAXI)</strong> เนื่องจากรถยนต์ส่วนกลางไม่ว่างปฏิบัติงานในช่วงเวลาดังกล่าว</p>
-        <p>รบกวนท่านเข้าสู่ระบบเพื่อดำเนินการกรอกข้อมูล <strong>ระยะทางประมาณการ (กิโลเมตร)</strong> และ <strong>วงเงินงบประมาณเบิกจ่ายโดยประมาณ (บาท)</strong> เพื่อส่งคำขอเข้าสู่การอนุมัติตามลำดับขั้น (L1 ➔ L2 ➔ L3 ➔ L4) ต่อไป</p>
-        <p>ท่านสามารถคลิกที่ปุ่มสีแดง <strong>[กรอกค่าพาหนะ]</strong> ในตารางรายการที่ฉันขอ เพื่อระบุข้อมูลได้ทันที:</p>
-        <div style="text-align: center; margin: 25px 0;">
-          <a href="https://car-booking.fishmarket.co.th/" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">กรอกรายละเอียดค่าพาหนะ</a>
-        </div>
-      `;
-      sendEmailNotification(reqEmail, subject, body);
-      
-      showToast(`ได้ส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกข้อมูลค่าพาหนะรถรับจ้างเรียบร้อยแล้ว`, "success");
-      return;
+        // Trigger email notification to L0 asking to fill vehicle fare
+        const reqEmail = resolveRequesterEmail(booking);
+        const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
+        const body = `
+          <p>เรียน คุณ ${booking.requester},</p>
+          <p>ใบขออนุญาตใช้ยานพาหนะเลขที่ <strong>${booking.id}</strong> ของท่าน ได้รับความเห็นในการจัดสรรพาหนะเดินทางแบบ <strong>รถรับจ้างสาธารณะ (TAXI)</strong> เนื่องจากรถยนต์ส่วนกลางไม่ว่างปฏิบัติงานในช่วงเวลาดังกล่าว</p>
+          <p>รบกวนท่านเข้าสู่ระบบเพื่อดำเนินการกรอกข้อมูล <strong>ระยะทางประมาณการ (กิโลเมตร)</strong> และ <strong>วงเงินงบประมาณเบิกจ่ายโดยประมาณ (บาท)</strong> เพื่อส่งคำขอเข้าสู่การอนุมัติตามลำดับขั้น (L1 ➔ L2 ➔ L3 ➔ L4) ต่อไป</p>
+          <p>ท่านสามารถคลิกที่ปุ่มสีแดง <strong>[กรอกค่าพาหนะ]</strong> ในตารางรายการที่ฉันขอ เพื่อระบุข้อมูลได้ทันที:</p>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">กรอกรายละเอียดค่าพาหนะ</a>
+          </div>
+        `;
+        sendEmailNotification(reqEmail, subject, body);
+        
+        showToast(`ได้ส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกข้อมูลค่าพาหนะรถรับจ้างเรียบร้อยแล้ว`, "success");
+        return;
+      } else {
+        // 🎯 Pass 2: L0 has filled fare and L1 has approved. L2 approves and forwards to L3 (หส.พด.)!
+        booking.travelType = 'public_car';
+        booking.carId = '';
+        booking.driverName = '-';
+        assignedDriver = '-';
+        booking.waitingForRequesterInput = false;
+      }
     } else {
       // Conflict check
       if (hasBookingConflict(assignedCarId, booking.startDate, booking.endDate, booking.id)) {
