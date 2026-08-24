@@ -58,6 +58,7 @@ if (Test-Path "$rootDir\bookings.json") {
 Write-Host "Pulling latest codebase from GitHub..." -ForegroundColor Yellow
 git config user.email "admin@fishmarket.co.th"
 git config user.name "Administrator"
+git stash
 git pull origin main
 
 # 5. Restore live server database.db & bookings.json so live data is NEVER overwritten
