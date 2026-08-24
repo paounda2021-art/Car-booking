@@ -780,24 +780,19 @@ async function initDatabase() {
         dbBookingsLoaded = true;
 
         try {
-          localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
-        } catch (err) {
-          console.warn("⚠️ LocalStorage quota exceeded during initDatabase. Saving optimized cache...", err);
-          try {
-            const optimizedBookings = dbBookings.map(b => {
-              if (!b.signatures || !Array.isArray(b.signatures)) return b;
-              const cleanSigs = b.signatures.map(s => {
-                if (s.signature && s.signature.length > 500) {
-                  return { ...s, signature: 'db_ref' };
-                }
-                return s;
-              });
-              return { ...b, signatures: cleanSigs };
+          const optimizedBookings = dbBookings.map(b => {
+            if (!b || !b.signatures || !Array.isArray(b.signatures)) return b;
+            const cleanSigs = b.signatures.map(s => {
+              if (s && s.signature && s.signature.length > 500) {
+                return { ...s, signature: 'db_ref' };
+              }
+              return s;
             });
-            localStorage.setItem('bookings_data', JSON.stringify(optimizedBookings));
-          } catch (e2) {
-            console.warn("⚠️ LocalStorage full, skipping local cache.", e2);
-          }
+            return { ...b, signatures: cleanSigs };
+          });
+          localStorage.setItem('bookings_data', JSON.stringify(optimizedBookings));
+        } catch (err) {
+          console.warn("⚠️ LocalStorage full, skipping local cache.", err);
         }
       }
     }
@@ -2502,8 +2497,8 @@ function renderBookingsLists() {
     const isL4User = userHasApproveLevel(currentUser, 4);
 
     // 🎯 ตรวจสอบว่าผู้ใช้เคยลงนามอนุมัติใบจองนี้แล้วหรือยัง
-    const hasUserSigned = Array.isArray(b.signatures) && b.signatures.some(s => 
-      (s.approverName && s.approverName.includes(currentUser.name)) ||
+    const hasUserSigned = currentUser && Array.isArray(b.signatures) && b.signatures.some(s => 
+      (s.approverName && currentUser.name && s.approverName.includes(currentUser.name)) ||
       (s.status === 'approved' && s.level === 2 && isL2User) ||
       (s.status === 'approved' && s.level === 3 && isL3User) ||
       (s.status === 'approved' && s.level === 4 && isL4User)
