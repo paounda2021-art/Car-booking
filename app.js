@@ -732,48 +732,10 @@ async function initDatabase() {
         // Filter out system config and test mock IDs safely without wiping real data
         dbBookings = dbBookings.filter(b => b && b.id && b.id !== 'system_config' && !b.id.startsWith('BKG-FMO-00'));
 
-        // Merge with local storage bookings to ensure newly updated/approved local bookings are not lost during network/cache delays
-        const localDataStr = localStorage.getItem('bookings_data');
-        if (localDataStr) {
-          try {
-            const localBookings = JSON.parse(localDataStr);
-            if (Array.isArray(localBookings)) {
-              let hasMergedNew = false;
-              localBookings.forEach(localB => {
-                if (!localB || !localB.id || localB.id === 'system_config') return;
-                const existingIdx = dbBookings.findIndex(dbB => dbB.id === localB.id);
-                if (existingIdx === -1) {
-                  dbBookings.push(localB);
-                  hasMergedNew = true;
-                } else {
-                  const dbB = dbBookings[existingIdx];
-                  const localLevel = localB.currentApprovalLevel || 1;
-                  const dbLevel = dbB.currentApprovalLevel || 1;
-                  const localCompleted = (localB.status === 'approved' || localB.status === 'rejected' || localB.status === 'cancelled');
-                  const dbCompleted = (dbB.status === 'approved' || dbB.status === 'rejected' || dbB.status === 'cancelled');
-                  
-                  if (localCompleted && !dbCompleted) {
-                    dbBookings[existingIdx] = localB;
-                    hasMergedNew = true;
-                  } else if (localLevel > dbLevel) {
-                    dbBookings[existingIdx] = localB;
-                    hasMergedNew = true;
-                  } else if (Array.isArray(localB.signatures) && Array.isArray(dbB.signatures)) {
-                    const localSigned = localB.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length;
-                    const dbSigned = dbB.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length;
-                    if (localSigned > dbSigned) {
-                      dbBookings[existingIdx] = localB;
-                      hasMergedNew = true;
-                    }
-                  }
-                }
-              });
-              if (hasMergedNew) {
-                console.log("🛡️ Safely merged updated local approval states into fetched database!");
-              }
-            }
-          } catch(e) {}
-        }
+        // Always clear stale localStorage cache and prioritize server database as source of truth
+        try {
+          localStorage.removeItem('bookings_data');
+        } catch(e) {}
 
         dbBookings = deduplicateBookings(dbBookings);
         bookings = dbBookings;
@@ -2270,21 +2232,23 @@ function helperCreateTableRow(b, isPendingForMe) {
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
   // 🎯 Show export button ONLY for L2, L3, and L4 users
-  const exportBtn = document.getElementById('btn-export-csv');
-  if (exportBtn) {
-    const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
-    const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
-    const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
+  const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
+  const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
+  const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
+  const hasExportPermission = currentUser && (isL2 || isL3 || isL4);
 
-    const hasExportPermission = currentUser && (isL2 || isL3 || isL4);
-    if (hasExportPermission) {
-      exportBtn.classList.remove('hidden');
-      exportBtn.style.display = 'inline-flex';
-    } else {
-      exportBtn.classList.add('hidden');
-      exportBtn.style.display = 'none';
+  ['btn-export-csv', 'btn-export-csv-history'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      if (hasExportPermission) {
+        btn.classList.remove('hidden');
+        btn.style.display = 'inline-flex';
+      } else {
+        btn.classList.add('hidden');
+        btn.style.display = 'none';
+      }
     }
-  }
+  });
 
   // Force card view layout
   bookingViewLayout = 'card';
