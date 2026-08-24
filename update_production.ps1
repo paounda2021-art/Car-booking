@@ -41,19 +41,37 @@ if ($itemsToZip.Count -gt 0) {
     }
 }
 
-# 3. Allow git to update bookings.json
-try {
-    git update-index --no-assume-unchanged bookings.json
-} catch {}
+# 3. Save temporary copy of live database.db & bookings.json to preserve live server data 100%
+$tempLiveDb = Join-Path $targetBackupDir "live_db_$timestamp.db"
+$tempLiveJson = Join-Path $targetBackupDir "live_bookings_$timestamp.json"
 
-# 4. Pull updated codebase from GitHub without deleting local database.db
+if (Test-Path "$rootDir\database.db") {
+    Copy-Item "$rootDir\database.db" $tempLiveDb -Force
+    Write-Host "🛡️ Live database.db preserved to $tempLiveDb" -ForegroundColor Cyan
+}
+if (Test-Path "$rootDir\bookings.json") {
+    Copy-Item "$rootDir\bookings.json" $tempLiveJson -Force
+    Write-Host "🛡️ Live bookings.json preserved to $tempLiveJson" -ForegroundColor Cyan
+}
+
+# 4. Pull updated codebase from GitHub
 Write-Host "Pulling latest codebase from GitHub..." -ForegroundColor Yellow
 git config user.email "admin@fishmarket.co.th"
 git config user.name "Administrator"
 git pull origin main
 
+# 5. Restore live server database.db & bookings.json so live data is NEVER overwritten
+if (Test-Path $tempLiveDb) {
+    Copy-Item $tempLiveDb "$rootDir\database.db" -Force
+    Write-Host "✅ Restored live database.db successfully!" -ForegroundColor Green
+}
+if (Test-Path $tempLiveJson) {
+    Copy-Item $tempLiveJson "$rootDir\bookings.json" -Force
+    Write-Host "✅ Restored live bookings.json successfully!" -ForegroundColor Green
+}
+
 # 6. Restart server in PM2
 Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Yellow
 pm2 start car-booking
 
-Write-Host "🎉 Production server updated successfully! Backup ZIP saved in $zipFilePath" -ForegroundColor Green
+Write-Host "🎉 Production server updated successfully without overwriting live database! Backup ZIP saved in $zipFilePath" -ForegroundColor Green
