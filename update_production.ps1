@@ -54,27 +54,29 @@ if (Test-Path "$rootDir\bookings.json") {
     Write-Host "Live bookings.json preserved to $tempLiveJson" -ForegroundColor Cyan
 }
 
-# 4. Pull updated codebase from GitHub
-Write-Host "Pulling latest codebase from GitHub..." -ForegroundColor Yellow
+# 4. Force pull updated master codebase and database from GitHub
+Write-Host "Force pulling latest master database.db and codebase from GitHub..." -ForegroundColor Yellow
 git config user.email "admin@fishmarket.co.th"
 git config user.name "Administrator"
-git stash
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 
-# 5. Execute startup sync to merge master records seamlessly
-Write-Host "Merging master records and updating database..." -ForegroundColor Green
+# 5. Execute database sync from master bookings.json
+Write-Host "Syncing master database records..." -ForegroundColor Green
 node -e "
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
 try {
   const db = new DatabaseSync('database.db');
+  db.exec('DELETE FROM bookings');
   const bList = JSON.parse(fs.readFileSync('bookings.json', 'utf8'));
-  const stmt = db.prepare('INSERT OR REPLACE INTO bookings (id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit, driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince, purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price, goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures, waitingForRequesterInput, taxiInfo, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  const stmt = db.prepare('INSERT INTO bookings (id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit, driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince, purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price, goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures, waitingForRequesterInput, taxiInfo, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
   bList.forEach(b => {
     stmt.run(b.id, b.requester||'', b.requesterEmail||'', b.managerEmail||'', b.position||'', b.department||'', b.office||'', b.division||'', b.controlUnit||'', b.driverLicenseFile||'', b.addressNo||'', b.addressMoo||'', b.addressRoad||'', b.addressSubdistrict||'', b.addressDistrict||'', b.addressProvince||'', b.purpose||'', b.destination||'', b.ref||'', b.passengers||'', b.startDate||'', b.endDate||'', b.trips||2, b.travelType||'', b.carId||'', b.distance||0, b.price||0, b.goCheck?1:0, b.backCheck?1:0, b.status||'pending', b.currentApprovalLevel||1, b.driverName||'', b.returnedEarly?1:0, b.driverAccepted?1:0, typeof b.signatures==='string'?b.signatures:JSON.stringify(b.signatures||[]), b.waitingForRequesterInput?1:0, typeof b.taxiInfo==='string'?b.taxiInfo:JSON.stringify(b.taxiInfo||{}), b.active?1:0);
   });
+  const count = db.prepare('SELECT COUNT(*) as c FROM bookings').get();
   db.close();
-  console.log('✅ Database sync completed successfully!');
+  console.log('✅ Database sync completed! Total records in database.db: ' + count.c);
 } catch(e) {
   console.log('Sync note:', e.message);
 }
