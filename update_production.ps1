@@ -61,15 +61,24 @@ git config user.name "Administrator"
 git stash
 git pull origin main
 
-# 5. Restore live server database.db & bookings.json so live data is NEVER overwritten
-if (Test-Path $tempLiveDb) {
-    Copy-Item $tempLiveDb "$rootDir\database.db" -Force
-    Write-Host "Restored live database.db successfully!" -ForegroundColor Green
+# 5. Execute startup sync to merge master records seamlessly
+Write-Host "Merging master records and updating database..." -ForegroundColor Green
+node -e "
+const fs = require('fs');
+const { DatabaseSync } = require('node:sqlite');
+try {
+  const db = new DatabaseSync('database.db');
+  const bList = JSON.parse(fs.readFileSync('bookings.json', 'utf8'));
+  const stmt = db.prepare('INSERT OR REPLACE INTO bookings (id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit, driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince, purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price, goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures, waitingForRequesterInput, taxiInfo, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  bList.forEach(b => {
+    stmt.run(b.id, b.requester||'', b.requesterEmail||'', b.managerEmail||'', b.position||'', b.department||'', b.office||'', b.division||'', b.controlUnit||'', b.driverLicenseFile||'', b.addressNo||'', b.addressMoo||'', b.addressRoad||'', b.addressSubdistrict||'', b.addressDistrict||'', b.addressProvince||'', b.purpose||'', b.destination||'', b.ref||'', b.passengers||'', b.startDate||'', b.endDate||'', b.trips||2, b.travelType||'', b.carId||'', b.distance||0, b.price||0, b.goCheck?1:0, b.backCheck?1:0, b.status||'pending', b.currentApprovalLevel||1, b.driverName||'', b.returnedEarly?1:0, b.driverAccepted?1:0, typeof b.signatures==='string'?b.signatures:JSON.stringify(b.signatures||[]), b.waitingForRequesterInput?1:0, typeof b.taxiInfo==='string'?b.taxiInfo:JSON.stringify(b.taxiInfo||{}), b.active?1:0);
+  });
+  db.close();
+  console.log('✅ Database sync completed successfully!');
+} catch(e) {
+  console.log('Sync note:', e.message);
 }
-if (Test-Path $tempLiveJson) {
-    Copy-Item $tempLiveJson "$rootDir\bookings.json" -Force
-    Write-Host "Restored live bookings.json successfully!" -ForegroundColor Green
-}
+"
 
 # 6. Restart server in PM2
 Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Yellow
