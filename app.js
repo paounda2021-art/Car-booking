@@ -1466,27 +1466,53 @@ function loginUser(userObj) {
   renderDashboard();
   renderMonthCalendar();
 
-  // 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ (แท็บงานรออนุมัติจากคุณ) เสมอเมื่อเข้าสู่ระบบ
+  // 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ เสมอเมื่อเข้าสู่ระบบ
   localStorage.setItem('current_active_view', 'bookings');
-  sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
+  const isApproverUser = currentUser && Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0;
 
-  // 🎯 บังคับปรับปุ่มและเนื้อหาแท็บ 'งานรออนุมัติจากคุณ' ให้ Active ทันที
-  document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
-    if (btn.getAttribute('data-tab') === 'tab-pending-approvals') {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-  document.querySelectorAll('#view-bookings .tab-content').forEach(tab => {
-    if (tab.id === 'tab-pending-approvals') {
-      tab.classList.add('active');
-      tab.style.removeProperty('display');
-    } else {
-      tab.classList.remove('active');
-      tab.style.display = 'none';
-    }
-  });
+  if (isApproverUser) {
+    sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
+    document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
+      if (btn.getAttribute('data-tab') === 'tab-pending-approvals') {
+        btn.classList.remove('hidden');
+        btn.style.removeProperty('display');
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    document.querySelectorAll('#view-bookings .tab-content').forEach(tab => {
+      if (tab.id === 'tab-pending-approvals') {
+        tab.classList.add('active');
+        tab.style.removeProperty('display');
+      } else {
+        tab.classList.remove('active');
+        tab.style.display = 'none';
+      }
+    });
+  } else {
+    sessionStorage.setItem('user_selected_booking_tab', 'tab-my-bookings');
+    document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
+      if (btn.getAttribute('data-tab') === 'tab-pending-approvals') {
+        btn.classList.add('hidden');
+        btn.style.display = 'none';
+        btn.classList.remove('active');
+      } else if (btn.getAttribute('data-tab') === 'tab-my-bookings') {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    document.querySelectorAll('#view-bookings .tab-content').forEach(tab => {
+      if (tab.id === 'tab-my-bookings') {
+        tab.classList.add('active');
+        tab.style.removeProperty('display');
+      } else {
+        tab.classList.remove('active');
+        tab.style.display = 'none';
+      }
+    });
+  }
 
   renderBookingsLists(); 
   showView('bookings');
@@ -2269,19 +2295,37 @@ function renderBookingsLists() {
   const myBkgTab = document.getElementById('tab-my-bookings');
   const allHistoryTab = document.getElementById('tab-all-history');
 
-  const isRequester = currentUser && currentUser.role === 'requester' && (!currentUser.canApprove || currentUser.canApprove.length === 0);
+  const isApproverUser = currentUser && Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0;
 
-  if (isRequester) {
-    if (pendingTabBtn) pendingTabBtn.classList.add('hidden');
-    if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
-    if (pendingTabBtn) pendingTabBtn.classList.remove('active');
-    if (allHistoryTabBtn) allHistoryTabBtn.classList.remove('active');
+  if (!isApproverUser) {
+    // 🎯 L0 / Non-approver: Hide "งานรออนุมัติจากคุณ" tab completely!
+    if (pendingTabBtn) {
+      pendingTabBtn.classList.add('hidden');
+      pendingTabBtn.style.display = 'none';
+      pendingTabBtn.classList.remove('active');
+    }
+    if (pendingTab) {
+      pendingTab.classList.remove('active');
+      pendingTab.style.display = 'none';
+    }
 
-    if (myBkgTab) { myBkgTab.classList.add('active'); myBkgTab.style.display = 'block'; }
-    if (pendingTab) { pendingTab.classList.remove('active'); pendingTab.style.display = 'none'; }
-    if (allHistoryTab) { allHistoryTab.classList.remove('active'); allHistoryTab.style.display = 'none'; }
+    const userActiveTab = sessionStorage.getItem('user_selected_booking_tab') || 'tab-my-bookings';
+    if (userActiveTab === 'tab-all-history') {
+      if (allHistoryTabBtn) allHistoryTabBtn.classList.add('active');
+      if (myBkgTabBtn) myBkgTabBtn.classList.remove('active');
+      if (allHistoryTab) { allHistoryTab.classList.add('active'); allHistoryTab.style.removeProperty('display'); }
+      if (myBkgTab) { myBkgTab.classList.remove('active'); myBkgTab.style.display = 'none'; }
+    } else {
+      if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
+      if (allHistoryTabBtn) allHistoryTabBtn.classList.remove('active');
+      if (myBkgTab) { myBkgTab.classList.add('active'); myBkgTab.style.removeProperty('display'); }
+      if (allHistoryTab) { allHistoryTab.classList.remove('active'); allHistoryTab.style.display = 'none'; }
+    }
   } else {
-    if (pendingTabBtn) pendingTabBtn.classList.remove('hidden');
+    if (pendingTabBtn) {
+      pendingTabBtn.classList.remove('hidden');
+      pendingTabBtn.style.removeProperty('display');
+    }
 
     // For Approvers (L1, L2, L3, L4): Default to Tab 2 "งานรออนุมัติจากคุณ" unless user clicked Tab 3 "ประวัติทั้งหมด" or Tab 1 "รายการที่ฉันขอ"
     const userActiveTab = sessionStorage.getItem('user_selected_booking_tab') || 'tab-pending-approvals';
