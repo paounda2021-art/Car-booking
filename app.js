@@ -2264,7 +2264,13 @@ function renderBookingsLists() {
   const myBkgTab = document.getElementById('tab-my-bookings');
   const allHistoryTab = document.getElementById('tab-all-history');
 
-  const isApproverUser = currentUser && Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0;
+  const isApproverUser = currentUser && (
+    (Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0) ||
+    userHasApproveLevel(currentUser, 1) ||
+    userHasApproveLevel(currentUser, 2) ||
+    userHasApproveLevel(currentUser, 3) ||
+    userHasApproveLevel(currentUser, 4)
+  );
 
   if (!isApproverUser) {
     // 🎯 L0 / Non-approver: Hide "งานรออนุมัติจากคุณ" tab completely!

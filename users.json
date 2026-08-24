@@ -830,10 +830,13 @@
     "position": "เจ้าหน้าที่ธุรการ",
     "department1": "ฝบง.",
     "department2": "สพด.",
-    "role": "admin",
+    "role": "fleet_admin",
     "manager_email": "saisunee.p@fishmarket.co.th",
     "sign": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGcAAAA0CAYAAACXWyagAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAANdSURBVHhe7dftT1NnGAZw/5NlWWKcW5hDFze2maAoESsoZkJDe9oCQ1AKrkBbalt6rLxNaE9bKyLKa8UDJSJIKWWbgRmN8Q2zub/nWiizW8s5UD6YkfT6fTp97vv5cj09uZ+zZw8REREREREREREREREREe1itSYnMtdoF7gZjuHjj4qwsvonD+hDELtHYKxzo8pohVaw4HRZLXRCW1Zh79t/FmfK2zE6Hs+qn7LU7g7gq2/PQewe2xRsa1sIscWXm9b/y1DjxsXGIGZm/0Dg5syWvbQDdQ1ODNyOqgYqT69CCkyq1vukKRR8r0vW5+OvIYVl1d5MT56s4efeQNb9OcPc5IXdHtw2mNm55/D5I4p9PukO8g6exOLyX6n69cCIYm+me5EFNDfxArGJqcaJiUgiFUztj6JqSH39Udy69VCx/t2REsQTz9JqQyPqb+F7drsEoym7WZYzlhIvUalrT4UyN/capaUWHDp8Pi2oMz/UY98XR2FuuQ6dfmf/7uHR2Jb9NpsfnZ13t+zJSfWXfKlQqrQemAzXkr+93RFMz75KPmvKG3F34pfk88nSSygo2Jgn2ZiPvYPe6FXsX1p6C5PJhenob4r1nKYXXOjqeYDCogvY+2kJXM7hVEgO9yCGx5+jtNyG6OyL1Lo/NAPNqYtpYS4/foGaujZoyqpRpbsMzWkT8vNLkpeCDu8UPs8T0Ng0kNyzsPg0tVenv4L5+Tc8mEwV2svo98uoqGxF0XETRsf/nTfrHO4hfJZXAXNzeFN48tTGW7ROFAdhbe/DQjx9zrx3rtINTVkXBONgsv7J3rMYGPwdP7WGIcsrintyWmfXEEbGlrcMRjDaYKhWvxR099xBQ4OIxPKaas86b48Mh+shCk94UFwiovCYFV/mGxEO88NUkUFv2TYYq31j9iixtPSg3zeuWs8UDC/hwEEBPimBrwuM8IjZXa1zkrYyfWbsxIV6FyL31d+64MCQYk0KblynozOrinX6R4fbhw7P9h+bmYRqs+qe89p6tDiuqtZpB+7df4Te3hDkqQfbBjoxGYPZ0qnYdyM0hqZm5asyfWCTcgxWRygt/Piva3B2SBA9Eg/l/zT3aAXHiwUcK67G0RMGHPqmDDann4dCREREREREREREREREu9LfkySvFyec6XoAAAAASUVORK5CYII=",
-    "customApprovalLevels": null
+    "customApprovalLevels": null,
+    "canApprove": [
+      2
+    ]
   },
   {
     "employee_id": "07170106",
