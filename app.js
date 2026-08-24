@@ -2175,9 +2175,9 @@ function helperCreateTableRow(b, isPendingForMe) {
   const actionBtnText = isPendingForMe ? '✍️ พิจารณา' : '👁️ ดูรายละเอียด';
   const actionBtnClass = isPendingForMe ? 'btn-warning' : 'btn-primary';
   
-  const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
-  const printBtn = (b.status === 'approved' && isAdmin)
-    ? `<button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
+  const isApprovedBooking = (b.status === 'approved' || b.status === 'completed');
+  const printBtn = isApprovedBooking
+    ? `<button class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: #10b981; color: white; border-color: #10b981; font-weight: bold;" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
     : '';
 
   let stepsDots = '';
@@ -2232,23 +2232,20 @@ function helperCreateTableRow(b, isPendingForMe) {
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
   // 🎯 Show export button ONLY for L2, L3, and L4 users
-  const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
-  const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
-  const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
-  const hasExportPermission = currentUser && (isL2 || isL3 || isL4);
-
-  ['btn-export-csv', 'btn-export-csv-history'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) {
-      if (hasExportPermission) {
-        btn.classList.remove('hidden');
-        btn.style.display = 'inline-flex';
-      } else {
-        btn.classList.add('hidden');
-        btn.style.display = 'none';
-      }
+  const exportBtn = document.getElementById('btn-export-csv');
+  if (exportBtn) {
+    const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
+    const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
+    const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
+    const hasExportPermission = currentUser && (isL2 || isL3 || isL4);
+    if (hasExportPermission) {
+      exportBtn.classList.remove('hidden');
+      exportBtn.style.display = 'inline-flex';
+    } else {
+      exportBtn.classList.add('hidden');
+      exportBtn.style.display = 'none';
     }
-  });
+  }
 
   // Force card view layout
   bookingViewLayout = 'card';
@@ -2382,9 +2379,9 @@ function renderBookingsLists() {
     const actionBtnText = isPendingForMe ? '✍️ พิจารณาตรวจอนุมัติ' : '👁️ ดูรายละเอียด';
     const actionBtnClass = isPendingForMe ? 'btn-warning' : 'btn-primary';
     
-    const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
-    const printBtn = (b.status === 'approved' && isAdmin)
-      ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
+    const isApprovedBooking = (b.status === 'approved' || b.status === 'completed');
+    const printBtn = isApprovedBooking
+      ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openReportView('${b.id}')" style="background: #10b981; color: white; border-color: #10b981; font-weight: bold; padding: 0.35rem 0.65rem;">🖨️ ออกรายงาน</button>`
       : '';
 
     let stepsDots = '';
