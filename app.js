@@ -4764,14 +4764,27 @@ function buildReportHTMLContent(b) {
 }
 
 function openReportView(bookingId) {
-  const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
-  if (!isAdmin) {
-    showToast("ขออภัย! สิทธิ์การเข้าถึงรายงานเบิกจ่ายเฉพาะผู้ดูแลระบบและผู้อนุมัติฝ่ายยานพาหนะเท่านั้น", "error");
-    return;
-  }
-  
+  const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
+  const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
+  const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
+  const isApproverOrAdmin = currentUser && (
+    isL2 || isL3 || isL4 ||
+    currentUser.role === 'admin' ||
+    currentUser.role === 'fleet_admin' ||
+    currentUser.role === 'supervisor' ||
+    currentUser.role === 'director' ||
+    currentUser.role === 'executive' ||
+    (Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0)
+  );
+
   const b = bookings.find(x => x.id === bookingId);
   if (!b) return;
+
+  const isMyRequest = checkIsMyRequest(b, currentUser);
+  if (!isApproverOrAdmin && !isMyRequest) {
+    showToast("ขออภัย! สิทธิ์การเข้าถึงรายงานเบิกจ่ายเฉพาะผู้ดูแลระบบ ผู้อนุมัติ และผู้ขออนุญาตเท่านั้น", "error");
+    return;
+  }
 
   if (b.status !== 'approved') {
     showToast("ขออภัย! สามารถออกรายงานได้เฉพาะรายการจองที่อนุมัติเบิกจ่ายเสร็จสมบูรณ์แล้วเท่านั้น", "warning");
