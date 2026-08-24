@@ -11462,15 +11462,15 @@
     "startDate": "2026-08-26T13:00",
     "endDate": "2026-08-26T16:30",
     "trips": 2,
-    "travelType": "public_car",
+    "travelType": "fmo_car",
     "carId": "",
     "distance": 0,
     "price": 0,
     "goCheck": true,
     "backCheck": true,
     "status": "pending",
-    "currentApprovalLevel": 1,
-    "driverName": "-",
+    "currentApprovalLevel": 2,
+    "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
     "signatures": [
@@ -11519,7 +11519,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false
   },
@@ -11548,15 +11548,15 @@
     "startDate": "2026-09-02T13:00",
     "endDate": "2026-09-02T16:30",
     "trips": 2,
-    "travelType": "public_car",
+    "travelType": "fmo_car",
     "carId": "",
     "distance": 0,
     "price": 0,
     "goCheck": true,
     "backCheck": true,
     "status": "pending",
-    "currentApprovalLevel": 1,
-    "driverName": "-",
+    "currentApprovalLevel": 2,
+    "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
     "signatures": [
@@ -11605,7 +11605,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false
   },
@@ -11634,15 +11634,15 @@
     "startDate": "2026-09-09T13:00",
     "endDate": "2026-09-09T16:30",
     "trips": 2,
-    "travelType": "public_car",
+    "travelType": "fmo_car",
     "carId": "",
     "distance": 0,
     "price": 0,
     "goCheck": true,
     "backCheck": true,
     "status": "pending",
-    "currentApprovalLevel": 1,
-    "driverName": "-",
+    "currentApprovalLevel": 2,
+    "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
     "signatures": [
@@ -11691,7 +11691,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false
   },
@@ -11720,15 +11720,15 @@
     "startDate": "2026-09-16T13:00",
     "endDate": "2026-09-16T16:30",
     "trips": 2,
-    "travelType": "public_car",
+    "travelType": "fmo_car",
     "carId": "",
     "distance": 0,
     "price": 0,
     "goCheck": true,
     "backCheck": true,
     "status": "pending",
-    "currentApprovalLevel": 1,
-    "driverName": "-",
+    "currentApprovalLevel": 2,
+    "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
     "signatures": [
@@ -11777,7 +11777,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false
   },
@@ -11806,15 +11806,15 @@
     "startDate": "2026-09-23T13:00",
     "endDate": "2026-09-23T16:30",
     "trips": 2,
-    "travelType": "public_car",
+    "travelType": "fmo_car",
     "carId": "",
     "distance": 0,
     "price": 0,
     "goCheck": true,
     "backCheck": true,
     "status": "pending",
-    "currentApprovalLevel": 1,
-    "driverName": "-",
+    "currentApprovalLevel": 2,
+    "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
     "signatures": [
@@ -11863,7 +11863,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false
   },
@@ -12150,15 +12150,15 @@
     "startDate": "2026-08-19T14:30",
     "endDate": "2026-08-19T16:30",
     "trips": 2,
-    "travelType": "public_car",
+    "travelType": "fmo_car",
     "carId": "",
     "distance": 0,
     "price": 0,
     "goCheck": true,
     "backCheck": true,
     "status": "pending",
-    "currentApprovalLevel": 1,
-    "driverName": "-",
+    "currentApprovalLevel": 2,
+    "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
     "signatures": [
@@ -12207,7 +12207,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false
   },
@@ -12322,15 +12322,15 @@
     "startDate": "2026-08-19T14:30",
     "endDate": "2026-08-19T16:30",
     "trips": 2,
-    "travelType": "public_car",
+    "travelType": "fmo_car",
     "carId": "",
     "distance": 0,
     "price": 0,
     "goCheck": true,
     "backCheck": true,
     "status": "pending",
-    "currentApprovalLevel": 1,
-    "driverName": "-",
+    "currentApprovalLevel": 2,
+    "driverName": "",
     "returnedEarly": false,
     "driverAccepted": false,
     "signatures": [
@@ -12379,7 +12379,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false
   },
