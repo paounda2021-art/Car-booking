@@ -2175,8 +2175,18 @@ function helperCreateTableRow(b, isPendingForMe) {
   const actionBtnText = isPendingForMe ? '✍️ พิจารณา' : '👁️ ดูรายละเอียด';
   const actionBtnClass = isPendingForMe ? 'btn-warning' : 'btn-primary';
   
+  const isL2L3L4User = currentUser && (
+    userHasApproveLevel(currentUser, 2) ||
+    userHasApproveLevel(currentUser, 3) ||
+    userHasApproveLevel(currentUser, 4) ||
+    currentUser.role === 'fleet_admin' ||
+    currentUser.role === 'admin' ||
+    currentUser.role === 'director' ||
+    currentUser.role === 'executive' ||
+    ['chalong.c', 'sakda.a', 'panadon.p', 'saisunee.p', 'piyawan.k', 'sarena.m'].includes((currentUser.username || '').toLowerCase())
+  );
   const isApprovedBooking = (b.status === 'approved' || b.status === 'completed');
-  const printBtn = isApprovedBooking
+  const printBtn = (isApprovedBooking && isL2L3L4User)
     ? `<button class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: #10b981; color: white; border-color: #10b981; font-weight: bold;" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
     : '';
 
@@ -2379,8 +2389,18 @@ function renderBookingsLists() {
     const actionBtnText = isPendingForMe ? '✍️ พิจารณาตรวจอนุมัติ' : '👁️ ดูรายละเอียด';
     const actionBtnClass = isPendingForMe ? 'btn-warning' : 'btn-primary';
     
+    const isL2L3L4User = currentUser && (
+      userHasApproveLevel(currentUser, 2) ||
+      userHasApproveLevel(currentUser, 3) ||
+      userHasApproveLevel(currentUser, 4) ||
+      currentUser.role === 'fleet_admin' ||
+      currentUser.role === 'admin' ||
+      currentUser.role === 'director' ||
+      currentUser.role === 'executive' ||
+      ['chalong.c', 'sakda.a', 'panadon.p', 'saisunee.p', 'piyawan.k', 'sarena.m'].includes((currentUser.username || '').toLowerCase())
+    );
     const isApprovedBooking = (b.status === 'approved' || b.status === 'completed');
-    const printBtn = isApprovedBooking
+    const printBtn = (isApprovedBooking && isL2L3L4User)
       ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openReportView('${b.id}')" style="background: #10b981; color: white; border-color: #10b981; font-weight: bold; padding: 0.35rem 0.65rem;">🖨️ ออกรายงาน</button>`
       : '';
 
@@ -4767,24 +4787,15 @@ function openReportView(bookingId) {
   const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
   const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
   const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
-  const isApproverOrAdmin = currentUser && (
-    isL2 || isL3 || isL4 ||
-    currentUser.role === 'admin' ||
-    currentUser.role === 'fleet_admin' ||
-    currentUser.role === 'supervisor' ||
-    currentUser.role === 'director' ||
-    currentUser.role === 'executive' ||
-    (Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0)
-  );
+  const isL2L3L4 = currentUser && (isL2 || isL3 || isL4);
+
+  if (!isL2L3L4) {
+    showToast("ขออภัย! สิทธิ์การเข้าถึงรายงานเบิกจ่ายเฉพาะผู้อนุมัติระดับ L2, L3 และ L4 เท่านั้น", "error");
+    return;
+  }
 
   const b = bookings.find(x => x.id === bookingId);
   if (!b) return;
-
-  const isMyRequest = checkIsMyRequest(b, currentUser);
-  if (!isApproverOrAdmin && !isMyRequest) {
-    showToast("ขออภัย! สิทธิ์การเข้าถึงรายงานเบิกจ่ายเฉพาะผู้ดูแลระบบ ผู้อนุมัติ และผู้ขออนุญาตเท่านั้น", "error");
-    return;
-  }
 
   if (b.status !== 'approved') {
     showToast("ขออภัย! สามารถออกรายงานได้เฉพาะรายการจองที่อนุมัติเบิกจ่ายเสร็จสมบูรณ์แล้วเท่านั้น", "warning");
