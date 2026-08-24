@@ -2914,7 +2914,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false,
     "createdAt": "2026-07-23T04:42:39.215Z"
@@ -3172,7 +3172,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false,
     "createdAt": "2026-07-23T05:19:37.439Z"
@@ -7042,7 +7042,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false,
     "createdAt": "2026-08-06T07:03:28.716Z"
@@ -9535,7 +9535,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false,
     "createdAt": "2026-08-13T04:30:37.804Z"
@@ -12716,7 +12716,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false,
     "createdAt": "2026-08-19T09:25:08.665Z"
@@ -13146,7 +13146,7 @@
         "signature": ""
       }
     ],
-    "waitingForRequesterInput": true,
+    "waitingForRequesterInput": false,
     "taxiInfo": {},
     "active": false,
     "createdAt": "2026-08-20T03:48:40.302Z"
