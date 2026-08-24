@@ -2269,21 +2269,14 @@ function helperCreateTableRow(b, isPendingForMe) {
 
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
-  // Show export button for approvers, L2 (fleet_admin/admin), and managers
+  // 🎯 Show export button ONLY for L2, L3, and L4 users
   const exportBtn = document.getElementById('btn-export-csv');
   if (exportBtn) {
-    const hasExportPermission = currentUser && (
-      currentUser.role === 'fleet_admin' ||
-      currentUser.role === 'admin' ||
-      currentUser.role === 'supervisor' ||
-      currentUser.role === 'director' ||
-      currentUser.role === 'executive' ||
-      (Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0) ||
-      userHasApproveLevel(currentUser, 1) ||
-      userHasApproveLevel(currentUser, 2) ||
-      userHasApproveLevel(currentUser, 3) ||
-      userHasApproveLevel(currentUser, 4)
-    );
+    const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
+    const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
+    const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
+
+    const hasExportPermission = currentUser && (isL2 || isL3 || isL4);
     if (hasExportPermission) {
       exportBtn.classList.remove('hidden');
       exportBtn.style.display = 'inline-flex';
@@ -2927,20 +2920,27 @@ function renderMonthCalendar() {
         const badge = document.createElement('div');
         let badgeClass = 'calendar-event-badge';
         const statusStr = String(b.status || '');
-        if (statusStr === 'approved') badgeClass += ' approved';
-        else if (statusStr === 'pending' || statusStr.startsWith('pending')) badgeClass += ' pending';
+        if (statusStr === 'approved') {
+          badgeClass += ' approved';
+        } else if (b.waitingForRequesterInput || statusStr === 'waiting_for_requester_edit' || statusStr === 'waiting_taxi_amount') {
+          badgeClass += ' waiting-edit';
+        } else if (statusStr === 'pending' || statusStr.startsWith('pending')) {
+          badgeClass += ' pending';
+        }
 
         badge.className = badgeClass;
         badge.setAttribute('data-booking-id', b.id);
         
         let icon = '🚗';
-        if (b.travelType === 'public_car') icon = '🚐';
-        else {
+        if (b.travelType === 'public_car' || b.carId === 'taxi') {
+          icon = '🚕';
+        } else {
           const c = cars.find(car => car.id === b.carId);
           if (c) icon = c.icon;
         }
 
-        badge.innerHTML = `<span>${icon} ${b.purpose}</span>`;
+        const displayPurpose = b.purpose || '(ไม่ระบุเรื่อง)';
+        badge.innerHTML = `<span>${icon} ${displayPurpose}</span>`;
         const startT = formatThaiTimeOnly(b.startDate);
         const endT = formatThaiTimeOnly(b.endDate);
         const startD = new Date(b.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });

@@ -1546,6 +1546,10 @@ body {
   background: var(--warning);
 }
 
+.calendar-event-badge.waiting-edit {
+  background: #ef4444;
+}
+
 .calendar-event-badge.approved {
   background: var(--primary);
 }
