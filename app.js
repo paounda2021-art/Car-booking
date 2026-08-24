@@ -1809,18 +1809,15 @@ function updateStats() {
   const availCount = cars.filter(c => !busyCarIds.includes(c.id)).length;
   if (statAvailCars) statAvailCars.textContent = `${availCount} คัน`;
 
-  // 1. ดึงระดับการอนุมัติที่เลือกจาก Dropdown ปัจจุบัน (ค่าเริ่มต้นคือ 'all')
-  const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+  // 1. คำนวณจำนวนรายการที่รออนุมัติจริงตามสิทธิ์ผู้ใช้ (สำหรับตัวเลขบนแท็บและกระดิ่งแจ้งเตือน)
   let pendingCount = 0;
 
   if (currentUser) {
     bookings.forEach(b => {
       // ตรวจสอบว่า เป็นการร้องขอยกเลิกของ L2 หรือไม่
       const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser.canApprove && currentUser.canApprove.includes(2);
-      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel || (b.status === 'cancellation_requested' && activeLevel === 'all'));
 
       if ((b.status.startsWith('pending') || isCancellationRequestForL2) && !b.waitingForRequesterInput) {
-        
         // ตรวจสอบว่า งานเลเวลนี้ (b.currentApprovalLevel) อยู่ในสิทธิ์ที่ User คนนี้อนุมัติได้จริงไหม
         const canApproveThisLevel = userHasApproveLevel(currentUser, b.currentApprovalLevel) || isCancellationRequestForL2;
         
@@ -1829,18 +1826,18 @@ function updateStats() {
           (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
         );
 
-        if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
+        if (canApproveThisLevel && !alreadySigned) {
           // เงื่อนไขคัดกรองพิเศษเพิ่มเติมสำหรับระดับ L1 (Supervisor)
           if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
             const mEmail = resolveManagerEmail(b).toLowerCase();
             const cEmail = (currentUser.email || '').toLowerCase();
             const isL1ByEmail = mEmail && mEmail === cEmail;
-            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && (currentUser.username || '').toLowerCase() === 'prathum.c';
             if (isL1ByEmail || isL1Fallback) {
               pendingCount++;
             }
           } 
-          // เงื่อนไขสำหรับระดับ L2, L3, L4 (ยึดตาม Dropdown ที่เลือกได้ทันที)
+          // เงื่อนไขสำหรับระดับ L2, L3, L4 (รวมนับรายการรออนุมัติทั้งหมด)
           else {
             pendingCount++;
           }
@@ -1858,8 +1855,7 @@ function updateStats() {
   if (pendingBadge) pendingBadge.textContent = pendingCount;
   if (tabPendingBadge) tabPendingBadge.textContent = pendingCount;
 
-  // 3. เพิ่มการอัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่ง
-  // 🔔 แสดงตัวเลขแจ้งเตือนงานรออนุมัติ (pendingCount) ที่กระดิ่ง เป็นอันดับแรก
+  // 3. 🔔 อัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่งแจ้งเตือน (Top Bar)
   const emailBadge = document.getElementById('email-inbox-badge') || document.querySelector('.notification-badge');
   if (emailBadge) {
     const activeLogs = getActiveEmailLogs();
@@ -2481,10 +2477,8 @@ function renderBookingsLists() {
     const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
     
     if ((b.status.startsWith('pending') || isCancellationRequestForL2) && currentUser && !b.waitingForRequesterInput) {
-      const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
       const lvl = b.currentApprovalLevel;
       const canApproveThisLevel = userHasApproveLevel(currentUser, lvl) || isCancellationRequestForL2;
-      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === lvl || (b.status === 'cancellation_requested' && activeLevel === 'all'));
 
       // 🎯 ตรวจสอบว่า user คนนี้ได้อนุมัติใบนี้ไปแล้วหรือยัง (ถ้าอนุมัติแล้ว ไม่ต้องแสดงในคิวรออนุมัติ)
       const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
@@ -2492,13 +2486,13 @@ function renderBookingsLists() {
         (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
       );
 
-      if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
+      if (canApproveThisLevel && !alreadySigned) {
         if (lvl === 1 && b.status !== 'cancellation_requested') {
           // L1: แสดงเฉพาะงานที่ส่งถึง Manager ท่านนี้ตามอีเมล หรือ Prathum fallback
           const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
           const isL1ByEmail = mEmail && mEmail === cEmail;
-          const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+          const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && (currentUser.username || '').toLowerCase() === 'prathum.c';
           if (isL1ByEmail || isL1Fallback) {
             isPendingForMe = true;
           }
