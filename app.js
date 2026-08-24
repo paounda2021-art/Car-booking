@@ -2269,18 +2269,27 @@ function helperCreateTableRow(b, isPendingForMe) {
 
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
-  // Show export button for L2 (fleet_admin) and Ms. Saisunee
+  // Show export button for approvers, L2 (fleet_admin/admin), and managers
   const exportBtn = document.getElementById('btn-export-csv');
   if (exportBtn) {
     const hasExportPermission = currentUser && (
       currentUser.role === 'fleet_admin' ||
-      (currentUser.email && currentUser.email.toLowerCase() === 'saisunee.p@fishmarket.co.th') ||
-      (currentUser.username && currentUser.username.toLowerCase() === 'saisunee.p')
+      currentUser.role === 'admin' ||
+      currentUser.role === 'supervisor' ||
+      currentUser.role === 'director' ||
+      currentUser.role === 'executive' ||
+      (Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0) ||
+      userHasApproveLevel(currentUser, 1) ||
+      userHasApproveLevel(currentUser, 2) ||
+      userHasApproveLevel(currentUser, 3) ||
+      userHasApproveLevel(currentUser, 4)
     );
     if (hasExportPermission) {
       exportBtn.classList.remove('hidden');
+      exportBtn.style.display = 'inline-flex';
     } else {
       exportBtn.classList.add('hidden');
+      exportBtn.style.display = 'none';
     }
   }
 
