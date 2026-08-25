@@ -1,6 +1,9 @@
-const fs = require('fs');
-const path = require('path');
-const puppeteer = require('puppeteer');
+let puppeteer = null;
+try {
+  puppeteer = require('puppeteer');
+} catch (e) {
+  console.warn('[PDF Module] Puppeteer module not installed in node_modules.');
+}
 
 const ROOT_DIR = __dirname;
 
@@ -809,6 +812,9 @@ function buildReportHTMLContent(b, usersList, carsList) {
 let sharedBrowser = null;
 
 async function getSharedBrowser() {
+  if (!puppeteer) {
+    throw new Error('Puppeteer is not installed in local environment.');
+  }
   if (sharedBrowser && sharedBrowser.isConnected()) {
     return sharedBrowser;
   }

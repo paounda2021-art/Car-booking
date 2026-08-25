@@ -741,72 +741,29 @@ async function initDatabase() {
         // Filter out system config and test mock IDs safely without wiping real data
         dbBookings = dbBookings.filter(b => b && b.id && b.id !== 'system_config' && !b.id.startsWith('BKG-FMO-00'));
 
-        // Merge with local storage bookings to ensure newly updated/approved local bookings are not lost during network/cache delays
-        const localDataStr = localStorage.getItem('bookings_data');
-        if (localDataStr) {
-          try {
-            const localBookings = JSON.parse(localDataStr);
-            if (Array.isArray(localBookings)) {
-              let hasMergedNew = false;
-              localBookings.forEach(localB => {
-                if (!localB || !localB.id || localB.id === 'system_config') return;
-                const existingIdx = dbBookings.findIndex(dbB => dbB.id === localB.id);
-                if (existingIdx === -1) {
-                  dbBookings.push(localB);
-                  hasMergedNew = true;
-                } else {
-                  const dbB = dbBookings[existingIdx];
-                  const localLevel = localB.currentApprovalLevel || 1;
-                  const dbLevel = dbB.currentApprovalLevel || 1;
-                  const localCompleted = (localB.status === 'approved' || localB.status === 'rejected' || localB.status === 'cancelled');
-                  const dbCompleted = (dbB.status === 'approved' || dbB.status === 'rejected' || dbB.status === 'cancelled');
-                  
-                  if (localCompleted && !dbCompleted) {
-                    dbBookings[existingIdx] = localB;
-                    hasMergedNew = true;
-                  } else if (localLevel > dbLevel) {
-                    dbBookings[existingIdx] = localB;
-                    hasMergedNew = true;
-                  } else if (Array.isArray(localB.signatures) && Array.isArray(dbB.signatures)) {
-                    const localSigned = localB.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length;
-                    const dbSigned = dbB.signatures.filter(s => s && (s.status === 'approved' || s.status === 'rejected')).length;
-                    if (localSigned > dbSigned) {
-                      dbBookings[existingIdx] = localB;
-                      hasMergedNew = true;
-                    }
-                  }
-                }
-              });
-              if (hasMergedNew) {
-                console.log("🛡️ Safely merged updated local approval states into fetched database!");
-              }
-            }
-          } catch(e) {}
-        }
+        // Always clear stale localStorage cache and prioritize server database as source of truth
+        try {
+          localStorage.removeItem('bookings_data');
+        } catch(e) {}
 
         dbBookings = deduplicateBookings(dbBookings);
         bookings = dbBookings;
         dbBookingsLoaded = true;
 
         try {
-          localStorage.setItem('bookings_data', JSON.stringify(dbBookings));
-        } catch (err) {
-          console.warn("⚠️ LocalStorage quota exceeded during initDatabase. Saving optimized cache...", err);
-          try {
-            const optimizedBookings = dbBookings.map(b => {
-              if (!b.signatures || !Array.isArray(b.signatures)) return b;
-              const cleanSigs = b.signatures.map(s => {
-                if (s.signature && s.signature.length > 500) {
-                  return { ...s, signature: 'db_ref' };
-                }
-                return s;
-              });
-              return { ...b, signatures: cleanSigs };
+          const optimizedBookings = dbBookings.map(b => {
+            if (!b || !b.signatures || !Array.isArray(b.signatures)) return b;
+            const cleanSigs = b.signatures.map(s => {
+              if (s && s.signature && s.signature.length > 500) {
+                return { ...s, signature: 'db_ref' };
+              }
+              return s;
             });
-            localStorage.setItem('bookings_data', JSON.stringify(optimizedBookings));
-          } catch (e2) {
-            console.warn("⚠️ LocalStorage full, skipping local cache.", e2);
-          }
+            return { ...b, signatures: cleanSigs };
+          });
+          localStorage.setItem('bookings_data', JSON.stringify(optimizedBookings));
+        } catch (err) {
+          console.warn("⚠️ LocalStorage full, skipping local cache.", err);
         }
       }
     }
@@ -1480,27 +1437,53 @@ function loginUser(userObj) {
   renderDashboard();
   renderMonthCalendar();
 
-  // 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ (แท็บงานรออนุมัติจากคุณ) เสมอเมื่อเข้าสู่ระบบ
+  // 🟢 11. บังคับเข้าสู่หน้ารายการจอง & อนุมัติ เสมอเมื่อเข้าสู่ระบบ
   localStorage.setItem('current_active_view', 'bookings');
-  sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
+  const isApproverUser = currentUser && Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0;
 
-  // 🎯 บังคับปรับปุ่มและเนื้อหาแท็บ 'งานรออนุมัติจากคุณ' ให้ Active ทันที
-  document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
-    if (btn.getAttribute('data-tab') === 'tab-pending-approvals') {
-      btn.classList.add('active');
-    } else {
-      btn.classList.remove('active');
-    }
-  });
-  document.querySelectorAll('#view-bookings .tab-content').forEach(tab => {
-    if (tab.id === 'tab-pending-approvals') {
-      tab.classList.add('active');
-      tab.style.removeProperty('display');
-    } else {
-      tab.classList.remove('active');
-      tab.style.display = 'none';
-    }
-  });
+  if (isApproverUser) {
+    sessionStorage.setItem('user_selected_booking_tab', 'tab-pending-approvals');
+    document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
+      if (btn.getAttribute('data-tab') === 'tab-pending-approvals') {
+        btn.classList.remove('hidden');
+        btn.style.removeProperty('display');
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    document.querySelectorAll('#view-bookings .tab-content').forEach(tab => {
+      if (tab.id === 'tab-pending-approvals') {
+        tab.classList.add('active');
+        tab.style.removeProperty('display');
+      } else {
+        tab.classList.remove('active');
+        tab.style.display = 'none';
+      }
+    });
+  } else {
+    sessionStorage.setItem('user_selected_booking_tab', 'tab-my-bookings');
+    document.querySelectorAll('#view-bookings .tab-btn').forEach(btn => {
+      if (btn.getAttribute('data-tab') === 'tab-pending-approvals') {
+        btn.classList.add('hidden');
+        btn.style.display = 'none';
+        btn.classList.remove('active');
+      } else if (btn.getAttribute('data-tab') === 'tab-my-bookings') {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    document.querySelectorAll('#view-bookings .tab-content').forEach(tab => {
+      if (tab.id === 'tab-my-bookings') {
+        tab.classList.add('active');
+        tab.style.removeProperty('display');
+      } else {
+        tab.classList.remove('active');
+        tab.style.display = 'none';
+      }
+    });
+  }
 
   renderBookingsLists(); 
   showView('bookings');
@@ -1835,18 +1818,15 @@ function updateStats() {
   const availCount = cars.filter(c => !busyCarIds.includes(c.id)).length;
   if (statAvailCars) statAvailCars.textContent = `${availCount} คัน`;
 
-  // 1. ดึงระดับการอนุมัติที่เลือกจาก Dropdown ปัจจุบัน (ค่าเริ่มต้นคือ 'all')
-  const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+  // 1. คำนวณจำนวนรายการที่รออนุมัติจริงตามสิทธิ์ผู้ใช้ (สำหรับตัวเลขบนแท็บและกระดิ่งแจ้งเตือน)
   let pendingCount = 0;
 
   if (currentUser) {
     bookings.forEach(b => {
       // ตรวจสอบว่า เป็นการร้องขอยกเลิกของ L2 หรือไม่
       const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser.canApprove && currentUser.canApprove.includes(2);
-      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === b.currentApprovalLevel || (b.status === 'cancellation_requested' && activeLevel === 'all'));
 
       if ((b.status.startsWith('pending') || isCancellationRequestForL2) && !b.waitingForRequesterInput) {
-        
         // ตรวจสอบว่า งานเลเวลนี้ (b.currentApprovalLevel) อยู่ในสิทธิ์ที่ User คนนี้อนุมัติได้จริงไหม
         const canApproveThisLevel = userHasApproveLevel(currentUser, b.currentApprovalLevel) || isCancellationRequestForL2;
         
@@ -1855,18 +1835,18 @@ function updateStats() {
           (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
         );
 
-        if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
+        if (canApproveThisLevel && !alreadySigned) {
           // เงื่อนไขคัดกรองพิเศษเพิ่มเติมสำหรับระดับ L1 (Supervisor)
           if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
             const mEmail = resolveManagerEmail(b).toLowerCase();
             const cEmail = (currentUser.email || '').toLowerCase();
             const isL1ByEmail = mEmail && mEmail === cEmail;
-            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && (currentUser.username || '').toLowerCase() === 'prathum.c';
             if (isL1ByEmail || isL1Fallback) {
               pendingCount++;
             }
           } 
-          // เงื่อนไขสำหรับระดับ L2, L3, L4 (ยึดตาม Dropdown ที่เลือกได้ทันที)
+          // เงื่อนไขสำหรับระดับ L2, L3, L4 (รวมนับรายการรออนุมัติทั้งหมด)
           else {
             pendingCount++;
           }
@@ -1884,8 +1864,7 @@ function updateStats() {
   if (pendingBadge) pendingBadge.textContent = pendingCount;
   if (tabPendingBadge) tabPendingBadge.textContent = pendingCount;
 
-  // 3. เพิ่มการอัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่ง
-  // 🔔 แสดงตัวเลขแจ้งเตือนงานรออนุมัติ (pendingCount) ที่กระดิ่ง เป็นอันดับแรก
+  // 3. 🔔 อัปเดตตัวเลขแจ้งเตือนสีแดงที่กระดิ่งแจ้งเตือน (Top Bar)
   const emailBadge = document.getElementById('email-inbox-badge') || document.querySelector('.notification-badge');
   if (emailBadge) {
     const activeLogs = getActiveEmailLogs();
@@ -2201,9 +2180,19 @@ function helperCreateTableRow(b, isPendingForMe) {
   const actionBtnText = isPendingForMe ? '✍️ พิจารณา' : '👁️ ดูรายละเอียด';
   const actionBtnClass = isPendingForMe ? 'btn-warning' : 'btn-primary';
   
-  const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
-  const printBtn = (b.status === 'approved' && isAdmin)
-    ? `<button class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
+  const isL2L3L4User = currentUser && (
+    userHasApproveLevel(currentUser, 2) ||
+    userHasApproveLevel(currentUser, 3) ||
+    userHasApproveLevel(currentUser, 4) ||
+    currentUser.role === 'fleet_admin' ||
+    currentUser.role === 'admin' ||
+    currentUser.role === 'director' ||
+    currentUser.role === 'executive' ||
+    ['chalong.c', 'sakda.a', 'panadon.p', 'saisunee.p', 'piyawan.k', 'sarena.m'].includes((currentUser.username || '').toLowerCase())
+  );
+  const isApprovedBooking = (b.status === 'approved' || b.status === 'completed');
+  const printBtn = (isApprovedBooking && isL2L3L4User)
+    ? `<button class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: #10b981; color: white; border-color: #10b981; font-weight: bold;" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
     : '';
 
   let stepsDots = '';
@@ -2257,18 +2246,19 @@ function helperCreateTableRow(b, isPendingForMe) {
 
 // Render Bookings Lists (Tabs)
 function renderBookingsLists() {
-  // Show export button for L2 (fleet_admin) and Ms. Saisunee
+  // 🎯 Show export button ONLY for L2, L3, and L4 users
   const exportBtn = document.getElementById('btn-export-csv');
   if (exportBtn) {
-    const hasExportPermission = currentUser && (
-      currentUser.role === 'fleet_admin' ||
-      (currentUser.email && currentUser.email.toLowerCase() === 'saisunee.p@fishmarket.co.th') ||
-      (currentUser.username && currentUser.username.toLowerCase() === 'saisunee.p')
-    );
+    const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
+    const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
+    const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
+    const hasExportPermission = currentUser && (isL2 || isL3 || isL4);
     if (hasExportPermission) {
       exportBtn.classList.remove('hidden');
+      exportBtn.style.display = 'inline-flex';
     } else {
       exportBtn.classList.add('hidden');
+      exportBtn.style.display = 'none';
     }
   }
 
@@ -2283,19 +2273,43 @@ function renderBookingsLists() {
   const myBkgTab = document.getElementById('tab-my-bookings');
   const allHistoryTab = document.getElementById('tab-all-history');
 
-  const isRequester = currentUser && currentUser.role === 'requester' && (!currentUser.canApprove || currentUser.canApprove.length === 0);
+  const isApproverUser = currentUser && (
+    (Array.isArray(currentUser.canApprove) && currentUser.canApprove.length > 0) ||
+    userHasApproveLevel(currentUser, 1) ||
+    userHasApproveLevel(currentUser, 2) ||
+    userHasApproveLevel(currentUser, 3) ||
+    userHasApproveLevel(currentUser, 4)
+  );
 
-  if (isRequester) {
-    if (pendingTabBtn) pendingTabBtn.classList.add('hidden');
-    if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
-    if (pendingTabBtn) pendingTabBtn.classList.remove('active');
-    if (allHistoryTabBtn) allHistoryTabBtn.classList.remove('active');
+  if (!isApproverUser) {
+    // 🎯 L0 / Non-approver: Hide "งานรออนุมัติจากคุณ" tab completely!
+    if (pendingTabBtn) {
+      pendingTabBtn.classList.add('hidden');
+      pendingTabBtn.style.display = 'none';
+      pendingTabBtn.classList.remove('active');
+    }
+    if (pendingTab) {
+      pendingTab.classList.remove('active');
+      pendingTab.style.display = 'none';
+    }
 
-    if (myBkgTab) { myBkgTab.classList.add('active'); myBkgTab.style.display = 'block'; }
-    if (pendingTab) { pendingTab.classList.remove('active'); pendingTab.style.display = 'none'; }
-    if (allHistoryTab) { allHistoryTab.classList.remove('active'); allHistoryTab.style.display = 'none'; }
+    const userActiveTab = sessionStorage.getItem('user_selected_booking_tab') || 'tab-my-bookings';
+    if (userActiveTab === 'tab-all-history') {
+      if (allHistoryTabBtn) allHistoryTabBtn.classList.add('active');
+      if (myBkgTabBtn) myBkgTabBtn.classList.remove('active');
+      if (allHistoryTab) { allHistoryTab.classList.add('active'); allHistoryTab.style.removeProperty('display'); }
+      if (myBkgTab) { myBkgTab.classList.remove('active'); myBkgTab.style.display = 'none'; }
+    } else {
+      if (myBkgTabBtn) myBkgTabBtn.classList.add('active');
+      if (allHistoryTabBtn) allHistoryTabBtn.classList.remove('active');
+      if (myBkgTab) { myBkgTab.classList.add('active'); myBkgTab.style.removeProperty('display'); }
+      if (allHistoryTab) { allHistoryTab.classList.remove('active'); allHistoryTab.style.display = 'none'; }
+    }
   } else {
-    if (pendingTabBtn) pendingTabBtn.classList.remove('hidden');
+    if (pendingTabBtn) {
+      pendingTabBtn.classList.remove('hidden');
+      pendingTabBtn.style.removeProperty('display');
+    }
 
     // For Approvers (L1, L2, L3, L4): Default to Tab 2 "งานรออนุมัติจากคุณ" unless user clicked Tab 3 "ประวัติทั้งหมด" or Tab 1 "รายการที่ฉันขอ"
     const userActiveTab = sessionStorage.getItem('user_selected_booking_tab') || 'tab-pending-approvals';
@@ -2386,9 +2400,19 @@ function renderBookingsLists() {
     const actionBtnText = isPendingForMe ? '✍️ พิจารณาตรวจอนุมัติ' : '👁️ ดูรายละเอียด';
     const actionBtnClass = isPendingForMe ? 'btn-warning' : 'btn-primary';
     
-    const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
-    const printBtn = (b.status === 'approved' && isAdmin)
-      ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openReportView('${b.id}')">🖨️ ออกรายงาน</button>`
+    const isL2L3L4User = currentUser && (
+      userHasApproveLevel(currentUser, 2) ||
+      userHasApproveLevel(currentUser, 3) ||
+      userHasApproveLevel(currentUser, 4) ||
+      currentUser.role === 'fleet_admin' ||
+      currentUser.role === 'admin' ||
+      currentUser.role === 'director' ||
+      currentUser.role === 'executive' ||
+      ['chalong.c', 'sakda.a', 'panadon.p', 'saisunee.p', 'piyawan.k', 'sarena.m'].includes((currentUser.username || '').toLowerCase())
+    );
+    const isApprovedBooking = (b.status === 'approved' || b.status === 'completed');
+    const printBtn = (isApprovedBooking && isL2L3L4User)
+      ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openReportView('${b.id}')" style="background: #10b981; color: white; border-color: #10b981; font-weight: bold; padding: 0.35rem 0.65rem;">🖨️ ออกรายงาน</button>`
       : '';
 
     let stepsDots = '';
@@ -2468,10 +2492,8 @@ function renderBookingsLists() {
     const isCancellationRequestForL2 = (b.status === 'cancellation_requested') && currentUser && currentUser.canApprove && currentUser.canApprove.includes(2);
     
     if ((b.status.startsWith('pending') || isCancellationRequestForL2) && currentUser && !b.waitingForRequesterInput) {
-      const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
       const lvl = b.currentApprovalLevel;
       const canApproveThisLevel = userHasApproveLevel(currentUser, lvl) || isCancellationRequestForL2;
-      const isSelectedLevel = (activeLevel === 'all' || parseInt(activeLevel) === lvl || (b.status === 'cancellation_requested' && activeLevel === 'all'));
 
       // 🎯 ตรวจสอบว่า user คนนี้ได้อนุมัติใบนี้ไปแล้วหรือยัง (ถ้าอนุมัติแล้ว ไม่ต้องแสดงในคิวรออนุมัติ)
       const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
@@ -2479,13 +2501,13 @@ function renderBookingsLists() {
         (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
       );
 
-      if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
+      if (canApproveThisLevel && !alreadySigned) {
         if (lvl === 1 && b.status !== 'cancellation_requested') {
           // L1: แสดงเฉพาะงานที่ส่งถึง Manager ท่านนี้ตามอีเมล หรือ Prathum fallback
           const mEmail = resolveManagerEmail(b).toLowerCase();
           const cEmail = (currentUser.email || '').toLowerCase();
           const isL1ByEmail = mEmail && mEmail === cEmail;
-          const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
+          const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && (currentUser.username || '').toLowerCase() === 'prathum.c';
           if (isL1ByEmail || isL1Fallback) {
             isPendingForMe = true;
           }
@@ -2511,8 +2533,8 @@ function renderBookingsLists() {
     const isL4User = userHasApproveLevel(currentUser, 4);
 
     // 🎯 ตรวจสอบว่าผู้ใช้เคยลงนามอนุมัติใบจองนี้แล้วหรือยัง
-    const hasUserSigned = Array.isArray(b.signatures) && b.signatures.some(s => 
-      (s.approverName && s.approverName.includes(currentUser.name)) ||
+    const hasUserSigned = currentUser && Array.isArray(b.signatures) && b.signatures.some(s => 
+      (s.approverName && currentUser.name && s.approverName.includes(currentUser.name)) ||
       (s.status === 'approved' && s.level === 2 && isL2User) ||
       (s.status === 'approved' && s.level === 3 && isL3User) ||
       (s.status === 'approved' && s.level === 4 && isL4User)
@@ -2888,20 +2910,27 @@ function renderMonthCalendar() {
         const badge = document.createElement('div');
         let badgeClass = 'calendar-event-badge';
         const statusStr = String(b.status || '');
-        if (statusStr === 'approved') badgeClass += ' approved';
-        else if (statusStr === 'pending' || statusStr.startsWith('pending')) badgeClass += ' pending';
+        if (statusStr === 'approved') {
+          badgeClass += ' approved';
+        } else if (b.waitingForRequesterInput || statusStr === 'waiting_for_requester_edit' || statusStr === 'waiting_taxi_amount') {
+          badgeClass += ' waiting-edit';
+        } else if (statusStr === 'pending' || statusStr.startsWith('pending')) {
+          badgeClass += ' pending';
+        }
 
         badge.className = badgeClass;
         badge.setAttribute('data-booking-id', b.id);
         
         let icon = '🚗';
-        if (b.travelType === 'public_car') icon = '🚐';
-        else {
+        if (b.travelType === 'public_car' || b.carId === 'taxi') {
+          icon = '🚕';
+        } else {
           const c = cars.find(car => car.id === b.carId);
           if (c) icon = c.icon;
         }
 
-        badge.innerHTML = `<span>${icon} ${b.purpose}</span>`;
+        const displayPurpose = b.purpose || '(ไม่ระบุเรื่อง)';
+        badge.innerHTML = `<span>${icon} ${displayPurpose}</span>`;
         const startT = formatThaiTimeOnly(b.startDate);
         const endT = formatThaiTimeOnly(b.endDate);
         const startD = new Date(b.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' });
@@ -3748,7 +3777,23 @@ async function handleApprovalAction(isApproved) {
         booking.driverName = '-';
         booking.status = 'waiting_taxi_amount';
         booking.waitingForRequesterInput = true;
+        booking.status = 'pending';
+        booking.currentApprovalLevel = 1; // ย้อนกลับไปให้ L0 ระบุค่าพาหนะ แล้วเริ่มอนุมัติตามลำดับ L1 ➔ L2 ➔ L3 ➔ L4
         
+        // Reset signatures from L1 onwards
+        booking.signatures.forEach(sig => {
+          if (sig.level >= 1) {
+            sig.approverName = '';
+            sig.status = 'pending';
+            sig.comment = '';
+            sig.timestamp = '';
+            sig.signature = '';
+            if (sig.level === 2) {
+              sig.driverName = '';
+            }
+          }
+        });
+
         await saveBookings();
         document.getElementById('modal-approval').classList.remove('active');
         
@@ -3758,13 +3803,13 @@ async function handleApprovalAction(isApproved) {
         renderBookingsLists();
         renderMonthCalendar();
 
-        // Trigger email notification (L2 -> L0 TAXI Loop)
+        // Trigger email notification to L0 asking to fill vehicle fare
         const reqEmail = resolveRequesterEmail(booking);
         const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
         const body = `
           <p>เรียน คุณ ${booking.requester},</p>
           <p>ใบขออนุญาตใช้ยานพาหนะเลขที่ <strong>${booking.id}</strong> ของท่าน ได้รับความเห็นในการจัดสรรพาหนะเดินทางแบบ <strong>รถรับจ้างสาธารณะ (TAXI)</strong> เนื่องจากรถยนต์ส่วนกลางไม่ว่างปฏิบัติงานในช่วงเวลาดังกล่าว</p>
-          <p>รบกวนท่านเข้าสู่ระบบเพื่อดำเนินการกรอกข้อมูล <strong>ระยะทางประมาณการ (กิโลเมตร)</strong> และ <strong>วงเงินงบประมาณเบิกจ่ายโดยประมาณ (บาท)</strong> เพื่อส่งใบงานกลับไปดำเนินการเสนออนุมัติตามลำดับขั้นต่อไป</p>
+          <p>รบกวนท่านเข้าสู่ระบบเพื่อดำเนินการกรอกข้อมูล <strong>ระยะทางประมาณการ (กิโลเมตร)</strong> และ <strong>วงเงินงบประมาณเบิกจ่ายโดยประมาณ (บาท)</strong> เพื่อส่งคำขอเข้าสู่การอนุมัติตามลำดับขั้น (L1 ➔ L2 ➔ L3 ➔ L4) ต่อไป</p>
           <p>ท่านสามารถคลิกที่ปุ่มสีแดง <strong>[กรอกค่าพาหนะ]</strong> ในตารางรายการที่ฉันขอ เพื่อระบุข้อมูลได้ทันที:</p>
           <div style="text-align: center; margin: 25px 0;">
             <a href="https://car-booking.fishmarket.co.th/" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">กรอกรายละเอียดค่าพาหนะ</a>
@@ -3772,7 +3817,7 @@ async function handleApprovalAction(isApproved) {
         `;
         sendEmailNotification(reqEmail, subject, body);
         
-        showToast(`ได้ส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกข้อมูลระยะทางและค่าใช้จ่ายรถรับจ้างเรียบร้อยแล้ว`, "success");
+        showToast(`ได้ส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกข้อมูลค่าพาหนะรถรับจ้างเรียบร้อยแล้ว`, "success");
         return;
       } else {
         // Distance and price are set! Advance L2 approval seamlessly
@@ -3782,6 +3827,7 @@ async function handleApprovalAction(isApproved) {
         booking.waitingForRequesterInput = false;
         booking.status = 'pending';
         assignedDriver = '-';
+        booking.waitingForRequesterInput = false;
       }
     } else {
       // Conflict check
@@ -4768,12 +4814,16 @@ function buildReportHTMLContent(b) {
 }
 
 function openReportView(bookingId) {
-  const isAdmin = currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'director' || currentUser.role === 'executive');
-  if (!isAdmin) {
-    showToast("ขออภัย! สิทธิ์การเข้าถึงรายงานเบิกจ่ายเฉพาะผู้ดูแลระบบและผู้อนุมัติฝ่ายยานพาหนะเท่านั้น", "error");
+  const isL2 = userHasApproveLevel(currentUser, 2) || (currentUser && (currentUser.role === 'fleet_admin' || currentUser.role === 'admin' || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())));
+  const isL3 = userHasApproveLevel(currentUser, 3) || (currentUser && (currentUser.role === 'director' || ['panadon.p', 'saisunee.p'].includes((currentUser.username || '').toLowerCase())));
+  const isL4 = userHasApproveLevel(currentUser, 4) || (currentUser && (currentUser.role === 'executive' || ['piyawan.k', 'saisunee.p', 'sarena.m'].includes((currentUser.username || '').toLowerCase())));
+  const isL2L3L4 = currentUser && (isL2 || isL3 || isL4);
+
+  if (!isL2L3L4) {
+    showToast("ขออภัย! สิทธิ์การเข้าถึงรายงานเบิกจ่ายเฉพาะผู้อนุมัติระดับ L2, L3 และ L4 เท่านั้น", "error");
     return;
   }
-  
+
   const b = bookings.find(x => x.id === bookingId);
   if (!b) return;
 
@@ -5571,12 +5621,12 @@ function setupEventListeners() {
       booking.carId = 'taxi';
       booking.driverName = '-';
       booking.status = 'pending';
-      booking.currentApprovalLevel = 2;
+      booking.currentApprovalLevel = 1;
       booking.waitingForRequesterInput = true;
       
-      // Reset L2, L3, L4 signatures
+      // Reset L1, L2, L3, L4 signatures
       booking.signatures.forEach(sig => {
-        if (sig.level >= 2) {
+        if (sig.level >= 1) {
           sig.status = 'pending';
           sig.approverName = '';
           sig.comment = '';
