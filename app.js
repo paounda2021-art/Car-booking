@@ -225,6 +225,15 @@ function resolveRequesterEmail(booking) {
   return 'ranida.c@fishmarket.co.th';
 }
 
+// Helper to dynamically resolve the Fleet Admin (L2) email
+function resolveFleetAdminEmail() {
+  if (typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+    const l2User = usersList.find(u => u.role === 'fleet_admin' || (u.canApprove && (u.canApprove.includes(2) || u.canApprove.includes('2'))));
+    if (l2User && l2User.email) return l2User.email;
+  }
+  return 'chalong.c@fishmarket.co.th';
+}
+
 // Asynchronous helper to send email notification via server-side API proxy
 async function sendEmailNotification(toEmail, subject, htmlBody) {
   if (!toEmail) {
@@ -3328,20 +3337,28 @@ async function openApprovalModal(bookingId) {
       });
       
       const driverInput = document.getElementById('assign-driver');
+      const taxiInputsBox = document.getElementById('fleet-admin-taxi-inputs');
+      const taxiDistInput = document.getElementById('assign-taxi-distance');
+      const taxiPriceInput = document.getElementById('assign-taxi-price');
       
-      if (booking.travelType === 'public_car') {
+      if (taxiDistInput) taxiDistInput.value = booking.distance || '';
+      if (taxiPriceInput) taxiPriceInput.value = booking.price || '';
+
+      if (booking.travelType === 'public_car' || booking.carId === 'taxi') {
         carSelect.value = 'taxi';
         if (driverGroup) driverGroup.style.display = 'block';
         if (driverInput) {
           driverInput.value = '-';
           driverInput.disabled = true;
         }
+        if (taxiInputsBox) taxiInputsBox.style.display = 'block';
       } else {
         if (driverGroup) driverGroup.style.display = 'block';
         if (driverInput) {
           driverInput.value = booking.driverName || (booking.controlUnit === 'รถสวัสดิการ' ? booking.requester : 'นายดีเลิศ สมใจ');
           driverInput.disabled = false;
         }
+        if (taxiInputsBox) taxiInputsBox.style.display = 'none';
         carSelect.value = booking.carId || '';
       }
     }
@@ -3710,10 +3727,26 @@ async function handleApprovalAction(isApproved) {
     }
     
     if (assignedCarId === 'taxi') {
-      if (!booking.distance || !booking.price || booking.distance == 0 || booking.price == 0) {
+      const inputDist = parseFloat(document.getElementById('assign-taxi-distance')?.value);
+      const inputPrice = parseFloat(document.getElementById('assign-taxi-price')?.value);
+      
+      const hasDirectDist = !isNaN(inputDist) && inputDist > 0;
+      const hasDirectPrice = !isNaN(inputPrice) && inputPrice > 0;
+
+      if (hasDirectDist && hasDirectPrice) {
+        booking.distance = inputDist;
+        booking.price = inputPrice;
+      }
+
+      const effectiveDist = booking.distance || 0;
+      const effectivePrice = booking.price || 0;
+
+      if (effectiveDist <= 0 || effectivePrice <= 0) {
+        // No distance/price provided by L2 or L0 -> Request L0 to fill Taxi fare details
         booking.travelType = 'public_car';
-        booking.carId = '';
+        booking.carId = 'taxi';
         booking.driverName = '-';
+        booking.status = 'waiting_taxi_amount';
         booking.waitingForRequesterInput = true;
         
         await saveBookings();
@@ -3742,9 +3775,12 @@ async function handleApprovalAction(isApproved) {
         showToast(`ได้ส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกข้อมูลระยะทางและค่าใช้จ่ายรถรับจ้างเรียบร้อยแล้ว`, "success");
         return;
       } else {
+        // Distance and price are set! Advance L2 approval seamlessly
         booking.travelType = 'public_car';
-        booking.carId = '';
+        booking.carId = 'taxi';
         booking.driverName = '-';
+        booking.waitingForRequesterInput = false;
+        booking.status = 'pending';
         assignedDriver = '-';
       }
     } else {
@@ -5489,12 +5525,15 @@ function setupEventListeners() {
 
   document.getElementById('assign-car').addEventListener('change', (e) => {
     const driverInput = document.getElementById('assign-driver');
+    const taxiInputsBox = document.getElementById('fleet-admin-taxi-inputs');
     if (driverInput) {
       if (e.target.value === 'taxi') {
         driverInput.value = '-';
         driverInput.disabled = true;
+        if (taxiInputsBox) taxiInputsBox.style.display = 'block';
       } else {
         driverInput.disabled = false;
+        if (taxiInputsBox) taxiInputsBox.style.display = 'none';
         const car = cars.find(c => c.id === e.target.value);
         driverInput.value = car ? (car.driverName || '') : '';
       }
@@ -5529,7 +5568,7 @@ function setupEventListeners() {
     let assignedDriver = '';
     if (assignedCarId === 'taxi') {
       booking.travelType = 'public_car';
-      booking.carId = '';
+      booking.carId = 'taxi';
       booking.driverName = '-';
       booking.status = 'pending';
       booking.currentApprovalLevel = 2;
@@ -5881,18 +5920,19 @@ function setupFillTaxiHandler() {
         booking.distance = distance;
         booking.price = price;
         booking.waitingForRequesterInput = false;
-        booking.currentApprovalLevel = 1; // Send back to L1
+        booking.status = 'pending';
+        booking.currentApprovalLevel = 2; // Return to L2 (ผู้จัดรถ) to sign L2 approval with filled taxi details!
 
-        // Reset approval signatures from L1 onwards
+        // Reset approval signatures for L2 onwards (PRESERVE L1 Signature!)
         booking.signatures.forEach(sig => {
-          if (sig.level >= 1) {
+          if (sig.level >= 2) {
             sig.approverName = '';
             sig.status = 'pending';
             sig.comment = '';
             sig.timestamp = '';
             sig.signature = '';
             if (sig.level === 2) {
-              sig.driverName = '';
+              sig.driverName = '-';
             }
           }
         });
@@ -5906,12 +5946,12 @@ function setupFillTaxiHandler() {
         renderBookingsLists();
         renderMonthCalendar();
 
-        // Trigger email notification to L1 (manager)
-        const toEmail = resolveManagerEmail(booking);
-        const subject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ (จัดสรร TAXI) เลขที่ ${booking.id} รอการตรวจสอบเห็นชอบ`;
+        // Trigger email notification to L2 (ผู้จัดรถ)
+        const toEmail = resolveFleetAdminEmail();
+        const subject = `[ระบบจองรถ อสป.] ผู้เสนอขอระบุข้อมูลค่าพาหนะ TAXI เรียบร้อยแล้ว คำขอเลขที่ ${booking.id} (รอ L2 ลงนามอนุมัติ)`;
         const body = `
-          <p>เรียน หัวหน้าแผนกผู้ควบคุม,</p>
-          <p>มีรายการเสนอขออนุญาตใช้ยานพาหนะและเบิกจ่ายค่าพาหนะใหม่ (จัดสรรเป็นรถรับจ้าง TAXI) รหัสใบขอใช้เลขที่ <strong>${booking.id}</strong> ได้รับการระบุระยะทางและประมาณการค่าใช้จ่ายเดินทางเรียบร้อยแล้ว และเสนอขึ้นมายังท่านเพื่อพิจารณาตรวจเห็นชอบในระดับ <strong>หัวหน้าแผนก (L1)</strong> อีกครั้ง</p>
+          <p>เรียน ผู้จัดรถ / งานยานพาหนะ (L2),</p>
+          <p>รายการขออนุญาตใช้ยานพาหนะ (จัดสรรเป็นรถรับจ้าง TAXI) เลขที่ <strong>${booking.id}</strong> โดยผู้ขอจอง <strong>${booking.requester}</strong> ได้ดำเนินการระบุระยะทางและวงเงินประมาณการค่าพาหนะเรียบร้อยแล้ว</p>
           <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; font-size: 14px;">
             <tr><td style="padding: 6px 0; font-weight: bold; width: 140px;">เลขที่คำขอ:</td><td style="padding: 6px 0;">${booking.id}</td></tr>
             <tr><td style="padding: 6px 0; font-weight: bold;">ผู้เสนอขอจอง:</td><td style="padding: 6px 0;">${booking.requester} (${booking.position || ''})</td></tr>
@@ -5920,14 +5960,14 @@ function setupFillTaxiHandler() {
             <tr><td style="padding: 6px 0; font-weight: bold;">ระยะทางโดยประมาณ:</td><td style="padding: 6px 0;">${distance} กิโลเมตร</td></tr>
             <tr><td style="padding: 6px 0; font-weight: bold;">วงเงินประมาณค่าพาหนะ:</td><td style="padding: 6px 0;">${price} บาท</td></tr>
           </table>
-          <p>ท่านสามารถคลิกเข้าสู่ระบบเพื่อพิจารณาลงความเห็นชอบหรือปฏิเสธคำขอได้ที่ลิงก์ด้านล่างนี้:</p>
+          <p>เอกสารได้เสนอขึ้นมายังท่านเพื่อลงนามอนุมัติในระดับ <strong>ผู้จัดรถ (L2)</strong> อีกครั้งก่อนเสนอ L3/L4 ต่อไป:</p>
           <div style="text-align: center; margin: 25px 0;">
-            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาตรวจอนุมัติ</a>
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-family: 'Sarabun', sans-serif;">✍️ พิจารณาลงนามอนุมัติ L2</a>
           </div>
         `;
         sendEmailNotification(toEmail, subject, body);
 
-        showToast(`บันทึกข้อมูลระยะทาง ${distance} กม. และค่าใช้จ่ายประมาณ ${price} บาท เรียบร้อยแล้ว ระบบได้ส่งเอกสารกลับไปเริ่มกระบวนการอนุมัติที่หัวหน้าแผนก (L1) อีกครั้ง`, "success");
+        showToast(`บันทึกข้อมูลระยะทาง ${distance} กม. และค่าใช้จ่ายประมาณ ${price} บาท เรียบร้อยแล้ว ระบบได้ส่งเอกสารกลับไปยังผู้จัดรถ (L2) เพื่อลงนามอนุมัติเรียบร้อยแล้ว`, "success");
       }
     });
   }
