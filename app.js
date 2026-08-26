@@ -1875,10 +1875,10 @@ function updateStats() {
     emailBadge.style.display = bellCount > 0 ? 'inline-block' : 'none';
   }
 
-  // 4. คำนวณจำนวนรายการที่ฉันขอ (L0) - เพิ่มการดักด้วยอีเมลให้แม่นยำขึ้น
+  // 4. คำนวณจำนวนรายการที่ฉันขอ (L0) - ใช้ checkIsMyRequest เพื่อความแม่นยำ 100%
   let myCount = 0;
   if (currentUser) {
-    myCount = bookings.filter(b => (b.requesterEmail && b.requesterEmail.toLowerCase() === currentUser.email.toLowerCase()) || b.requester === currentUser.name).length;
+    myCount = bookings.filter(b => checkIsMyRequest(b, currentUser)).length;
   }
   const tabMyCountBadge = document.getElementById('tab-my-bookings-count');
   if (tabMyCountBadge) tabMyCountBadge.textContent = myCount;
@@ -2497,13 +2497,16 @@ function renderBookingsLists() {
       const lvl = b.currentApprovalLevel;
       const canApproveThisLevel = userHasApproveLevel(currentUser, lvl) || isCancellationRequestForL2;
 
+      // 🎯 หากเป็นคำขอของตนเอง (isMyRequest) ตนเองจะไม่สามารถเป็นอนุมัติตนเองในคิว L1 ได้
+      const isSelfApproval = isMyRequest && lvl === 1;
+
       // 🎯 ตรวจสอบว่า user คนนี้ได้อนุมัติใบนี้ไปแล้วหรือยัง (ถ้าอนุมัติแล้ว ไม่ต้องแสดงในคิวรออนุมัติ)
       const alreadySigned = Array.isArray(b.signatures) && b.signatures.some(s =>
         s.level === lvl && s.status === 'approved' &&
         (s.approverName && currentUser.name && s.approverName.includes(currentUser.name))
       );
 
-      if (canApproveThisLevel && !alreadySigned) {
+      if (canApproveThisLevel && !alreadySigned && !isSelfApproval) {
         if (lvl === 1 && b.status !== 'cancellation_requested') {
           // L1: แสดงเฉพาะงานที่ส่งถึง Manager ท่านนี้ตามอีเมล หรือ Prathum fallback
           const mEmail = resolveManagerEmail(b).toLowerCase();
@@ -6181,11 +6184,20 @@ function initApprovalSwitcher() {
       const selectedVal = e.target.value;
       sessionStorage.setItem('activeApprovalLevel', selectedVal);
       
-      // เมื่อเลือก L0 หรือ 'all' บังคับโชว์ปุ่ม + เขียนใบขออนุญาต เสมอ
       if (selectedVal === '0') {
         if (bookingBtn) bookingBtn.classList.remove('hidden');
-      } else if (isOnlyHighLevelApprover && selectedVal !== 'all') {
-        if (bookingBtn) bookingBtn.classList.add('hidden');
+        // 🎯 สลับ Tab ไปที่ "รายการที่ฉันขอ" (#tab-my-bookings) อัตโนมัติเมื่อทำงานในฐานะ L0
+        const myTab = document.getElementById('tab-my-bookings');
+        if (myTab) myTab.click();
+      } else if (['1', '2', '3', '4'].includes(selectedVal)) {
+        if (isOnlyHighLevelApprover && selectedVal !== 'all') {
+          if (bookingBtn) bookingBtn.classList.add('hidden');
+        } else {
+          if (bookingBtn) bookingBtn.classList.remove('hidden');
+        }
+        // 🎯 สลับ Tab ไปที่ "งานรออนุมัติจากคุณ" (#tab-pending-bookings) อัตโนมัติเมื่อเลือกบทบาทอนุมัติ
+        const pendingTab = document.getElementById('tab-pending-bookings');
+        if (pendingTab) pendingTab.click();
       } else {
         if (bookingBtn) bookingBtn.classList.remove('hidden');
       }
