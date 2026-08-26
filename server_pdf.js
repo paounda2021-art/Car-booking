@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 let puppeteer = null;
 try {
   puppeteer = require('puppeteer');
@@ -820,7 +823,7 @@ async function getSharedBrowser() {
   }
   try {
     sharedBrowser = await puppeteer.launch({
-      headless: 'new',
+      headless: true,
       windowsHide: true,
       pipe: true,
       args: [
