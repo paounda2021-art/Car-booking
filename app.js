@@ -2588,8 +2588,19 @@ function renderBookingsLists() {
   };
 
   const finalMyBookingsList = dedupeList(myBookingsList);
-  const finalPendingBookingsList = dedupeList(pendingBookingsList);
+  let finalPendingBookingsList = dedupeList(pendingBookingsList);
   const cleanAllBookingsList = dedupeList(allBookingsList);
+
+  const activeLevel = sessionStorage.getItem('activeApprovalLevel') || 'all';
+  if (activeLevel === '0') {
+    // 🎯 Mode L0 (ผู้ขอใช้รถ): เคลียร์คิวรออนุมัติให้ว่าง (เพราะ L0 ดูเฉพาะรายการที่ฉันขอ)
+    finalPendingBookingsList = [];
+  } else if (activeLevel !== 'all') {
+    const targetLvl = parseInt(activeLevel, 10);
+    if (!isNaN(targetLvl)) {
+      finalPendingBookingsList = finalPendingBookingsList.filter(item => item.booking && item.booking.currentApprovalLevel === targetLvl);
+    }
+  }
 
   // 🎯 1. Sort Pending Approvals list by earliest departure date ascending (earliest trips going first)
   finalPendingBookingsList.sort((a, b) => {
@@ -6139,12 +6150,24 @@ function initApprovalSwitcher() {
   // รีเซ็ตค่าเป็นทั้งหมด
   sessionStorage.setItem('activeApprovalLevel', 'all');
 
-  // 2. ถ้าคนนั้นมีสิทธิ์อนุมัติมากกว่า 1 บทบาท (เช่น สายสุนีย์, ซารีนา)
-  if (currentUser.canApprove && currentUser.canApprove.length > 1) {
+  const isOnlyHighLevelApprover = currentUser.canApprove && 
+                                  currentUser.canApprove.length > 0 && 
+                                  currentUser.canApprove.every(lvl => lvl >= 3) && 
+                                  (currentUser.username || '').toLowerCase() !== 'panadon.p';
+
+  // 2. ถ้าคนนั้นมีสิทธิ์อนุมัติ (เช่น L1, L2, L3, L4) แสดง Dropdown สลับบทบาท (รวมถึง L0 ผู้ขอใช้รถ)
+  if (currentUser.canApprove && currentUser.canApprove.length >= 1) {
     container.classList.remove('hidden');
     container.style.display = 'block'; // 🚨 ปลดล็อก! บังคับให้โชว์ออกมา
     
     switcher.innerHTML = '<option value="all">แสดงงานอนุมัติทั้งหมด</option>';
+    
+    // 🟢 เพิ่มตัวเลือก ทำงานในฐานะ L0 (ผู้ขอใช้รถ) ให้กับ L1 และผู้อนุมัติทุกคน
+    let opt0 = document.createElement('option');
+    opt0.value = '0';
+    opt0.innerHTML = 'ทำงานในฐานะ L0 (ผู้ขอใช้รถ)';
+    switcher.appendChild(opt0);
+
     currentUser.canApprove.forEach(level => {
       let opt = document.createElement('option');
       opt.value = level;
@@ -6153,23 +6176,29 @@ function initApprovalSwitcher() {
     });
 
     switcher.onchange = (e) => {
-      sessionStorage.setItem('activeApprovalLevel', e.target.value);
+      const selectedVal = e.target.value;
+      sessionStorage.setItem('activeApprovalLevel', selectedVal);
+      
+      // เมื่อเลือก L0 หรือ 'all' บังคับโชว์ปุ่ม + เขียนใบขออนุญาต เสมอ
+      if (selectedVal === '0') {
+        if (bookingBtn) bookingBtn.classList.remove('hidden');
+      } else if (isOnlyHighLevelApprover && selectedVal !== 'all') {
+        if (bookingBtn) bookingBtn.classList.add('hidden');
+      } else {
+        if (bookingBtn) bookingBtn.classList.remove('hidden');
+      }
+
       updateStats();         
       renderBookingsLists(); 
     };
   } 
-  // 3. ถ้ามีบทบาทเดียว หรือไม่มีสิทธิ์อนุมัติ (เช่น ฉลอง, ศักดา หรือพนักงานทั่วไป)
+  // 3. ถ้าไม่มีสิทธิ์อนุมัติ (พนักงานทั่วไป)
   else {
     container.classList.add('hidden');
     container.style.display = 'none'; // บังคับซ่อน
   }
 
   // 4. จัดการปุ่ม + เขียนใบขออนุญาต
-  // แต่ยกเว้น พนาดร (panadon.p) ที่เป็น L0 และ L3 ทำให้ต้องเห็นปุ่มเขียนใบเสนอจอง
-  const isOnlyHighLevelApprover = currentUser.canApprove && 
-                                  currentUser.canApprove.length > 0 && 
-                                  currentUser.canApprove.every(lvl => lvl >= 3) && 
-                                  (currentUser.username || '').toLowerCase() !== 'panadon.p';
   if (isOnlyHighLevelApprover) {
     if (bookingBtn) bookingBtn.classList.add('hidden');
   } else {
