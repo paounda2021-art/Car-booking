@@ -1907,7 +1907,8 @@ function updateStats() {
       if (filterVal !== 'all' && (isL2User || isL3User)) {
         const st = b.status;
         if (filterVal === 'approved') return st === 'approved';
-        if (filterVal === 'pending') return st.startsWith('pending');
+        if (filterVal === 'pending') return st.startsWith('pending') && !b.waitingForRequesterInput;
+        if (filterVal === 'waiting_taxi_amount') return (st === 'waiting_taxi_amount' || st === 'pending_l0_taxi' || b.waitingForRequesterInput === true || (b.carId === 'taxi' && (!b.price || b.price <= 0) && st !== 'cancelled' && st !== 'rejected' && st !== 'approved'));
         if (filterVal === 'rejected') return st === 'rejected';
         if (filterVal === 'cancelled') return st === 'cancelled' || st === 'cancellation_requested';
         if (filterVal === 'waiting_for_requester_edit') return st === 'waiting_for_requester_edit';
@@ -2667,7 +2668,7 @@ function renderBookingsLists() {
       if (isL2OrL3Filter) {
         if (filterVal === 'approved') matchStatus = (st === 'approved');
         else if (filterVal === 'pending') matchStatus = st.startsWith('pending') && !b.waitingForRequesterInput;
-        else if (filterVal === 'waiting_taxi_amount') matchStatus = (st === 'waiting_taxi_amount' || st === 'pending_l0_taxi' || b.waitingForRequesterInput === true || (b.carId === 'taxi' && !b.estimatedCost));
+        else if (filterVal === 'waiting_taxi_amount') matchStatus = (st === 'waiting_taxi_amount' || st === 'pending_l0_taxi' || b.waitingForRequesterInput === true || (b.carId === 'taxi' && (!b.price || b.price <= 0) && st !== 'cancelled' && st !== 'rejected' && st !== 'approved'));
         else if (filterVal === 'rejected') matchStatus = (st === 'rejected');
         else if (filterVal === 'cancelled') matchStatus = (st === 'cancelled' || st === 'cancellation_requested');
         else if (filterVal === 'waiting_for_requester_edit') matchStatus = (st === 'waiting_for_requester_edit');
