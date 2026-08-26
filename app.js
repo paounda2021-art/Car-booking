@@ -5969,6 +5969,7 @@ function setupFillTaxiHandler() {
         booking.distance = distance;
         booking.price = price;
         booking.waitingForRequesterInput = false;
+        booking.status = 'pending';
         booking.currentApprovalLevel = 1; // Send back to L1
 
         // Reset approval signatures from L1 onwards
