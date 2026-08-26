@@ -256,7 +256,7 @@ try {
 
   const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
   if (fs.existsSync(bookingsJsonPath)) {
-    const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
+    const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '').replace(/[\u0000-\u0009\u000B\u000C\u000E-\u001F]/g, '');
     const fileBookings = JSON.parse(rawJson) || [];
     const dbBookings = sqliteGetBookings() || [];
 

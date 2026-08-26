@@ -718,7 +718,9 @@ async function initDatabase() {
   try {
     const dbResponse = await fetch('/api/get-bookings?t=' + Date.now(), { cache: 'no-store' });
     if (dbResponse.ok) {
-      let dbBookings = await dbResponse.json();
+      let dbText = await dbResponse.text();
+      dbText = dbText.replace(/[\u0000-\u0009\u000B\u000C\u000E-\u001F]/g, '');
+      let dbBookings = JSON.parse(dbText);
       if (dbBookings && Array.isArray(dbBookings)) {
         dbBookings = dbBookings.map(b => {
           if (!b) return b;
