@@ -141,6 +141,19 @@ function sqliteGetBookings() {
   try {
     const query = db.prepare("SELECT * FROM bookings");
     const rows = query.all();
+    if (!rows || rows.length === 0) {
+      // 🛡️ Fallback: If SQLite table is empty, auto-populate from bookings.json
+      const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
+      if (fs.existsSync(bookingsJsonPath)) {
+        const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
+        const fileBookings = JSON.parse(rawJson) || [];
+        if (Array.isArray(fileBookings) && fileBookings.length > 0) {
+          console.log(`[SQLite Read] Table empty. Auto-migrating ${fileBookings.length} records from bookings.json`);
+          sqliteSaveBookings(fileBookings);
+          return fileBookings;
+        }
+      }
+    }
     return rows.map(r => {
       const b = { ...r };
       b.goCheck = r.goCheck === 1;

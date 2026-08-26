@@ -750,6 +750,11 @@ async function initDatabase() {
         bookings = dbBookings;
         dbBookingsLoaded = true;
 
+        // Force UI re-render when fresh server bookings are loaded
+        if (typeof renderMonthCalendar === 'function') renderMonthCalendar();
+        if (typeof renderBookingsLists === 'function') renderBookingsLists();
+        if (typeof updateStats === 'function') updateStats();
+
         try {
           const optimizedBookings = dbBookings.map(b => {
             if (!b || !b.signatures || !Array.isArray(b.signatures)) return b;
