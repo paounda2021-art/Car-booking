@@ -3327,7 +3327,14 @@ async function openApprovalModal(bookingId) {
   const fleetAssignBox = document.getElementById('fleet-admin-assign-box');
   
   // Clear modal inputs
-  document.getElementById('approval-comment').value = '';
+  const commentInputEl = document.getElementById('approval-comment');
+  if (commentInputEl) {
+    if (booking.distance > 0 && booking.price > 0) {
+      commentInputEl.value = `ระบุค่าพาหนะเรียบร้อยแล้ว ระยะทาง ${booking.distance} กม. (ราคาประมาณ ${booking.price} บาท)`;
+    } else {
+      commentInputEl.value = '';
+    }
+  }
   fleetAssignBox.style.display = 'none';
   const fleetEditPanel = document.getElementById('fleet-admin-edit-panel');
   if (fleetEditPanel) fleetEditPanel.style.display = 'none';
@@ -5564,6 +5571,14 @@ function setupEventListeners() {
         driverInput.value = '-';
         driverInput.disabled = true;
         if (taxiInputsBox) taxiInputsBox.style.display = 'block';
+        
+        const booking = bookings.find(b => b.id === activeBookingIdForApproval);
+        if (booking && booking.distance > 0 && booking.price > 0) {
+          const commentEl = document.getElementById('approval-comment');
+          if (commentEl && !commentEl.value) {
+            commentEl.value = `ระบุค่าพาหนะเรียบร้อยแล้ว ระยะทาง ${booking.distance} กม. (ราคาประมาณ ${booking.price} บาท)`;
+          }
+        }
       } else {
         driverInput.disabled = false;
         if (taxiInputsBox) taxiInputsBox.style.display = 'none';
