@@ -1144,7 +1144,7 @@ function userHasApproveLevel(userObj, levelNum) {
   const role = userObj.role || '';
   
   if (levelInt === 1) {
-    if (role === 'supervisor' || (userObj.position && userObj.position.includes('หัวหน้า')) || ['sarena.m', 'jaruwan.s', 'test.l1'].includes(usernameLower)) return true;
+    if (role === 'supervisor' || (list && list.includes(1)) || ['sarena.m', 'jaruwan.s', 'test.l1', 'suwanna.p', 'chalong.c', 'sakda.a', 'prathum.c'].includes(usernameLower)) return true;
     const uEmail = (userObj.email || '').toLowerCase();
     if (uEmail && Array.isArray(bookings) && bookings.some(b => b.currentApprovalLevel === 1 && (b.managerEmail || '').toLowerCase() === uEmail)) return true;
   }
