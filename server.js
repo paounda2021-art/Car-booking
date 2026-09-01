@@ -27,27 +27,24 @@ try {
   console.error("[SQLite] PRAGMA setup error:", pragmaErr);
 }
 
-// Safe Atomic Write for JSON files to prevent file corruption during concurrent operations or restarts
-function safeWriteJsonFile(filePath, data, callback) {
-  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 8)}.tmp`;
-  const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-  
-  fs.writeFile(tmpPath, content, 'utf8', (writeErr) => {
-    if (writeErr) {
-      console.error(`[SafeWrite] Temp write error for ${filePath}:`, writeErr);
-      if (callback) callback(writeErr);
-      return;
+// Startup cleanup for any lingering .tmp files
+try {
+  const files = fs.readdirSync(__dirname);
+  files.forEach(f => {
+    if (f.endsWith('.tmp')) {
+      try { fs.unlinkSync(path.join(__dirname, f)); } catch(e) {}
     }
-    fs.rename(tmpPath, filePath, (renameErr) => {
-      if (renameErr) {
-        console.error(`[SafeWrite] Atomic rename error for ${filePath}:`, renameErr);
-        fs.writeFile(filePath, content, 'utf8', (fallbackErr) => {
-          if (callback) callback(fallbackErr);
-        });
-      } else {
-        if (callback) callback(null);
-      }
-    });
+  });
+} catch(e) {}
+
+// Safe Write for JSON files without creating lingering .tmp files
+function safeWriteJsonFile(filePath, data, callback) {
+  const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  fs.writeFile(filePath, content, 'utf8', (err) => {
+    if (err) {
+      console.error(`[SafeWrite] Write error for ${filePath}:`, err);
+    }
+    if (callback) callback(err);
   });
 }
 
