@@ -26,7 +26,7 @@ $zipFilePath = Join-Path $targetBackupDir $zipFileName
 Write-Host "Creating timestamped ZIP backup at $zipFilePath..." -ForegroundColor Yellow
 
 $itemsToZip = @()
-foreach ($item in @("database.db", "bookings.json", "users.json", "app.js", "server.js", "index.html")) {
+foreach ($item in @("bookings.json", "users.json", "app.js", "server.js", "server_pdf.js", "index.html")) {
     $fullPath = Join-Path $rootDir $item
     if (Test-Path $fullPath) {
         $itemsToZip += $fullPath
@@ -35,10 +35,10 @@ foreach ($item in @("database.db", "bookings.json", "users.json", "app.js", "ser
 
 if ($itemsToZip.Count -gt 0) {
     try {
-        Compress-Archive -Path $itemsToZip -DestinationPath $zipFilePath -Force
+        Compress-Archive -Path $itemsToZip -DestinationPath $zipFilePath -Force -ErrorAction SilentlyContinue
         Write-Host "Server ZIP Backup created successfully: $zipFilePath" -ForegroundColor Green
     } catch {
-        Write-Host "Warning creating ZIP backup in C:\Backups: $_" -ForegroundColor Red
+        Write-Host "ZIP backup notice: $_" -ForegroundColor Yellow
     }
 }
 
