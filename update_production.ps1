@@ -10,6 +10,7 @@ Write-Host "Updating production server in $rootDir..." -ForegroundColor Green
 Write-Host "Stopping car-booking service to release file locks..." -ForegroundColor Yellow
 try {
     pm2 stop car-booking
+    Start-Sleep -Seconds 2
 } catch {}
 
 # 2. Create timestamped ZIP backup in C:\Backups\ before pulling new code
