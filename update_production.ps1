@@ -55,12 +55,12 @@ if (Test-Path "$rootDir\bookings.json") {
     Write-Host "Live bookings.json preserved to $tempLiveJson" -ForegroundColor Cyan
 }
 
-# 4. Force pull updated master codebase and database from GitHub
-Write-Host "Force pulling latest master database.db and codebase from GitHub..." -ForegroundColor Yellow
+# 4. Force pull updated master codebase from GitHub (safely without locking database.db)
+Write-Host "Force pulling latest master codebase from GitHub..." -ForegroundColor Yellow
 git config user.email "admin@fishmarket.co.th"
 git config user.name "Administrator"
 git fetch origin main
-git reset --hard origin/main
+git checkout origin/main -- app.js server.js index.html server_pdf.js bookings.json users.json update_production.ps1
 
 # 5. Execute database sync from master bookings.json
 Write-Host "Syncing master database records..." -ForegroundColor Green
