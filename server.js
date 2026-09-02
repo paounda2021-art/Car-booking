@@ -27,6 +27,22 @@ try {
   console.error("[SQLite] PRAGMA setup error:", pragmaErr);
 }
 
+// Cleanup any lingering .tmp files from root directory
+function cleanOrphanTmpFiles() {
+  try {
+    const files = fs.readdirSync(ROOT_DIR);
+    files.forEach(file => {
+      if (file.endsWith('.tmp')) {
+        try {
+          fs.unlinkSync(path.join(ROOT_DIR, file));
+          console.log(`[Cleanup] Deleted orphan temp file: ${file}`);
+        } catch(e) {}
+      }
+    });
+  } catch(e) {}
+}
+cleanOrphanTmpFiles();
+
 // Safe Atomic Write for JSON files to prevent file corruption during concurrent operations or restarts
 function safeWriteJsonFile(filePath, data, callback) {
   const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 8)}.tmp`;
@@ -42,6 +58,7 @@ function safeWriteJsonFile(filePath, data, callback) {
       if (renameErr) {
         console.error(`[SafeWrite] Atomic rename error for ${filePath}:`, renameErr);
         fs.writeFile(filePath, content, 'utf8', (fallbackErr) => {
+          fs.unlink(tmpPath, () => {}); // Delete temp file on fallback
           if (callback) callback(fallbackErr);
         });
       } else {
