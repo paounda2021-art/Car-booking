@@ -1797,13 +1797,20 @@ function checkIsManagerOrApprover(b, userObj) {
   
   const uEmail = (userObj.email || '').trim().toLowerCase();
   const uUsername = (userObj.username || '').trim().toLowerCase();
-  const mEmail = resolveManagerEmail(b).toLowerCase();
+  const bManagerEmail = (b.managerEmail || '').trim().toLowerCase();
+  const resolvedEmail = resolveManagerEmail(b).trim().toLowerCase();
 
-  // 1. Check direct manager email match
-  if (uEmail && mEmail && uEmail === mEmail) return true;
-  
-  // 2. Check if requester in usersList has manager_email matching userObj.email or userObj.username
-  if (window.usersList && Array.isArray(window.usersList)) {
+  // 1. Direct manager email match with booking's managerEmail or resolved managerEmail
+  if (uEmail && ((bManagerEmail && bManagerEmail === uEmail) || (resolvedEmail && resolvedEmail === uEmail))) return true;
+  if (uUsername && ((bManagerEmail && bManagerEmail.includes(uUsername)) || (resolvedEmail && resolvedEmail.includes(uUsername)))) return true;
+
+  // 2. Special name/email matching for Pratum
+  const isPratum = (uUsername === 'prathum.c' || uEmail.includes('pratum') || uEmail.includes('prathum'));
+  const isTargetPratum = (bManagerEmail.includes('pratum') || bManagerEmail.includes('prathum') || resolvedEmail.includes('pratum') || resolvedEmail.includes('prathum'));
+  if (isPratum && isTargetPratum) return true;
+
+  // 3. Check if requester in usersList has manager_email matching userObj.email or userObj.username
+  if (typeof usersList !== 'undefined' && Array.isArray(usersList)) {
     const reqUser = usersList.find(u => 
       (u.name && b.requester && u.name.trim() === b.requester.trim()) ||
       (u.email && b.requesterEmail && u.email.toLowerCase() === b.requesterEmail.toLowerCase()) ||
@@ -1811,21 +1818,18 @@ function checkIsManagerOrApprover(b, userObj) {
     );
     if (reqUser && reqUser.manager_email) {
       const managerEmailClean = reqUser.manager_email.trim().toLowerCase();
-      if ((uEmail && managerEmailClean === uEmail) || (uUsername && managerEmailClean.startsWith(uUsername))) {
-        return true;
+      if (managerEmailClean !== '' && managerEmailClean !== 'ranida.c@fishmarket.co.th') {
+        if ((uEmail && managerEmailClean === uEmail) || (uUsername && managerEmailClean.includes(uUsername))) {
+          return true;
+        }
       }
     }
   }
 
-  // 3. Special case for Prathum (prathum.c / ranida.c@fishmarket.co.th)
-  if (userObj.username && userObj.username.toLowerCase() === 'prathum.c' && (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th')) {
-    return true;
-  }
-  
   // 4. Check if user approved L1 in signatures
   if (b.signatures && Array.isArray(b.signatures)) {
     const l1Sig = b.signatures.find(s => s.level === 1);
-    if (l1Sig) {
+    if (l1Sig && (l1Sig.status === 'approved' || l1Sig.status === 'signed')) {
       const normalize = (n) => n ? n.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.s\.|น\.ส\.|ว่าที่ร\.ต\.|ว่าที่ร้อยตรี|ดร\.)\s*/, '') : '';
       const uNameNormalized = normalize(userObj.name);
       const approverNameNormalized = normalize(l1Sig.approverName);
