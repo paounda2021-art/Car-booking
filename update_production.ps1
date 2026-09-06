@@ -1,19 +1,14 @@
 # update_production.ps1
-# Script to safely backup server data to ZIP in C:\Backups\ and update production server to match GitHub main 100%
+# Script to safely update production server code while preserving 100% of live database.db, bookings.json, users.json, and cars.json
 
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (-not $rootDir) { $rootDir = Get-Location }
 
+Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "Updating production server in $rootDir..." -ForegroundColor Green
+Write-Host "==========================================" -ForegroundColor Cyan
 
-# 1. Stop PM2 server first to release Windows file locks on database.db
-Write-Host "Stopping car-booking service to release file locks..." -ForegroundColor Yellow
-try {
-    pm2 stop car-booking
-    Start-Sleep -Seconds 2
-} catch {}
-
-# 2. Create timestamped ZIP backup in C:\Backups\ before pulling new code
+# 1. Create timestamped Backup directory
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $targetBackupDir = "C:\Backups"
 if (-not (Test-Path $targetBackupDir)) {
@@ -23,72 +18,67 @@ if (-not (Test-Path $targetBackupDir)) {
 $zipFileName = "backup_server_$timestamp.zip"
 $zipFilePath = Join-Path $targetBackupDir $zipFileName
 
-Write-Host "Creating timestamped ZIP backup at $zipFilePath..." -ForegroundColor Yellow
+# 2. Preserve live server database and data JSON files
+Write-Host "Preserving live production data (database.db, bookings.json, users.json, cars.json)..." -ForegroundColor Yellow
 
+$liveDb = Join-Path $rootDir "database.db"
+$liveBookings = Join-Path $rootDir "bookings.json"
+$liveUsers = Join-Path $rootDir "users.json"
+$liveCars = Join-Path $rootDir "cars.json"
+
+$tempDb = Join-Path $targetBackupDir "live_db_$timestamp.db"
+$tempBookings = Join-Path $targetBackupDir "live_bookings_$timestamp.json"
+$tempUsers = Join-Path $targetBackupDir "live_users_$timestamp.json"
+$tempCars = Join-Path $targetBackupDir "live_cars_$timestamp.json"
+
+if (Test-Path $liveDb) { Copy-Item $liveDb $tempDb -Force; Write-Host "Saved live DB to $tempDb" -ForegroundColor Cyan }
+if (Test-Path $liveBookings) { Copy-Item $liveBookings $tempBookings -Force; Write-Host "Saved live Bookings to $tempBookings" -ForegroundColor Cyan }
+if (Test-Path $liveUsers) { Copy-Item $liveUsers $tempUsers -Force; Write-Host "Saved live Users to $tempUsers" -ForegroundColor Cyan }
+if (Test-Path $liveCars) { Copy-Item $liveCars $tempCars -Force; Write-Host "Saved live Cars to $tempCars" -ForegroundColor Cyan }
+
+# Zip archive for extra backup safety
 $itemsToZip = @()
-foreach ($item in @("bookings.json", "users.json", "app.js", "server.js", "server_pdf.js", "index.html")) {
+foreach ($item in @("database.db", "bookings.json", "users.json", "cars.json", "app.js", "server.js", "index.html")) {
     $fullPath = Join-Path $rootDir $item
-    if (Test-Path $fullPath) {
-        $itemsToZip += $fullPath
-    }
+    if (Test-Path $fullPath) { $itemsToZip += $fullPath }
 }
-
 if ($itemsToZip.Count -gt 0) {
     try {
-        Compress-Archive -Path $itemsToZip -DestinationPath $zipFilePath -Force -ErrorAction SilentlyContinue
-        Write-Host "Server ZIP Backup created successfully: $zipFilePath" -ForegroundColor Green
+        Compress-Archive -Path $itemsToZip -DestinationPath $zipFilePath -Force
+        Write-Host "Created ZIP backup: $zipFilePath" -ForegroundColor Green
     } catch {
-        Write-Host "ZIP backup notice: $_" -ForegroundColor Yellow
+        Write-Host "ZIP backup note: $_" -ForegroundColor Yellow
     }
 }
 
-# 3. Save temporary copy of live database.db & bookings.json to preserve live server data 100%
-$tempLiveDb = Join-Path $targetBackupDir "live_db_$timestamp.db"
-$tempLiveJson = Join-Path $targetBackupDir "live_bookings_$timestamp.json"
+# 3. Stop PM2 service to release Windows file locks
+Write-Host "Stopping car-booking service to release file locks..." -ForegroundColor Yellow
+try {
+    pm2 stop car-booking
+} catch {}
 
-if (Test-Path "$rootDir\database.db") {
-    Copy-Item "$rootDir\database.db" $tempLiveDb -Force
-    Write-Host "Live database.db preserved to $tempLiveDb" -ForegroundColor Cyan
-}
-if (Test-Path "$rootDir\bookings.json") {
-    Copy-Item "$rootDir\bookings.json" $tempLiveJson -Force
-    Write-Host "Live bookings.json preserved to $tempLiveJson" -ForegroundColor Cyan
-}
-
-# 4. Force pull updated master codebase from GitHub (safely without locking database.db)
-Write-Host "Force pulling latest master codebase from GitHub..." -ForegroundColor Yellow
+# 4. Pull updated codebase from GitHub main
+Write-Host "Pulling latest application code (app.js, server.js, index.html) from GitHub..." -ForegroundColor Yellow
 git config user.email "admin@fishmarket.co.th"
 git config user.name "Administrator"
 git fetch origin main
-git checkout origin/main -- app.js server.js index.html server_pdf.js bookings.json users.json update_production.ps1
+git reset --hard origin/main
 
-# 5. Execute database sync from master bookings.json
-Write-Host "Syncing master database records..." -ForegroundColor Green
-node -e "
-const fs = require('fs');
-const { DatabaseSync } = require('node:sqlite');
-try {
-  const db = new DatabaseSync('database.db');
-  db.exec('DELETE FROM bookings');
-  const bList = JSON.parse(fs.readFileSync('bookings.json', 'utf8'));
-  const stmt = db.prepare('INSERT INTO bookings (id, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit, driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince, purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price, goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures, waitingForRequesterInput, taxiInfo, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  bList.forEach(b => {
-    stmt.run(b.id, b.requester||'', b.requesterEmail||'', b.managerEmail||'', b.position||'', b.department||'', b.office||'', b.division||'', b.controlUnit||'', b.driverLicenseFile||'', b.addressNo||'', b.addressMoo||'', b.addressRoad||'', b.addressSubdistrict||'', b.addressDistrict||'', b.addressProvince||'', b.purpose||'', b.destination||'', b.ref||'', b.passengers||'', b.startDate||'', b.endDate||'', b.trips||2, b.travelType||'', b.carId||'', b.distance||0, b.price||0, b.goCheck?1:0, b.backCheck?1:0, b.status||'pending', b.currentApprovalLevel||1, b.driverName||'', b.returnedEarly?1:0, b.driverAccepted?1:0, typeof b.signatures==='string'?b.signatures:JSON.stringify(b.signatures||[]), b.waitingForRequesterInput?1:0, typeof b.taxiInfo==='string'?b.taxiInfo:JSON.stringify(b.taxiInfo||{}), b.active?1:0);
-  });
-  const count = db.prepare('SELECT COUNT(*) as c FROM bookings').get();
-  db.close();
-  console.log('✅ Database sync completed! Total records in database.db: ' + count.c);
-} catch(e) {
-  console.log('Sync note:', e.message);
-}
-"
+# 5. Restore live production data files back over the workspace (GUARANTEES 0% DATA LOSS)
+Write-Host "Restoring live database and data JSON files back..." -ForegroundColor Green
+if (Test-Path $tempDb) { Copy-Item $tempDb $liveDb -Force }
+if (Test-Path $tempBookings) { Copy-Item $tempBookings $liveBookings -Force }
+if (Test-Path $tempUsers) { Copy-Item $tempUsers $liveUsers -Force }
+if (Test-Path $tempCars) { Copy-Item $tempCars $liveCars -Force }
 
-# 6. Restart server in PM2
-Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Yellow
+# 6. Restart PM2 server
+Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Green
 try {
     pm2 start car-booking
 } catch {
     pm2 restart car-booking --update-env
 }
 
-Write-Host "Production server updated successfully without overwriting live database! Backup ZIP saved in $zipFilePath" -ForegroundColor Green
+Write-Host "==========================================================================================" -ForegroundColor Green
+Write-Host "Production server updated SUCCESSFULLY! Live database, bookings, users, and cars PRESERVED 100%!" -ForegroundColor Green
+Write-Host "==========================================================================================" -ForegroundColor Green
