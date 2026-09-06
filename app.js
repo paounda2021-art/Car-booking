@@ -184,7 +184,12 @@ function compressImage(file, callback) {
 function resolveManagerEmail(booking) {
   if (!booking) return 'ranida.c@fishmarket.co.th';
   
-  // 1. Prioritize looking up requester in usersList (always accurate according to current user hierarchy!)
+  // 1. Prioritize booking.managerEmail if explicitly set on the booking
+  if (booking.managerEmail && booking.managerEmail.trim() !== '') {
+    return booking.managerEmail.trim();
+  }
+
+  // 2. Fallback to looking up requester in usersList
   if (typeof usersList !== 'undefined' && Array.isArray(usersList) && booking.requester) {
     const requesterName = booking.requester.trim();
     const normalizeName = n => n ? n.replace(/\s+/g, '') : '';
@@ -198,12 +203,41 @@ function resolveManagerEmail(booking) {
     }
   }
   
-  // 2. Fallback to booking.managerEmail
-  if (booking.managerEmail && booking.managerEmail.trim() !== '') {
-    return booking.managerEmail.trim();
-  }
-  
   return 'ranida.c@fishmarket.co.th'; // Default fallback
+}
+
+// Helper to check if a pending booking (at L1) requires approval from current user
+function isL1PendingForUser(b, user) {
+  if (!b || !user) return false;
+  if (b.currentApprovalLevel !== 1 || b.status === 'cancellation_requested') return false;
+
+  const canApproveL1 = userHasApproveLevel(user, 1) || (user.canApprove && user.canApprove.includes(1)) || (user.username || '').toLowerCase() === 'prathum.c';
+  if (!canApproveL1) return false;
+
+  const cEmail = (user.email || '').toLowerCase().trim();
+  const cUsername = (user.username || '').toLowerCase().trim();
+
+  const bManagerEmail = (b.managerEmail || '').toLowerCase().trim();
+  const resolvedEmail = resolveManagerEmail(b).toLowerCase().trim();
+
+  // Direct email match with booking's managerEmail or resolved managerEmail
+  if (cEmail && (bManagerEmail === cEmail || resolvedEmail === cEmail)) return true;
+
+  // Username match with email prefix (e.g. pratum.c vs prathum.c)
+  if (cUsername) {
+    if (bManagerEmail && (bManagerEmail.startsWith(cUsername) || bManagerEmail.includes(cUsername))) return true;
+    if (resolvedEmail && (resolvedEmail.startsWith(cUsername) || resolvedEmail.includes(cUsername))) return true;
+  }
+
+  // Special fallback for Mr. Pratum (prathum.c / pratum.c)
+  const isPratum = (cUsername === 'prathum.c' || cEmail.includes('pratum') || cEmail.includes('prathum'));
+  const isTargetPratum = (bManagerEmail.includes('pratum') || bManagerEmail.includes('prathum') || resolvedEmail.includes('pratum') || resolvedEmail.includes('prathum'));
+  if (isPratum && isTargetPratum) return true;
+
+  const isFallbackManager = (resolvedEmail === '' || resolvedEmail === 'ranida.c@fishmarket.co.th') && isPratum;
+  if (isFallbackManager) return true;
+
+  return false;
 }
 
 // Helper to dynamically resolve the requester email of a booking
@@ -1840,11 +1874,7 @@ function updateStats() {
         if (canApproveThisLevel && !alreadySigned) {
           // เงื่อนไขคัดกรองพิเศษเพิ่มเติมสำหรับระดับ L1 (Supervisor)
           if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
-            const mEmail = resolveManagerEmail(b).toLowerCase();
-            const cEmail = (currentUser.email || '').toLowerCase();
-            const isL1ByEmail = mEmail && mEmail === cEmail;
-            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && (currentUser.username || '').toLowerCase() === 'prathum.c';
-            if (isL1ByEmail || isL1Fallback) {
+            if (isL1PendingForUser(b, currentUser)) {
               pendingCount++;
             }
           } 
@@ -2509,12 +2539,7 @@ function renderBookingsLists() {
 
       if (canApproveThisLevel && !alreadySigned && !isSelfApproval) {
         if (lvl === 1 && b.status !== 'cancellation_requested') {
-          // L1: แสดงเฉพาะงานที่ส่งถึง Manager ท่านนี้ตามอีเมล หรือ Prathum fallback
-          const mEmail = resolveManagerEmail(b).toLowerCase();
-          const cEmail = (currentUser.email || '').toLowerCase();
-          const isL1ByEmail = mEmail && mEmail === cEmail;
-          const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && (currentUser.username || '').toLowerCase() === 'prathum.c';
-          if (isL1ByEmail || isL1Fallback) {
+          if (isL1PendingForUser(b, currentUser)) {
             isPendingForMe = true;
           }
         } else {
@@ -3345,13 +3370,7 @@ async function openApprovalModal(bookingId) {
     const lvl = booking.currentApprovalLevel;
 
     if (lvl === 1) {
-      // ✅ ใช้ userHasApproveLevel L1 ซึ่งครอบคลุม role supervisor, canApprove[1], managerEmail
-      const mEmail = resolveManagerEmail(booking).toLowerCase();
-      const cEmail = (currentUser.email || '').toLowerCase();
-      const isL1ByRole = userHasApproveLevel(currentUser, 1);
-      const isL1ByEmail = mEmail && mEmail === cEmail;
-      const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
-      if (isL1ByRole || isL1ByEmail || isL1Fallback) {
+      if (isL1PendingForUser(booking, currentUser)) {
         isMyTurn = true;
       }
     }
@@ -6452,11 +6471,7 @@ function updateEmailInboxUI() {
         );
         if (canApproveThisLevel && isSelectedLevel && !alreadySigned) {
           if (b.currentApprovalLevel === 1 && b.status !== 'cancellation_requested') {
-            const mEmail = resolveManagerEmail(b).toLowerCase();
-            const cEmail = (currentUser.email || '').toLowerCase();
-            const isL1ByEmail = mEmail && mEmail === cEmail;
-            const isL1Fallback = (mEmail === '' || mEmail === 'ranida.c@fishmarket.co.th') && currentUser.username.toLowerCase() === 'prathum.c';
-            if (isL1ByEmail || isL1Fallback) pCount++;
+            if (isL1PendingForUser(b, currentUser)) pCount++;
           } else {
             pCount++;
           }
@@ -7202,9 +7217,7 @@ function getMyPendingTasksList() {
       
       if (canApproveThisLevel && isSelectedLevel) {
         if (b.currentApprovalLevel === 1) {
-          const mEmail = resolveManagerEmail(b).toLowerCase();
-          const cEmail = (currentUser.email || '').toLowerCase();
-          return (mEmail === cEmail || mEmail === '');
+          return isL1PendingForUser(b, currentUser);
         }
         return true;
       }

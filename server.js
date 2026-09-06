@@ -27,22 +27,6 @@ try {
   console.error("[SQLite] PRAGMA setup error:", pragmaErr);
 }
 
-// Cleanup any lingering .tmp files from root directory
-function cleanOrphanTmpFiles() {
-  try {
-    const files = fs.readdirSync(ROOT_DIR);
-    files.forEach(file => {
-      if (file.endsWith('.tmp')) {
-        try {
-          fs.unlinkSync(path.join(ROOT_DIR, file));
-          console.log(`[Cleanup] Deleted orphan temp file: ${file}`);
-        } catch(e) {}
-      }
-    });
-  } catch(e) {}
-}
-cleanOrphanTmpFiles();
-
 // Safe Atomic Write for JSON files to prevent file corruption during concurrent operations or restarts
 function safeWriteJsonFile(filePath, data, callback) {
   const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 8)}.tmp`;
@@ -58,7 +42,6 @@ function safeWriteJsonFile(filePath, data, callback) {
       if (renameErr) {
         console.error(`[SafeWrite] Atomic rename error for ${filePath}:`, renameErr);
         fs.writeFile(filePath, content, 'utf8', (fallbackErr) => {
-          fs.unlink(tmpPath, () => {}); // Delete temp file on fallback
           if (callback) callback(fallbackErr);
         });
       } else {
@@ -151,6 +134,49 @@ try { db.exec("ALTER TABLE cars ADD COLUMN driverName TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN phone TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN customApprovalLevels TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN sign TEXT;"); } catch(e) {}
+
+// Helper function to check whether incoming booking update should overwrite existing stored record
+function shouldOverwriteBooking(existing, incoming) {
+  if (!existing) return true;
+  if (!incoming) return false;
+
+  const existingTerminal = (existing.status === 'approved' || existing.status === 'rejected' || existing.status === 'cancelled');
+  const incomingTerminal = (incoming.status === 'approved' || incoming.status === 'rejected' || incoming.status === 'cancelled');
+
+  // Rule 1: Terminal states override non-terminal states
+  if (incomingTerminal && !existingTerminal) return true;
+  if (existingTerminal && !incomingTerminal) return false;
+
+  // Rule 2: L0 Taxi fare or Requester Edit submission
+  // Existing is waiting for requester input (e.g. status waiting_taxi_amount / waiting_for_requester_edit)
+  // Incoming has been submitted by requester (e.g. status pending, level 1, price/distance entered)
+  const existingWaiting = (existing.waitingForRequesterInput === 1 || existing.waitingForRequesterInput === true || existing.status === 'waiting_taxi_amount' || existing.status === 'waiting_for_requester_edit' || existing.status === 'pending_l0_taxi');
+  const incomingSubmitted = (!incoming.waitingForRequesterInput && incoming.status === 'pending') || (incoming.carId === 'taxi' && (incoming.price > 0 || incoming.distance > 0) && incoming.status === 'pending');
+
+  if (existingWaiting && incomingSubmitted) {
+    return true;
+  }
+
+  if (existing.status === 'waiting_taxi_amount' && (incoming.price > 0 || incoming.distance > 0)) {
+    return true;
+  }
+
+  // Rule 3: Higher or equal approval level
+  const incomingLevel = incoming.currentApprovalLevel || 0;
+  const existingLevel = existing.currentApprovalLevel || 0;
+
+  if (incomingLevel >= existingLevel) {
+    return true;
+  }
+
+  // Rule 4: Count approved signatures
+  const countSigs = (sigs) => Array.isArray(sigs) ? sigs.filter(s => s && s.signature && s.signature !== 'db_ref' && (s.status === 'approved' || s.status === 'signed')).length : 0;
+  if (countSigs(incoming.signatures) > countSigs(existing.signatures)) {
+    return true;
+  }
+
+  return false;
+}
 
 // SQLite Helper Functions
 
@@ -293,11 +319,7 @@ try {
         masterMap.set(cleanId, b);
       } else {
         const existing = masterMap.get(cleanId);
-        const existingComp = (existing.status === 'approved' || existing.status === 'rejected' || existing.status === 'cancelled');
-        const itemComp = (b.status === 'approved' || b.status === 'rejected' || b.status === 'cancelled');
-        if (itemComp && !existingComp) {
-          masterMap.set(cleanId, b);
-        } else if ((b.currentApprovalLevel || 0) >= (existing.currentApprovalLevel || 0)) {
+        if (shouldOverwriteBooking(existing, b)) {
           masterMap.set(cleanId, b);
         }
       }
@@ -667,11 +689,7 @@ const server = http.createServer((req, res) => {
               map.set(cleanId, item);
             } else {
               const existing = map.get(cleanId);
-              const existingComp = (existing.status === 'approved' || existing.status === 'rejected' || existing.status === 'cancelled');
-              const itemComp = (item.status === 'approved' || item.status === 'rejected' || item.status === 'cancelled');
-              if (itemComp && !existingComp) {
-                map.set(cleanId, item);
-              } else if ((item.currentApprovalLevel || 0) >= (existing.currentApprovalLevel || 0)) {
+              if (shouldOverwriteBooking(existing, item)) {
                 map.set(cleanId, item);
               }
             }
