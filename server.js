@@ -575,6 +575,93 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const urlPath = url.pathname;
 
+  // API: External Auto-Booking from Smart Queue
+  if (urlPath === '/api/external/auto-booking' && req.method === 'POST') {
+    let chunks = [];
+    req.on('data', chunk => { chunks.push(chunk); });
+    req.on('end', () => {
+      try {
+        const body = Buffer.concat(chunks).toString('utf8');
+        const payload = JSON.parse(body) || {};
+        
+        const timestamp = Date.now();
+        const dateObj = new Date();
+        const yearTh = dateObj.getFullYear() + 543;
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        
+        const bookingId = payload.bookingId || `SQ-${yearTh}${month}${day}-${timestamp.toString().slice(-4)}`;
+
+        let passengerStr = '';
+        if (Array.isArray(payload.passengers)) {
+          passengerStr = payload.passengers.map(p => typeof p === 'object' ? `${p.name || ''} (${p.position || ''})`.trim() : String(p)).join(', ');
+        } else if (payload.passengers) {
+          passengerStr = String(payload.passengers);
+        }
+
+        const newBooking = {
+          id: bookingId,
+          createdAt: new Date().toISOString(),
+          requester: payload.requesterName || 'ระบบ Smart Queue',
+          requesterEmail: payload.requesterEmail || '',
+          position: payload.position || 'เจ้าหน้าที่ (Smart Queue)',
+          department: payload.department || 'องค์การสะพานปลา',
+          office: 'ส่วนกลาง',
+          division: payload.division || '',
+          controlUnit: '',
+          purpose: payload.purpose || (`ปฏิบัติภารกิจ อสป.: ${payload.title || payload.mission_title || ''}`).trim(),
+          destination: payload.destination || payload.location || '',
+          passengers: passengerStr,
+          startDate: payload.startDate || payload.start_date || '',
+          endDate: payload.endDate || payload.end_date || '',
+          trips: 1,
+          travelType: payload.travelType || 'บก',
+          carId: '',
+          distance: 0,
+          price: 0,
+          goCheck: 0,
+          backCheck: 0,
+          status: 'pending',
+          currentApprovalLevel: 1,
+          driverName: '',
+          returnedEarly: 0,
+          driverAccepted: 0,
+          signatures: [],
+          waitingForRequesterInput: 0,
+          taxiInfo: {},
+          active: 1
+        };
+
+        let dbBookings = sqliteGetBookings() || [];
+        const existingIdx = dbBookings.findIndex(b => b && b.id === bookingId);
+        if (existingIdx >= 0) {
+          dbBookings[existingIdx] = newBooking;
+        } else {
+          dbBookings.push(newBooking);
+        }
+
+        sqliteSaveBookings(dbBookings);
+        const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
+        safeWriteJsonFile(bookingsJsonPath, JSON.stringify(dbBookings, null, 2));
+
+        console.log(`[Auto-Booking] Created car booking ${bookingId} for mission ${payload.mission_id || ''}`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          success: true,
+          booking_id: bookingId,
+          status: 'PENDING',
+          message: 'Car booking created successfully'
+        }));
+      } catch (e) {
+        console.error('[Auto-Booking] Error creating booking:', e);
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: false, error: e.message }));
+      }
+    });
+    return;
+  }
+
   // API: generate-pdf-server (Generate high-res 1-page A4 PDF using Puppeteer on server)
   if (urlPath === '/api/generate-pdf-server' && req.method === 'POST') {
     let chunks = [];
