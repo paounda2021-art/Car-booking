@@ -27,6 +27,44 @@ try {
   console.error("[SQLite] PRAGMA setup error:", pragmaErr);
 }
 
+// Helper to safely unlink temporary files with retry for Windows EBUSY/EPERM locks
+function safeUnlink(filePath) {
+  if (!filePath) return;
+  fs.unlink(filePath, (err) => {
+    if (err && err.code !== 'ENOENT') {
+      setTimeout(() => {
+        fs.unlink(filePath, () => {});
+      }, 2000);
+    }
+  });
+}
+
+// Cleanup any orphaned temp files (*.tmp) on server startup and periodically
+function cleanupTempFiles() {
+  try {
+    const files = fs.readdirSync(ROOT_DIR);
+    let count = 0;
+    files.forEach(file => {
+      if (file.endsWith('.tmp')) {
+        const fullPath = path.join(ROOT_DIR, file);
+        try {
+          fs.unlinkSync(fullPath);
+          count++;
+        } catch (e) {
+          safeUnlink(fullPath);
+        }
+      }
+    });
+    if (count > 0) {
+      console.log(`[Cleanup] Cleaned up ${count} orphaned temporary (.tmp) file(s)`);
+    }
+  } catch (err) {
+    console.error('[Cleanup] Error scanning temp files:', err);
+  }
+}
+cleanupTempFiles();
+setInterval(cleanupTempFiles, 15 * 60 * 1000); // Auto-clean temp files every 15 minutes
+
 // Safe Atomic Write for JSON files to prevent file corruption during concurrent operations or restarts
 function safeWriteJsonFile(filePath, data, callback) {
   const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 8)}.tmp`;
@@ -35,14 +73,17 @@ function safeWriteJsonFile(filePath, data, callback) {
   fs.writeFile(tmpPath, content, 'utf8', (writeErr) => {
     if (writeErr) {
       console.error(`[SafeWrite] Temp write error for ${filePath}:`, writeErr);
-      if (callback) callback(writeErr);
+      safeUnlink(tmpPath);
+      fs.writeFile(filePath, content, 'utf8', (directErr) => {
+        if (callback) callback(directErr);
+      });
       return;
     }
     fs.rename(tmpPath, filePath, (renameErr) => {
       if (renameErr) {
-        console.error(`[SafeWrite] Atomic rename error for ${filePath}:`, renameErr);
+        // Atomic rename fallback on Windows when file is locked
+        safeUnlink(tmpPath);
         fs.writeFile(filePath, content, 'utf8', (fallbackErr) => {
-          fs.unlink(tmpPath, () => {});
           if (callback) callback(fallbackErr);
         });
       } else {
