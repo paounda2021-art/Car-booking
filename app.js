@@ -76,6 +76,10 @@ let activeBookingIdForApproval = null;
 // Welfare Car driver license file upload state (base64)
 let uploadedDriverLicenseBase64 = null;
 
+// Reference Document file upload state
+let uploadedRefFileBase64 = null;
+let uploadedRefFileName = null;
+
 // Simulated Email Notification logs
 let emailLogs = JSON.parse(localStorage.getItem('email_logs_data') || '[]');
 
@@ -84,7 +88,7 @@ let isSystemActive = localStorage.getItem('system_active') === 'true';
 let fpStart = null;
 let fpEnd = null;
 
-// Helper to open base64 files (PDF/images) in new tab safely using Blob URLs
+// Helper to open base64 files (PDF/images) in new tab safely using Blob URLs or Embed
 function openBase64File(base64DataUrl, filenamePrefix = 'file') {
   try {
     const parts = base64DataUrl.split(';base64,');
@@ -101,9 +105,8 @@ function openBase64File(base64DataUrl, filenamePrefix = 'file') {
 
     const blob = new Blob([uInt8Array], { type: contentType });
     const blobUrl = URL.createObjectURL(blob);
-    
-    const newTab = window.open(blobUrl, '_blank');
-    if (!newTab) {
+    const opened = window.open(blobUrl, '_blank');
+    if (!opened) {
       const extension = contentType.split('/')[1] || 'pdf';
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -1429,7 +1432,8 @@ function loginUser(userObj) {
   // 7. กำหนดค่าเริ่มต้นใส่ฟอร์มใบขอรถอัตโนมัติ
   document.getElementById('input-requester').value = currentUser.name;
   document.getElementById('input-position').value = currentUser.position;
-  document.getElementById('input-department').value = '-';
+  const deptInputEl = document.getElementById('input-department');
+  if (deptInputEl) deptInputEl.value = '-';
   document.getElementById('input-office').value = currentUser.office;
   document.getElementById('input-division').value = currentUser.department;
 
@@ -3341,6 +3345,32 @@ async function openApprovalModal(bookingId) {
     }
   }
 
+  // เติมข้อมูลเอกสารอ้างอิง/บันทึกอนุญาต
+  const refFileRow = document.getElementById('detail-ref-file-row');
+  const refFileEl = document.getElementById('detail-ref-file');
+  if (refFileRow && refFileEl) {
+    const fileUrl = booking.refFilePath ? (booking.refFilePath.startsWith('/') ? booking.refFilePath : '/' + booking.refFilePath) : null;
+    const fileData = booking.refFile || fileUrl;
+    if (fileData) {
+      const targetUrl = fileUrl || fileData;
+      if (fileData.startsWith('data:application/pdf') || (fileUrl && fileUrl.toLowerCase().endsWith('.pdf'))) {
+        refFileEl.innerHTML = `<a href="${targetUrl}" target="_blank" class="btn btn-secondary btn-sm btn-view-ref-file" data-booking-id="${booking.id}" style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.35rem 0.75rem; font-size:0.85rem; border-radius:6px; font-weight:600; background:var(--primary); color:white; border:none; text-decoration:none; cursor:pointer;">📄 เปิดดูเอกสารอ้างอิง (PDF)</a>`;
+      } else if (fileData.startsWith('data:image') || (fileUrl && (fileUrl.toLowerCase().endsWith('.png') || fileUrl.toLowerCase().endsWith('.jpg') || fileUrl.toLowerCase().endsWith('.jpeg') || fileUrl.toLowerCase().endsWith('.webp')))) {
+        refFileEl.innerHTML = `
+          <a href="${targetUrl}" target="_blank" class="btn-view-ref-file" data-booking-id="${booking.id}" title="คลิกเพื่อดูรูปใหญ่" style="cursor: pointer; display: inline-block;">
+            <img src="${fileData}" style="max-width: 140px; max-height: 90px; border-radius: 6px; border: 1px solid var(--border-color); object-fit: contain;">
+          </a>
+        `;
+      } else {
+        refFileEl.innerHTML = `<a href="${targetUrl}" target="_blank" download class="btn btn-secondary btn-sm" style="display:inline-flex; align-items:center; gap:0.25rem; padding:0.35rem 0.75rem; font-size:0.85rem;">📎 ดาวน์โหลดเอกสารอ้างอิง (${booking.refFileName || 'ไฟล์แนบ'})</a>`;
+      }
+      refFileRow.style.display = 'table-row';
+    } else {
+      refFileEl.textContent = '-';
+      refFileRow.style.display = 'none';
+    }
+  }
+
   document.getElementById('detail-route').textContent = booking.destination || booking.purpose || '-';
   
   const start = formatThaiDateTimeLong(booking.startDate);
@@ -4549,7 +4579,7 @@ function buildReportHTMLContent(b) {
     <!-- HEADER SECTION -->
     <div class="fmo-header-block">
       <div class="fmo-header-left">
-        <div class="fmo-line" style="font-size:13px;">[อ้างอิงเอกสารอนุมัติ/อนุญาต] ที่ <span class="dotted-fill" style="text-align:left; font-weight:normal; font-size:13px;">${b.ref || '-'}</span></div>
+        <div class="fmo-line" style="font-size:13px;">[เอกสารอ้างอิง/บันทึกอนุญาต] ที่ <span class="dotted-fill" style="text-align:left; font-weight:normal; font-size:13px;">${b.ref || '-'}</span></div>
       </div>
       <div class="fmo-header-right">
         <div class="fmo-logo-wrapper">
@@ -5107,6 +5137,21 @@ function setupEventListeners() {
         openBase64File(b.driverLicenseFile, `ใบขับขี่_${b.requester}`);
       }
     }
+    const refBtn = e.target.closest('.btn-view-ref-file');
+    if (refBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const href = refBtn.getAttribute('href');
+      const bId = refBtn.getAttribute('data-booking-id');
+      const b = bookings.find(x => String(x.id).trim() === String(bId).trim());
+      const fileTarget = (b && (b.refFilePath ? (b.refFilePath.startsWith('/') ? b.refFilePath : '/' + b.refFilePath) : b.refFile)) || href;
+      
+      if (fileTarget && fileTarget.startsWith('data:')) {
+        openBase64File(fileTarget, `เอกสารอ้างอิง_${b ? (b.ref || b.id) : 'file'}`);
+      } else if (fileTarget) {
+        window.open(fileTarget, '_blank');
+      }
+    }
   });
 
 
@@ -5136,6 +5181,21 @@ function setupEventListeners() {
     document.getElementById('check-car-go').checked = true;
     document.getElementById('check-car-back').checked = true;
     document.getElementById('input-trips').value = 2;
+
+    // Reset reference file state
+    uploadedRefFileBase64 = null;
+    uploadedRefFileName = null;
+    const refFileInput = document.getElementById('input-ref-file');
+    if (refFileInput) refFileInput.value = '';
+    const refFilenameEl = document.getElementById('ref-file-filename');
+    if (refFilenameEl) {
+      refFilenameEl.textContent = 'ยังไม่ได้เลือกไฟล์เอกสารแนบ (บังคับอัปโหลด)';
+      refFilenameEl.style.color = 'var(--danger)';
+    }
+    const refPreviewContainer = document.getElementById('ref-file-preview-container');
+    if (refPreviewContainer) refPreviewContainer.style.display = 'none';
+    const refPreviewEl = document.getElementById('ref-file-preview');
+    if (refPreviewEl) refPreviewEl.src = '';
 
     // Reset driver's license upload state, UI and welfare address fields
     uploadedDriverLicenseBase64 = null;
@@ -5318,6 +5378,11 @@ function setupEventListeners() {
       }
     }
 
+    if (!uploadedRefFileBase64) {
+      showToast("กรุณาอัปโหลดไฟล์เอกสารอ้างอิง/บันทึกอนุญาต", "warning");
+      return;
+    }
+
     // 4. สร้างชุดข้อมูลใบจองใหม่
     const newBooking = {
       id: newBookingId,
@@ -5325,7 +5390,7 @@ function setupEventListeners() {
       requesterEmail: currentUser.email || '',
       managerEmail: managerEmail,
       position: document.getElementById('input-position').value,
-      department: document.getElementById('input-department').value,
+      department: (document.getElementById('input-department') ? document.getElementById('input-department').value : '-'),
       office: document.getElementById('input-office').value,
       division: document.getElementById('input-division').value,
       controlUnit: controlUnit,
@@ -5339,6 +5404,8 @@ function setupEventListeners() {
       purpose,
       destination,
       ref,
+      refFile: uploadedRefFileBase64,
+      refFileName: uploadedRefFileName || 'เอกสารอ้างอิง',
       passengers,
       startDate,
       endDate,
@@ -5897,6 +5964,49 @@ function setupEventListeners() {
         if (filenameEl) filenameEl.textContent = 'ยังไม่ได้เลือกไฟล์';
         if (previewContainer) previewContainer.style.display = 'none';
         uploadedDriverLicenseBase64 = null;
+      }
+    });
+  }
+
+  // Handle reference document file upload & verification
+  const refFileInput = document.getElementById('input-ref-file');
+  if (refFileInput) {
+    refFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const filenameEl = document.getElementById('ref-file-filename');
+      const previewContainer = document.getElementById('ref-file-preview-container');
+      const previewEl = document.getElementById('ref-file-preview');
+      
+      if (!file) {
+        if (filenameEl) {
+          filenameEl.textContent = 'ยังไม่ได้เลือกไฟล์เอกสารแนบ (บังคับอัปโหลด)';
+          filenameEl.style.color = 'var(--danger)';
+        }
+        if (previewContainer) previewContainer.style.display = 'none';
+        uploadedRefFileBase64 = null;
+        uploadedRefFileName = null;
+        return;
+      }
+      
+      uploadedRefFileName = file.name;
+      if (filenameEl) {
+        filenameEl.textContent = `เลือกแล้ว: ${file.name}`;
+        filenameEl.style.color = 'var(--success)';
+      }
+      
+      if (file.type.startsWith('image/')) {
+        compressImage(file, (dataUrl) => {
+          uploadedRefFileBase64 = dataUrl;
+          if (previewEl) previewEl.src = dataUrl;
+          if (previewContainer) previewContainer.style.display = 'block';
+        });
+      } else {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          uploadedRefFileBase64 = event.target.result;
+          if (previewContainer) previewContainer.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
       }
     });
   }
@@ -7161,6 +7271,9 @@ window.changeHistoryPage = changeHistoryPage;
 document.addEventListener('click', function(e) {
   const targetBadge = e.target ? e.target.closest('.calendar-event-badge, [data-booking-id]') : null;
   if (targetBadge) {
+    if (targetBadge.closest('.btn-view-ref-file, .btn-view-license-file, .modal-overlay, .modal-box')) {
+      return;
+    }
     const bookingId = targetBadge.getAttribute('data-booking-id');
     if (bookingId) {
       e.preventDefault();

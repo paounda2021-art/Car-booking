@@ -42,6 +42,7 @@ function safeWriteJsonFile(filePath, data, callback) {
       if (renameErr) {
         console.error(`[SafeWrite] Atomic rename error for ${filePath}:`, renameErr);
         fs.writeFile(filePath, content, 'utf8', (fallbackErr) => {
+          fs.unlink(tmpPath, () => {});
           if (callback) callback(fallbackErr);
         });
       } else {
@@ -74,6 +75,9 @@ db.exec(`
     purpose TEXT,
     destination TEXT,
     ref TEXT,
+    refFile TEXT,
+    refFileName TEXT,
+    refFilePath TEXT,
     passengers TEXT,
     startDate TEXT,
     endDate TEXT,
@@ -128,6 +132,9 @@ db.exec(`
 // Ensure schema is updated with active column for system_config and createdAt for bookings
 try { db.exec("ALTER TABLE bookings ADD COLUMN createdAt TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE bookings ADD COLUMN active INTEGER DEFAULT 0;"); } catch(e) {}
+try { db.exec("ALTER TABLE bookings ADD COLUMN refFile TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE bookings ADD COLUMN refFileName TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE bookings ADD COLUMN refFilePath TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN name TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN icon TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE cars ADD COLUMN driverName TEXT;"); } catch(e) {}
@@ -223,13 +230,13 @@ function sqliteSaveBookings(bookingsList) {
       INSERT OR REPLACE INTO bookings (
         id, createdAt, requester, requesterEmail, managerEmail, position, department, office, division, controlUnit,
         driverLicenseFile, addressNo, addressMoo, addressRoad, addressSubdistrict, addressDistrict, addressProvince,
-        purpose, destination, ref, passengers, startDate, endDate, trips, travelType, carId, distance, price,
+        purpose, destination, ref, refFile, refFileName, refFilePath, passengers, startDate, endDate, trips, travelType, carId, distance, price,
         goCheck, backCheck, status, currentApprovalLevel, driverName, returnedEarly, driverAccepted, signatures,
         waitingForRequesterInput, taxiInfo, active
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?
       )
@@ -258,6 +265,9 @@ function sqliteSaveBookings(bookingsList) {
         b.purpose || '',
         b.destination || '',
         b.ref || '',
+        b.refFile || '',
+        b.refFileName || '',
+        b.refFilePath || '',
         b.passengers || '',
         b.startDate || '',
         b.endDate || '',
@@ -327,6 +337,7 @@ try {
 
     const masterList = Array.from(masterMap.values());
     console.log(`[Startup Auto-Sync] Bi-directional Sync completed. Total Master Bookings: ${masterList.length} records.`);
+    saveReferenceDocumentFiles(masterList);
     sqliteSaveBookings(masterList);
     safeWriteJsonFile(bookingsJsonPath, JSON.stringify(masterList, null, 2));
   }
@@ -467,6 +478,53 @@ function saveSignatureImages(list) {
   });
 }
 
+// Function to export & store reference document files in case folders (uploads/<BOOKING_ID>/)
+function saveReferenceDocumentFiles(list) {
+  if (!Array.isArray(list)) return;
+  const uploadsDir = path.join(ROOT_DIR, 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    try { fs.mkdirSync(uploadsDir, { recursive: true }); } catch(e) {}
+  }
+
+  list.forEach(b => {
+    if (!b || !b.id) return;
+    const refData = b.refFile;
+    if (refData && typeof refData === 'string' && refData.startsWith('data:')) {
+      const match = refData.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        const mimeType = match[1];
+        const base64Data = match[2];
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        let ext = '.bin';
+        if (mimeType.includes('pdf')) ext = '.pdf';
+        else if (mimeType.includes('png')) ext = '.png';
+        else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = '.jpg';
+        else if (mimeType.includes('webp')) ext = '.webp';
+        else if (mimeType.includes('word') || mimeType.includes('document')) ext = '.docx';
+        else if (b.refFileName) {
+          const fileExt = path.extname(b.refFileName);
+          if (fileExt) ext = fileExt;
+        }
+
+        const caseDir = path.join(uploadsDir, b.id);
+        if (!fs.existsSync(caseDir)) {
+          try { fs.mkdirSync(caseDir, { recursive: true }); } catch(e) {}
+        }
+        
+        const fileName = `ref_document${ext}`;
+        const filePath = path.join(caseDir, fileName);
+        try {
+          fs.writeFileSync(filePath, buffer);
+          b.refFilePath = `uploads/${b.id}/${fileName}`;
+        } catch(e) {
+          console.error(`Error saving reference file for ${b.id}:`, e);
+        }
+      }
+    }
+  });
+}
+
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -476,7 +534,9 @@ const MIME_TYPES = {
   '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
-  '.pdf': 'application/pdf'
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 };
 
 const server = http.createServer((req, res) => {
@@ -709,6 +769,7 @@ const server = http.createServer((req, res) => {
         } else {
           // Dual-Write 2: SQLite database
           try {
+            saveReferenceDocumentFiles(list);
             sqliteSaveBookings(list);
             saveSignatureImages(list);
           } catch(sqliteErr) {

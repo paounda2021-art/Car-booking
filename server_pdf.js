@@ -534,7 +534,7 @@ function buildReportHTMLContent(b, usersList, carsList) {
     <!-- HEADER SECTION -->
     <div class="fmo-header-block">
       <div class="fmo-header-left">
-        <div class="fmo-line" style="font-size:13px;">[อ้างอิงเอกสารอนุมัติ/อนุญาต] ที่ <span class="dotted-fill" style="text-align:left; font-weight:normal; font-size:13px;">${b.ref || '-'}</span></div>
+        <div class="fmo-line" style="font-size:13px;">[เอกสารอ้างอิง/บันทึกอนุญาต] ที่ <span class="dotted-fill" style="text-align:left; font-weight:normal; font-size:13px;">${b.ref || '-'}</span></div>
       </div>
       <div class="fmo-header-right">
         <div class="fmo-logo-wrapper">

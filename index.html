@@ -591,26 +591,22 @@
           <div class="form-row">
             <div class="form-group">
               <label for="input-requester">ชื่อผู้ขอจอง (ข้าพเจ้า)</label>
-              <input type="text" id="input-requester" class="form-control" placeholder="ชื่อ-นามสกุล" required>
+              <input type="text" id="input-requester" class="form-control" placeholder="ชื่อ-นามสกุล" required readonly style="background-color: rgba(255, 255, 255, 0.05); color: var(--text-muted); opacity: 0.85; cursor: not-allowed;">
             </div>
             <div class="form-group">
               <label for="input-position">ตำแหน่ง</label>
-              <input type="text" id="input-position" class="form-control" placeholder="ตำแหน่ง" required>
+              <input type="text" id="input-position" class="form-control" placeholder="ตำแหน่ง" required readonly style="background-color: rgba(255, 255, 255, 0.05); color: var(--text-muted); opacity: 0.85; cursor: not-allowed;">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label for="input-department">แผนก</label>
-              <input type="text" id="input-department" class="form-control" placeholder="แผนก" required>
-            </div>
-            <div class="form-group">
-              <label for="input-office">สำนักงาน</label>
-              <input type="text" id="input-office" class="form-control" placeholder="สำนักงาน" required>
+              <label for="input-office">สำนักงาน/แผนก</label>
+              <input type="text" id="input-office" class="form-control" placeholder="สำนักงาน/แผนก" required readonly style="background-color: rgba(255, 255, 255, 0.05); color: var(--text-muted); opacity: 0.85; cursor: not-allowed;">
             </div>
             <div class="form-group">
               <label for="input-division">สังกัด/ฝ่าย</label>
-              <input type="text" id="input-division" class="form-control" placeholder="สังกัด/ฝ่าย" required>
+              <input type="text" id="input-division" class="form-control" placeholder="สังกัด/ฝ่าย" required readonly style="background-color: rgba(255, 255, 255, 0.05); color: var(--text-muted); opacity: 0.85; cursor: not-allowed;">
             </div>
           </div>
 
@@ -677,8 +673,18 @@
               <input type="text" id="input-destination" class="form-control" placeholder="ระบุสถานที่ปลายทาง" required>
             </div>
             <div class="form-group">
-              <label for="input-ref">ที่ (อ้างอิงเอกสาร)</label>
-              <input type="text" id="input-ref" class="form-control" placeholder="เช่น อสป. 102/2569">
+              <label for="input-ref">เอกสารอ้างอิง/บันทึกอนุญาต <span style="color:var(--danger);">*</span></label>
+              <input type="text" id="input-ref" class="form-control" placeholder="เช่น ที่ กษ 1705.3/xxx" required style="margin-bottom: 0.5rem;">
+              <div class="ref-upload-container" style="border: 2px dashed var(--border-color); border-radius: 8px; background: rgba(255, 255, 255, 0.5); padding: 0.75rem; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.5rem; text-align:center;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('input-ref-file').click()" style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; max-width: 320px; font-weight: 600; padding: 0.5rem;">
+                  📁 อัปโหลดไฟล์เอกสารอ้างอิง/บันทึกอนุญาต (บังคับ)
+                </button>
+                <input type="file" id="input-ref-file" accept="image/*,application/pdf,.doc,.docx" style="display: none;">
+                <span id="ref-file-filename" style="font-size: 0.8rem; color: var(--danger); font-weight: 500;">ยังไม่ได้เลือกไฟล์เอกสารแนบ (บังคับอัปโหลด)</span>
+                <div id="ref-file-preview-container" style="display: none; margin-top: 0.25rem;">
+                  <img id="ref-file-preview" src="" style="max-width: 140px; max-height: 90px; border-radius: 6px; border: 1px solid var(--border-color); object-fit: contain;">
+                </div>
+              </div>
             </div>
           </div>
 
@@ -819,6 +825,10 @@
             <tr id="detail-welfare-address-row" style="display:none;">
               <td style="padding:0.25rem 0; color:var(--text-muted);">ที่อยู่ผู้ขอใช้รถ:</td>
               <td id="detail-welfare-address" style="padding:0.25rem 0;">-</td>
+            </tr>
+            <tr id="detail-ref-file-row" style="display:none;">
+              <td style="padding:0.25rem 0; color:var(--text-muted);">เอกสารอ้างอิง/บันทึกอนุญาต:</td>
+              <td id="detail-ref-file" style="padding:0.25rem 0;">-</td>
             </tr>
           </table>
         </div>
@@ -1179,6 +1189,6 @@
   <script src="flatpickr.min.js?v=1.0"></script>
   <script src="flatpickr.th.js?v=1.0"></script>
   <script src="html2pdf.bundle.min.js?v=1.0"></script>
-  <script src="app.js?v=56.0_fill_taxi_pending_status_fix"></script>
+  <script src="app.js?v=58.0_fix_capture_interception"></script>
 </body>
 </html>
