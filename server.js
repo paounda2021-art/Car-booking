@@ -618,22 +618,33 @@ const server = http.createServer((req, res) => {
         let reqDept = payload.department || '';
         let reqManagerEmail = payload.managerEmail || '';
 
-        if (!baseReqName || baseReqName.toLowerCase().includes('admin') || baseReqName.includes('ผู้ดูแลระบบ') || baseReqName.includes('Admin')) {
-          baseReqName = 'น.ส.รณิดา  โชติธนาอุดม';
-          reqEmail = 'ranida.c@fishmarket.co.th';
-          reqPosition = 'เจ้าหน้าที่บริหารงานทั่วไป / ร.หส.ทส.';
-          reqDept = 'ฝ.สป.ทร. 2';
-          reqManagerEmail = 'supranee.p@fishmarket.co.th';
-        } else {
-          // ลองค้นหาประวัติผู้ใช้งานในตาราง users เพื่อเติมตำแหน่งและอีเมลอัตโนมัติ
-          const dbUsers = sqliteGetUsers() || [];
-          const foundUser = dbUsers.find(u => u && u.name && u.name.includes(baseReqName));
-          if (foundUser) {
-            reqEmail = foundUser.email || reqEmail;
-            reqPosition = foundUser.position || reqPosition;
-            reqDept = foundUser.department1 || reqDept;
-            reqManagerEmail = foundUser.manager_email || reqManagerEmail;
+        const dbUsers = sqliteGetUsers() || [];
+        const reqLower = baseReqName.toLowerCase();
+
+        let foundUser = null;
+        if (reqLower.includes('พิมพ์ลดา') || reqLower.includes('pimrada')) {
+          foundUser = dbUsers.find(u => u && (u.username === 'pimrada.a' || (u.name && u.name.includes('พิมพ์ลดา'))));
+          if (!baseReqName || reqLower.includes('admin') || reqLower.includes('ผู้ดูแลระบบ')) {
+            baseReqName = 'น.ส.พิมพ์ลดา  อัศวเศรษฐชัย';
           }
+        } else if (reqLower.includes('อมรรัตน์') || reqLower.includes('amornrat') || reqLower.includes('amonrat')) {
+          foundUser = dbUsers.find(u => u && (u.username === 'amornrat.k' || (u.name && u.name.includes('อมรรัตน์'))));
+          if (!baseReqName || reqLower.includes('admin') || reqLower.includes('ผู้ดูแลระบบ')) {
+            baseReqName = 'น.ส.อมรรัตน์  ขุนทอง';
+          }
+        } else if (!baseReqName || reqLower.includes('admin') || reqLower.includes('ผู้ดูแลระบบ')) {
+          baseReqName = 'น.ส.รณิดา  โชติธนาอุดม';
+          foundUser = dbUsers.find(u => u && u.username === 'ranida.c');
+        } else {
+          foundUser = dbUsers.find(u => u && u.name && u.name.includes(baseReqName));
+        }
+
+        if (foundUser) {
+          baseReqName = foundUser.name || baseReqName;
+          reqEmail = foundUser.email || reqEmail;
+          reqPosition = foundUser.position || reqPosition;
+          reqDept = foundUser.department1 || reqDept;
+          reqManagerEmail = foundUser.manager_email || reqManagerEmail;
         }
 
         // 💡 3. ต่อท้ายชื่อผู้จองด้วย (กิจกรรมจัดสรรคิว)
@@ -650,15 +661,32 @@ const server = http.createServer((req, res) => {
         // ตั้งค่าประเภทการเดินทางเป็น "fmo_car" (🚘 รถยนต์ อสป.) เป็นค่าเริ่มต้น
         const travelType = payload.travelType || 'fmo_car';
 
-        // 💡 1. จัดเตรียมลายเซ็น L0 ของผู้สร้างกิจกรรม + บันทึกไฟล์ภาพลายเซ็น SIG_L0_<BOOKING_ID>.png
+        // 💡 1. จัดเตรียมลายเซ็น L0 ของผู้สร้างกิจกรรม (พิมพ์ลดา, อมรรัตน์ หรือเริ่มต้น) + บันทึกไฟล์ภาพลายเซ็น SIG_L0_<BOOKING_ID>.png
         const sigsDir = path.join(ROOT_DIR, 'signatures');
         if (!fs.existsSync(sigsDir)) {
           try { fs.mkdirSync(sigsDir, { recursive: true }); } catch(e) {}
         }
 
         let sigPngBuffer = null;
+        const pimradaSigPath = path.join(sigsDir, '1.pimrada.png');
+        const amornratSigPath = path.join(sigsDir, '2.amornrat.png');
         const defaultSigPath = path.join(ROOT_DIR, 'piyawan_sig_transparent.png');
-        if (fs.existsSync(defaultSigPath)) {
+
+        const isPimrada = reqLower.includes('พิมพ์ลดา') || reqLower.includes('pimrada');
+        const isAmornrat = reqLower.includes('อมรรัตน์') || reqLower.includes('amornrat') || reqLower.includes('amonrat');
+
+        if (isPimrada && fs.existsSync(pimradaSigPath)) {
+          try { sigPngBuffer = fs.readFileSync(pimradaSigPath); } catch(e) {}
+        } else if (isAmornrat && fs.existsSync(amornratSigPath)) {
+          try { sigPngBuffer = fs.readFileSync(amornratSigPath); } catch(e) {}
+        } else if (foundUser && foundUser.sign && foundUser.sign.startsWith('data:image')) {
+          try {
+            const b64 = foundUser.sign.split(';base64,').pop();
+            sigPngBuffer = Buffer.from(b64, 'base64');
+          } catch(e) {}
+        }
+
+        if (!sigPngBuffer && fs.existsSync(defaultSigPath)) {
           try { sigPngBuffer = fs.readFileSync(defaultSigPath); } catch(e) {}
         }
 
@@ -686,7 +714,7 @@ const server = http.createServer((req, res) => {
           managerEmail: reqManagerEmail,
           position: reqPosition || 'เจ้าหน้าที่ (Smart Queue)',
           department: reqDept || 'องค์การสะพานปลา',
-          office: 'ส่วนกลาง',
+          office: '',
           division: '',
           controlUnit: '',
           purpose: payload.purpose || (`ปฏิบัติภารกิจ อสป.: ${payload.title || payload.mission_title || ''}`).trim(),
@@ -964,6 +992,56 @@ const server = http.createServer((req, res) => {
             console.error("SQLite Dual-Write failed:", sqliteErr);
           }
 
+function notifySmartQueueCarStatus(bookingsList) {
+  if (!Array.isArray(bookingsList)) return;
+  const DEFAULT_CARS = [
+    { id: 'A', name: 'Toyota Commuter', plate: 'ฮษ 7446 (ส่วนกลาง)', driverName: 'นายชลาดล  ทองคำ', phone: '08-0992-3735' },
+    { id: 'B', name: 'Toyota Commuter', plate: '1 นญ 1865 (เช่า)', driverName: 'นายสันติ สุธรรม', phone: '09-1021-4916' },
+    { id: 'C', name: 'Toyota Commuter', plate: '1 นญ 2029 (เช่า)', driverName: 'นายคมกฤษ คุ้มชัย', phone: '09-4849-1122' },
+    { id: 'D', name: 'Toyota Commuter', plate: 'ฮล 2521 (รถสวัสดิการ)', driverName: '-', phone: '-' }
+  ];
+
+  bookingsList.forEach(b => {
+    if (!b || !b.id) return;
+    const statusUpper = String(b.status || 'PENDING').toUpperCase();
+    const carObj = DEFAULT_CARS.find(c => c.id === b.carId) || {};
+    
+    const payload = {
+      booking_id: b.id,
+      status: statusUpper === 'APPROVED' ? 'APPROVED' : statusUpper === 'REJECTED' ? 'REJECTED' : 'PENDING',
+      car_id: b.carId || carObj.id || '',
+      car_name: carObj.name || 'Toyota Commuter',
+      car_plate: carObj.plate || '',
+      driver_name: b.driverName || carObj.driverName || '',
+      driver_phone: carObj.phone || ''
+    };
+
+    const SMART_QUEUE_API_URL = process.env.SMART_QUEUE_API_URL || 'http://localhost:3005/api/external/update-car-status';
+    try {
+      const url = new URL(SMART_QUEUE_API_URL);
+      const postData = JSON.stringify(payload);
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 3005,
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        },
+        timeout: 3000
+      };
+      const req = http.request(options, (res) => {
+        res.on('data', () => {});
+      });
+      req.on('error', () => {});
+      req.on('timeout', () => { req.destroy(); });
+      req.write(postData);
+      req.end();
+    } catch(err) {}
+  });
+}
+
           // Automatic Server-Side Puppeteer PDF generation for newly approved bookings
           list.forEach(b => {
             if (b.id && b.status === 'approved') {
@@ -979,6 +1057,9 @@ const server = http.createServer((req, res) => {
               }
             }
           });
+
+          // Sync status to Smart Queue
+          try { notifySmartQueueCarStatus(list); } catch(e) {}
 
           res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ status: 'success', message: 'Bookings saved successfully' }));

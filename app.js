@@ -2493,10 +2493,11 @@ function renderBookingsLists() {
     const card = document.createElement('div');
     card.className = 'booking-card';
     card.onclick = () => openApprovalModal(b.id);
+    const reqSubInfo = (b.office === 'ส่วนกลาง' || (b.requester && b.requester.includes('(กิจกรรมจัดสรรคิว)'))) ? '' : (b.office || b.position);
     card.innerHTML = `
       <div class="booking-card-top">
         <span class="booking-id">${b.id}</span>
-        <span class="booking-requester">${b.requester} ${(b.office || b.position) ? '(' + (b.office || b.position) + ')' : ''}</span>
+        <span class="booking-requester">${b.requester} ${reqSubInfo ? '(' + reqSubInfo + ')' : ''}</span>
         <span class="badge ${statusClass}">${statusText}</span>
       </div>
       <div class="booking-card-body">
