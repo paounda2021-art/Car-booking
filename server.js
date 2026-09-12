@@ -65,31 +65,12 @@ function cleanupTempFiles() {
 cleanupTempFiles();
 setInterval(cleanupTempFiles, 15 * 60 * 1000); // Auto-clean temp files every 15 minutes
 
-// Safe Atomic Write for JSON files to prevent file corruption during concurrent operations or restarts
+// Write JSON files directly to prevent temporary (.tmp) file creation on Windows
 function safeWriteJsonFile(filePath, data, callback) {
-  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 8)}.tmp`;
   const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-  
-  fs.writeFile(tmpPath, content, 'utf8', (writeErr) => {
-    if (writeErr) {
-      console.error(`[SafeWrite] Temp write error for ${filePath}:`, writeErr);
-      safeUnlink(tmpPath);
-      fs.writeFile(filePath, content, 'utf8', (directErr) => {
-        if (callback) callback(directErr);
-      });
-      return;
-    }
-    fs.rename(tmpPath, filePath, (renameErr) => {
-      if (renameErr) {
-        // Atomic rename fallback on Windows when file is locked
-        safeUnlink(tmpPath);
-        fs.writeFile(filePath, content, 'utf8', (fallbackErr) => {
-          if (callback) callback(fallbackErr);
-        });
-      } else {
-        if (callback) callback(null);
-      }
-    });
+  fs.writeFile(filePath, content, 'utf8', (err) => {
+    if (err) console.error(`[WriteJson] Error writing ${filePath}:`, err);
+    if (callback) callback(err);
   });
 }
 
