@@ -584,13 +584,57 @@ const server = http.createServer((req, res) => {
         const body = Buffer.concat(chunks).toString('utf8');
         const payload = JSON.parse(body) || {};
         
-        const timestamp = Date.now();
+        let dbBookings = sqliteGetBookings() || [];
         const dateObj = new Date();
         const yearTh = dateObj.getFullYear() + 543;
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        
-        const bookingId = payload.bookingId || `SQ-${yearTh}${month}${day}-${timestamp.toString().slice(-4)}`;
+        const shortYear = String(yearTh).slice(-2); // e.g. '69'
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0'); // e.g. '09'
+        const bgkPrefix = `BGK-${shortYear}${month}-`; // e.g. 'BGK-6909-'
+
+        // 1. รันเลขใบขออนุญาตใช้รถยนต์ต่อจากเลขเดิมในระบบ (BGK-6909-XXX)
+        let bookingId = payload.bookingId;
+        if (!bookingId || !bookingId.startsWith('BGK-')) {
+          let maxSeq = 0;
+          dbBookings.forEach(b => {
+            if (b && b.id && typeof b.id === 'string') {
+              const cleanId = b.id.trim().toUpperCase();
+              if (cleanId.startsWith(bgkPrefix.toUpperCase())) {
+                const parts = cleanId.split('-');
+                const seqNum = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(seqNum) && seqNum > maxSeq) {
+                  maxSeq = seqNum;
+                }
+              }
+            }
+          });
+          const nextSeq = String(maxSeq + 1).padStart(3, '0');
+          bookingId = `${bgkPrefix}${nextSeq}`;
+        }
+
+        // 2. ชื่อผู้จองและสิทธิ์ Admin -> นางสาวรณิดา โชติธนาอุดม
+        let reqName = (payload.requesterName || '').trim();
+        let reqEmail = payload.requesterEmail || '';
+        let reqPosition = payload.position || '';
+        let reqDept = payload.department || '';
+        let reqManagerEmail = payload.managerEmail || '';
+
+        if (!reqName || reqName.toLowerCase().includes('admin') || reqName.includes('ผู้ดูแลระบบ') || reqName.includes('Admin')) {
+          reqName = 'น.ส.รณิดา  โชติธนาอุดม';
+          reqEmail = 'ranida.c@fishmarket.co.th';
+          reqPosition = 'เจ้าหน้าที่บริหารงานทั่วไป / ร.หส.ทส.';
+          reqDept = 'ฝ.สป.ทร. 2';
+          reqManagerEmail = 'supranee.p@fishmarket.co.th';
+        } else {
+          // ลองค้นหาประวัติผู้ใช้งานในตาราง users เพื่อเติมตำแหน่งและอีเมลอัตโนมัติ
+          const dbUsers = sqliteGetUsers() || [];
+          const foundUser = dbUsers.find(u => u && u.name && u.name.includes(reqName));
+          if (foundUser) {
+            reqEmail = foundUser.email || reqEmail;
+            reqPosition = foundUser.position || reqPosition;
+            reqDept = foundUser.department1 || reqDept;
+            reqManagerEmail = foundUser.manager_email || reqManagerEmail;
+          }
+        }
 
         let passengerStr = '';
         if (Array.isArray(payload.passengers)) {
@@ -599,15 +643,19 @@ const server = http.createServer((req, res) => {
           passengerStr = String(payload.passengers);
         }
 
+        // 3. ตั้งค่าประเภทการเดินทางเป็น "fmo_car" (🚘 รถยนต์ อสป.) เป็นค่าเริ่มต้น
+        const travelType = payload.travelType || 'fmo_car';
+
         const newBooking = {
           id: bookingId,
           createdAt: new Date().toISOString(),
-          requester: payload.requesterName || 'ระบบ Smart Queue',
-          requesterEmail: payload.requesterEmail || '',
-          position: payload.position || 'เจ้าหน้าที่ (Smart Queue)',
-          department: payload.department || 'องค์การสะพานปลา',
+          requester: reqName,
+          requesterEmail: reqEmail,
+          managerEmail: reqManagerEmail,
+          position: reqPosition || 'เจ้าหน้าที่ (Smart Queue)',
+          department: reqDept || 'องค์การสะพานปลา',
           office: 'ส่วนกลาง',
-          division: payload.division || '',
+          division: '',
           controlUnit: '',
           purpose: payload.purpose || (`ปฏิบัติภารกิจ อสป.: ${payload.title || payload.mission_title || ''}`).trim(),
           destination: payload.destination || payload.location || '',
@@ -615,7 +663,7 @@ const server = http.createServer((req, res) => {
           startDate: payload.startDate || payload.start_date || '',
           endDate: payload.endDate || payload.end_date || '',
           trips: 1,
-          travelType: payload.travelType || 'บก',
+          travelType: travelType,
           carId: '',
           distance: 0,
           price: 0,
@@ -632,7 +680,6 @@ const server = http.createServer((req, res) => {
           active: 1
         };
 
-        let dbBookings = sqliteGetBookings() || [];
         const existingIdx = dbBookings.findIndex(b => b && b.id === bookingId);
         if (existingIdx >= 0) {
           dbBookings[existingIdx] = newBooking;
@@ -644,7 +691,7 @@ const server = http.createServer((req, res) => {
         const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
         safeWriteJsonFile(bookingsJsonPath, JSON.stringify(dbBookings, null, 2));
 
-        console.log(`[Auto-Booking] Created car booking ${bookingId} for mission ${payload.mission_id || ''}`);
+        console.log(`[Auto-Booking] Created car booking ${bookingId} (${reqName}) for mission ${payload.mission_id || ''}`);
 
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
