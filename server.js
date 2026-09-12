@@ -612,14 +612,14 @@ const server = http.createServer((req, res) => {
         }
 
         // 2. ชื่อผู้จองและสิทธิ์ Admin -> นางสาวรณิดา โชติธนาอุดม
-        let reqName = (payload.requesterName || '').trim();
+        let baseReqName = (payload.requesterName || '').trim();
         let reqEmail = payload.requesterEmail || '';
         let reqPosition = payload.position || '';
         let reqDept = payload.department || '';
         let reqManagerEmail = payload.managerEmail || '';
 
-        if (!reqName || reqName.toLowerCase().includes('admin') || reqName.includes('ผู้ดูแลระบบ') || reqName.includes('Admin')) {
-          reqName = 'น.ส.รณิดา  โชติธนาอุดม';
+        if (!baseReqName || baseReqName.toLowerCase().includes('admin') || baseReqName.includes('ผู้ดูแลระบบ') || baseReqName.includes('Admin')) {
+          baseReqName = 'น.ส.รณิดา  โชติธนาอุดม';
           reqEmail = 'ranida.c@fishmarket.co.th';
           reqPosition = 'เจ้าหน้าที่บริหารงานทั่วไป / ร.หส.ทส.';
           reqDept = 'ฝ.สป.ทร. 2';
@@ -627,7 +627,7 @@ const server = http.createServer((req, res) => {
         } else {
           // ลองค้นหาประวัติผู้ใช้งานในตาราง users เพื่อเติมตำแหน่งและอีเมลอัตโนมัติ
           const dbUsers = sqliteGetUsers() || [];
-          const foundUser = dbUsers.find(u => u && u.name && u.name.includes(reqName));
+          const foundUser = dbUsers.find(u => u && u.name && u.name.includes(baseReqName));
           if (foundUser) {
             reqEmail = foundUser.email || reqEmail;
             reqPosition = foundUser.position || reqPosition;
@@ -636,6 +636,10 @@ const server = http.createServer((req, res) => {
           }
         }
 
+        // 💡 3. ต่อท้ายชื่อผู้จองด้วย (กิจกรรมจัดสรรคิว)
+        const cleanReqName = baseReqName.replace(/\s*\(กิจกรรมจัดสรรคิว\)\s*/g, '').trim();
+        const fullRequesterName = `${cleanReqName} (กิจกรรมจัดสรรคิว)`;
+
         let passengerStr = '';
         if (Array.isArray(payload.passengers)) {
           passengerStr = payload.passengers.map(p => typeof p === 'object' ? `${p.name || ''} (${p.position || ''})`.trim() : String(p)).join(', ');
@@ -643,13 +647,41 @@ const server = http.createServer((req, res) => {
           passengerStr = String(payload.passengers);
         }
 
-        // 3. ตั้งค่าประเภทการเดินทางเป็น "fmo_car" (🚘 รถยนต์ อสป.) เป็นค่าเริ่มต้น
+        // ตั้งค่าประเภทการเดินทางเป็น "fmo_car" (🚘 รถยนต์ อสป.) เป็นค่าเริ่มต้น
         const travelType = payload.travelType || 'fmo_car';
+
+        // 💡 1. จัดเตรียมลายเซ็น L0 ของผู้สร้างกิจกรรม + บันทึกไฟล์ภาพลายเซ็น SIG_L0_<BOOKING_ID>.png
+        const sigsDir = path.join(ROOT_DIR, 'signatures');
+        if (!fs.existsSync(sigsDir)) {
+          try { fs.mkdirSync(sigsDir, { recursive: true }); } catch(e) {}
+        }
+
+        let sigPngBuffer = null;
+        const defaultSigPath = path.join(ROOT_DIR, 'piyawan_sig_transparent.png');
+        if (fs.existsSync(defaultSigPath)) {
+          try { sigPngBuffer = fs.readFileSync(defaultSigPath); } catch(e) {}
+        }
+
+        const l0FilePath = path.join(sigsDir, `SIG_L0_${bookingId}.png`);
+        if (sigPngBuffer) {
+          try { fs.writeFileSync(l0FilePath, sigPngBuffer); } catch(e) {}
+        }
+
+        const nowIso = new Date().toISOString();
+        const base64Sig = sigPngBuffer ? `data:image/png;base64,${sigPngBuffer.toString('base64')}` : '';
+
+        const signatures = [
+          { level: 0, role: 'requester', approverName: fullRequesterName, status: 'approved', timestamp: nowIso, signature: base64Sig },
+          { level: 1, role: 'supervisor', approverName: '', status: 'pending', comment: '', timestamp: '', signature: '' },
+          { level: 2, role: 'fleet_admin', approverName: '', status: 'pending', comment: '', timestamp: '', signature: '', driverName: '' },
+          { level: 3, role: 'director', approverName: '', status: 'pending', comment: '', timestamp: '', signature: '' },
+          { level: 4, role: 'executive', approverName: '', status: 'pending', comment: '', timestamp: '', signature: '' }
+        ];
 
         const newBooking = {
           id: bookingId,
-          createdAt: new Date().toISOString(),
-          requester: reqName,
+          createdAt: nowIso,
+          requester: fullRequesterName,
           requesterEmail: reqEmail,
           managerEmail: reqManagerEmail,
           position: reqPosition || 'เจ้าหน้าที่ (Smart Queue)',
@@ -662,19 +694,19 @@ const server = http.createServer((req, res) => {
           passengers: passengerStr,
           startDate: payload.startDate || payload.start_date || '',
           endDate: payload.endDate || payload.end_date || '',
-          trips: 1,
+          trips: 2, // 💡 2. จำนวนเที่ยว = 2 เที่ยว
           travelType: travelType,
           carId: '',
           distance: 0,
           price: 0,
           goCheck: 0,
           backCheck: 0,
-          status: 'pending',
+          status: 'pending', // 🚨 มารอที่ L1 ของผู้สร้างกิจกรรม
           currentApprovalLevel: 1,
           driverName: '',
           returnedEarly: 0,
           driverAccepted: 0,
-          signatures: [],
+          signatures: signatures,
           waitingForRequesterInput: 0,
           taxiInfo: {},
           active: 1
@@ -691,7 +723,7 @@ const server = http.createServer((req, res) => {
         const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
         safeWriteJsonFile(bookingsJsonPath, JSON.stringify(dbBookings, null, 2));
 
-        console.log(`[Auto-Booking] Created car booking ${bookingId} (${reqName}) for mission ${payload.mission_id || ''}`);
+        console.log(`[Auto-Booking] Created car booking ${bookingId} (${fullRequesterName}) for mission ${payload.mission_id || ''}`);
 
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({
