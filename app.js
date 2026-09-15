@@ -756,8 +756,14 @@ async function initDatabase() {
     const dbResponse = await fetch('/api/get-bookings?t=' + Date.now(), { cache: 'no-store' });
     if (dbResponse.ok) {
       let dbText = await dbResponse.text();
-      dbText = dbText.replace(/[\u0000-\u0009\u000B\u000C\u000E-\u001F]/g, '');
-      let dbBookings = JSON.parse(dbText);
+      dbText = (dbText || '').replace(/[\u0000-\u0009\u000B\u000C\u000E-\u001F]/g, '').trim();
+      let dbBookings = [];
+      try {
+        dbBookings = dbText ? JSON.parse(dbText) : [];
+      } catch(parseErr) {
+        console.warn("⚠️ JSON parse error on get-bookings response, fallback to []:", parseErr);
+        dbBookings = [];
+      }
       if (dbBookings && Array.isArray(dbBookings)) {
         dbBookings = dbBookings.map(b => {
           if (!b) return b;
