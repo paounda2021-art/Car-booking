@@ -214,16 +214,43 @@ function sqliteGetBookings() {
     const query = db.prepare("SELECT * FROM bookings");
     const rows = query.all();
     if (!rows || rows.length === 0) {
-      // 🛡️ Fallback: If SQLite table is empty, auto-populate from bookings.json
+      // 🛡️ Fallback 1: If SQLite table is empty, auto-populate from bookings.json
       const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
       if (fs.existsSync(bookingsJsonPath)) {
-        const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
-        const fileBookings = JSON.parse(rawJson) || [];
-        if (Array.isArray(fileBookings) && fileBookings.length > 0) {
-          console.log(`[SQLite Read] Table empty. Auto-migrating ${fileBookings.length} records from bookings.json`);
-          sqliteSaveBookings(fileBookings);
-          return fileBookings;
-        }
+        try {
+          const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
+          const fileBookings = JSON.parse(rawJson) || [];
+          if (Array.isArray(fileBookings) && fileBookings.length > 0) {
+            console.log(`[SQLite Read] Table empty. Auto-migrating ${fileBookings.length} records from bookings.json`);
+            sqliteSaveBookings(fileBookings);
+            return fileBookings;
+          }
+        } catch(e) {}
+      }
+      // 🛡️ Fallback 2: Auto-recover from database_backup.db
+      const backupDbPath = path.join(ROOT_DIR, 'database_backup.db');
+      if (fs.existsSync(backupDbPath)) {
+        try {
+          const backupDb = new DatabaseSync(backupDbPath);
+          const backupRows = backupDb.prepare("SELECT * FROM bookings").all();
+          if (backupRows && backupRows.length > 0) {
+            console.log(`[SQLite Read] Table empty. Auto-restoring ${backupRows.length} records from database_backup.db`);
+            const bList = backupRows.map(r => {
+              const b = { ...r };
+              b.goCheck = r.goCheck === 1;
+              b.backCheck = r.backCheck === 1;
+              b.returnedEarly = r.returnedEarly === 1;
+              b.driverAccepted = r.driverAccepted === 1;
+              b.waitingForRequesterInput = r.waitingForRequesterInput === 1;
+              b.active = r.active === 1;
+              try { b.signatures = JSON.parse(r.signatures || '[]'); } catch(e) { b.signatures = []; }
+              try { b.taxiInfo = JSON.parse(r.taxiInfo || '{}'); } catch(e) { b.taxiInfo = {}; }
+              return b;
+            });
+            sqliteSaveBookings(bList);
+            return bList;
+          }
+        } catch(bErr) {}
       }
     }
     return rows.map(r => {
@@ -246,6 +273,10 @@ function sqliteGetBookings() {
 }
 
 function sqliteSaveBookings(bookingsList) {
+  if (!Array.isArray(bookingsList) || bookingsList.length === 0) {
+    console.warn("🛑 [SQLite Guard] Prevented wiping database with empty array!");
+    return;
+  }
   try {
     db.exec("DELETE FROM bookings");
     const insertBooking = db.prepare(`
@@ -972,7 +1003,15 @@ const server = http.createServer((req, res) => {
           });
           list = Array.from(map.values());
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("Error parsing payload in /api/save-bookings:", e);
+      }
+
+      if (!Array.isArray(list) || list.length === 0) {
+        console.warn("🛑 [API Guard] Aborted save: empty or invalid list in /api/save-bookings");
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ status: 'error', message: 'Invalid or empty bookings payload' }));
+      }
 
       const cleanBody = JSON.stringify(list, null, 2);
 
