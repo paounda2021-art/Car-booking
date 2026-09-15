@@ -17,12 +17,12 @@ const DB_PATH = fs.existsSync('C:\\apps\\car-booking\\database.db')
 console.log(`[SQLite] Using database path: ${DB_PATH}`);
 const db = new DatabaseSync(DB_PATH);
 
-// Enable DELETE journal mode and busy_timeout 5000 so external DB Browser tools can view database.db directly anytime
+// Enable WAL journal mode and busy_timeout 10000 for smooth multi-process access
 try {
-  db.exec("PRAGMA busy_timeout = 5000;");
-  db.exec("PRAGMA journal_mode = DELETE;");
+  db.exec("PRAGMA busy_timeout = 10000;");
+  db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA synchronous = NORMAL;");
-  console.log("[SQLite] Journal mode set to DELETE & synchronous NORMAL with busy_timeout 5000");
+  console.log("[SQLite] Journal mode set to WAL & synchronous NORMAL with busy_timeout 10000");
 } catch (pragmaErr) {
   console.error("[SQLite] PRAGMA setup error:", pragmaErr);
 }
