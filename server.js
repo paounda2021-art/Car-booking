@@ -348,6 +348,12 @@ function sqliteSaveBookings(bookingsList) {
       );
     });
     console.log("SQLite Save completed (bookings count:", bookingsList.length + ")");
+    // Also keep bookings.json in sync as safe secondary backup
+    safeWriteJsonFile(path.join(ROOT_DIR, 'bookings.json'), bookingsList);
+    // Auto-update database_backup.db
+    try {
+      fs.copyFileSync(DB_PATH, path.join(ROOT_DIR, 'database_backup.db'));
+    } catch(copyErr) {}
   } catch (e) {
     console.error("SQLite Write error (bookings):", e);
   }
