@@ -79,95 +79,100 @@ function safeWriteJsonFile(filePath, data, callback) {
   });
 }
 
-// Ensure tables exist
-db.exec(`
-  CREATE TABLE IF NOT EXISTS bookings (
-    id TEXT PRIMARY KEY,
-    createdAt TEXT,
-    requester TEXT,
-    requesterEmail TEXT,
-    managerEmail TEXT,
-    position TEXT,
-    department TEXT,
-    office TEXT,
-    division TEXT,
-    controlUnit TEXT,
-    driverLicenseFile TEXT,
-    addressNo TEXT,
-    addressMoo TEXT,
-    addressRoad TEXT,
-    addressSubdistrict TEXT,
-    addressDistrict TEXT,
-    addressProvince TEXT,
-    purpose TEXT,
-    destination TEXT,
-    ref TEXT,
-    refFile TEXT,
-    refFileName TEXT,
-    refFilePath TEXT,
-    passengers TEXT,
-    startDate TEXT,
-    endDate TEXT,
-    trips INTEGER,
-    travelType TEXT,
-    carId TEXT,
-    distance REAL,
-    price REAL,
-    goCheck INTEGER,
-    backCheck INTEGER,
-    status TEXT,
-    currentApprovalLevel INTEGER,
-    driverName TEXT,
-    returnedEarly INTEGER,
-    driverAccepted INTEGER,
-    signatures TEXT,
-    waitingForRequesterInput INTEGER,
-    taxiInfo TEXT,
-    active INTEGER DEFAULT 0
-  );
+// Ensure tables exist safely
+if (db) {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id TEXT PRIMARY KEY,
+        createdAt TEXT,
+        requester TEXT,
+        requesterEmail TEXT,
+        managerEmail TEXT,
+        position TEXT,
+        department TEXT,
+        office TEXT,
+        division TEXT,
+        controlUnit TEXT,
+        driverLicenseFile TEXT,
+        addressNo TEXT,
+        addressMoo TEXT,
+        addressRoad TEXT,
+        addressSubdistrict TEXT,
+        addressDistrict TEXT,
+        addressProvince TEXT,
+        purpose TEXT,
+        destination TEXT,
+        ref TEXT,
+        refFile TEXT,
+        refFileName TEXT,
+        refFilePath TEXT,
+        passengers TEXT,
+        startDate TEXT,
+        endDate TEXT,
+        trips INTEGER,
+        travelType TEXT,
+        carId TEXT,
+        distance REAL,
+        price REAL,
+        goCheck INTEGER,
+        backCheck INTEGER,
+        status TEXT,
+        currentApprovalLevel INTEGER,
+        driverName TEXT,
+        returnedEarly INTEGER,
+        driverAccepted INTEGER,
+        signatures TEXT,
+        waitingForRequesterInput INTEGER,
+        taxiInfo TEXT,
+        active INTEGER DEFAULT 0
+      );
 
-  CREATE TABLE IF NOT EXISTS cars (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    type TEXT,
-    plate TEXT,
-    status TEXT,
-    icon TEXT,
-    driverName TEXT,
-    phone TEXT,
-    brand TEXT,
-    driver TEXT,
-    controlUnit TEXT
-  );
+      CREATE TABLE IF NOT EXISTS cars (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        type TEXT,
+        plate TEXT,
+        status TEXT,
+        icon TEXT,
+        driverName TEXT,
+        phone TEXT,
+        brand TEXT,
+        driver TEXT,
+        controlUnit TEXT
+      );
 
-  CREATE TABLE IF NOT EXISTS users (
-    employee_id TEXT PRIMARY KEY,
-    username TEXT,
-    name TEXT,
-    position TEXT,
-    department1 TEXT,
-    department2 TEXT,
-    email TEXT,
-    manager_email TEXT,
-    role TEXT,
-    canApprove TEXT,
-    sign TEXT,
-    customApprovalLevels TEXT
-  );
-`);
+      CREATE TABLE IF NOT EXISTS users (
+        employee_id TEXT PRIMARY KEY,
+        username TEXT,
+        name TEXT,
+        position TEXT,
+        department1 TEXT,
+        department2 TEXT,
+        email TEXT,
+        manager_email TEXT,
+        role TEXT,
+        canApprove TEXT,
+        sign TEXT,
+        customApprovalLevels TEXT
+      );
+    `);
 
-// Ensure schema is updated with active column for system_config and createdAt for bookings
-try { db.exec("ALTER TABLE bookings ADD COLUMN createdAt TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE bookings ADD COLUMN active INTEGER DEFAULT 0;"); } catch(e) {}
-try { db.exec("ALTER TABLE bookings ADD COLUMN refFile TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE bookings ADD COLUMN refFileName TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE bookings ADD COLUMN refFilePath TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE cars ADD COLUMN name TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE cars ADD COLUMN icon TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE cars ADD COLUMN driverName TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE cars ADD COLUMN phone TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE users ADD COLUMN customApprovalLevels TEXT;"); } catch(e) {}
-try { db.exec("ALTER TABLE users ADD COLUMN sign TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE bookings ADD COLUMN createdAt TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE bookings ADD COLUMN active INTEGER DEFAULT 0;"); } catch(e) {}
+    try { db.exec("ALTER TABLE bookings ADD COLUMN refFile TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE bookings ADD COLUMN refFileName TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE bookings ADD COLUMN refFilePath TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE cars ADD COLUMN name TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE cars ADD COLUMN icon TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE cars ADD COLUMN driverName TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE cars ADD COLUMN phone TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE users ADD COLUMN customApprovalLevels TEXT;"); } catch(e) {}
+    try { db.exec("ALTER TABLE users ADD COLUMN sign TEXT;"); } catch(e) {}
+  } catch(tableErr) {
+    console.error("[SQLite] Error creating tables:", tableErr);
+  }
+}
 
 // Helper function to check whether incoming booking update should overwrite existing stored record
 function shouldOverwriteBooking(existing, incoming) {
@@ -2521,6 +2526,29 @@ function sendLineNotifyFallback(token, messageText) {
       lineReq.write(postData);
       lineReq.end();
     });
+    return;
+  }
+
+  // Force sync bookings endpoint
+  if (urlPath === '/api/sync-bookings') {
+    try {
+      const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
+      if (fs.existsSync(bookingsJsonPath)) {
+        const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '').replace(/[\u0000-\u0009\u000B\u000C\u000E-\u001F]/g, '');
+        const fileBookings = JSON.parse(rawJson) || [];
+        if (Array.isArray(fileBookings) && fileBookings.length > 0) {
+          sqliteSaveBookings(fileBookings);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ success: true, count: fileBookings.length, message: `Successfully synced ${fileBookings.length} bookings into SQLite database` }));
+          return;
+        }
+      }
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: false, message: 'bookings.json not found or empty' }));
+    } catch(err) {
+      res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
     return;
   }
 
