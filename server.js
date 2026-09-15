@@ -2583,6 +2583,18 @@ function sendLineNotifyFallback(token, messageText) {
   });
 });
 
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error(`[Server Error] Port ${PORT} is currently in use. Retrying in 2 seconds...`);
+    setTimeout(() => {
+      try { server.close(); } catch(err) {}
+      server.listen(PORT);
+    }, 2000);
+  } else {
+    console.error('[Server Error]', e);
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`Car Booking Server running on http://localhost:${PORT}`);
 });
