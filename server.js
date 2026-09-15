@@ -956,6 +956,20 @@ const server = http.createServer((req, res) => {
   // API: get-bookings
   if (urlPath === '/api/get-bookings' && req.method === 'GET') {
     let sqlData = sqliteGetBookings();
+    if (!Array.isArray(sqlData) || sqlData.length === 0) {
+      const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
+      if (fs.existsSync(bookingsFile)) {
+        try {
+          const rawJson = fs.readFileSync(bookingsFile, 'utf8').replace(/^\uFEFF/, '');
+          const fileBookings = JSON.parse(rawJson);
+          if (Array.isArray(fileBookings) && fileBookings.length > 0) {
+            console.log(`[/api/get-bookings] Auto-restoring ${fileBookings.length} records from bookings.json`);
+            sqliteSaveBookings(fileBookings);
+            sqlData = fileBookings;
+          }
+        } catch(e) {}
+      }
+    }
     if (!Array.isArray(sqlData)) {
       sqlData = [];
     }
