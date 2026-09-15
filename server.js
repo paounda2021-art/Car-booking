@@ -228,15 +228,16 @@ function sqliteGetBookings() {
   try {
     const query = db.prepare("SELECT * FROM bookings");
     const rows = query.all();
-    if (!rows || rows.length === 0) {
-      // 🛡️ Fallback 1: If SQLite table is empty, auto-populate from bookings.json
+    const realBookingsCount = (rows || []).filter(r => r && r.id !== 'system_config').length;
+    if (!rows || realBookingsCount === 0) {
+      // 🛡️ Fallback 1: If SQLite table is empty of real bookings, auto-populate from bookings.json
       const bookingsJsonPath = path.join(ROOT_DIR, 'bookings.json');
       if (fs.existsSync(bookingsJsonPath)) {
         try {
           const rawJson = fs.readFileSync(bookingsJsonPath, 'utf8').replace(/^\uFEFF/, '');
           const fileBookings = JSON.parse(rawJson) || [];
           if (Array.isArray(fileBookings) && fileBookings.length > 0) {
-            console.log(`[SQLite Read] Table empty. Auto-migrating ${fileBookings.length} records from bookings.json`);
+            console.log(`[SQLite Read] Table empty of real bookings. Auto-migrating ${fileBookings.length} records from bookings.json`);
             sqliteSaveBookings(fileBookings);
             return fileBookings;
           }
@@ -961,14 +962,15 @@ const server = http.createServer((req, res) => {
   // API: get-bookings
   if (urlPath === '/api/get-bookings' && req.method === 'GET') {
     let sqlData = sqliteGetBookings();
-    if (!Array.isArray(sqlData) || sqlData.length === 0) {
+    const realCount = Array.isArray(sqlData) ? sqlData.filter(b => b && b.id !== 'system_config').length : 0;
+    if (realCount === 0) {
       const bookingsFile = path.join(ROOT_DIR, 'bookings.json');
       if (fs.existsSync(bookingsFile)) {
         try {
           const rawJson = fs.readFileSync(bookingsFile, 'utf8').replace(/^\uFEFF/, '');
           const fileBookings = JSON.parse(rawJson);
           if (Array.isArray(fileBookings) && fileBookings.length > 0) {
-            console.log(`[/api/get-bookings] Auto-restoring ${fileBookings.length} records from bookings.json`);
+            console.log(`[/api/get-bookings] Real count is 0. Auto-restoring ${fileBookings.length} records from bookings.json`);
             sqliteSaveBookings(fileBookings);
             sqlData = fileBookings;
           }
