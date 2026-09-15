@@ -1109,7 +1109,7 @@ async function saveBookings() {
     console.warn("⚠️ LocalStorage write warning:", err);
   }
 
-  // 🔄 ส่งข้อมูลฉบับเต็มไปบันทึกที่ Server (SQLite) ในพื้นหลังเสมอ
+  // 🔄 ส่งข้อมูลฉบับเต็มไปบันทึกที่ Server (SQLite)
   const payload = [...bookings];
   payload.push({
     id: 'system_config',
@@ -1120,13 +1120,20 @@ async function saveBookings() {
     active: isSystemActive
   });
 
-  fetch('/api/save-bookings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  .then(() => console.log("☁️ บันทึกข้อมูลลง Server (SQLite) สำเร็จในพื้นหลัง!"))
-  .catch(err => console.warn("⚠️ Server sync failed:", err));
+  try {
+    const res = await fetch('/api/save-bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      console.log("☁️ บันทึกข้อมูลลง Server (SQLite) สำเร็จ!");
+    } else {
+      console.warn("⚠️ Server sync non-ok response:", res.status);
+    }
+  } catch (err) {
+    console.warn("⚠️ Server sync failed:", err);
+  }
 }
 
 // Function to save cars to localStorage and server API
@@ -5290,7 +5297,7 @@ function setupEventListeners() {
 
 
   // Booking Creation Submission
-  document.getElementById('form-create-booking').addEventListener('submit', (e) => {
+  document.getElementById('form-create-booking').addEventListener('submit', async (e) => {
     e.preventDefault();
 
     if (requesterSig.isEmpty() && (!currentUser || !currentUser.sign || !currentUser.sign.startsWith('data:image'))) {
@@ -5431,7 +5438,9 @@ function setupEventListeners() {
 
     // 5. นำใบจองเข้าตารางและสั่งบันทึก
     bookings.push(newBooking);
-    saveBookings();
+    showToast("กำลังส่งคำขอใบขออนุญาตและบันทึกลงระบบ...", "info");
+    await saveBookings();
+    showToast(`สร้างใบขออนุญาตเรียบร้อยแล้ว! (เลขที่ ${newBooking.id})`, "success");
     
     // Reset create modal
     document.getElementById('modal-booking').classList.remove('active');
