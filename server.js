@@ -70,9 +70,14 @@ function cleanupTempFiles() {
 cleanupTempFiles();
 setInterval(cleanupTempFiles, 15 * 60 * 1000); // Auto-clean temp files every 15 minutes
 
-// Write JSON files directly to prevent temporary (.tmp) file creation on Windows
+// Write JSON files directly with safety guard to prevent temporary (.tmp) file creation or 0-byte wipes
 function safeWriteJsonFile(filePath, data, callback) {
   const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  if (!content || content.length < 5) {
+    console.error(`🛑 [WriteJson Guard] Aborted writing empty/invalid content to ${filePath}`);
+    if (callback) callback(new Error('Empty content payload'));
+    return;
+  }
   fs.writeFile(filePath, content, 'utf8', (err) => {
     if (err) console.error(`[WriteJson] Error writing ${filePath}:`, err);
     if (callback) callback(err);
