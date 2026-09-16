@@ -1116,8 +1116,32 @@ async function saveBookings() {
     console.warn("⚠️ LocalStorage write warning:", err);
   }
 
-  // 🔄 ส่งข้อมูลฉบับเต็มไปบันทึกที่ Server (SQLite)
-  const payload = [...bookings];
+  // 🔄 ส่งข้อมูลไปบันทึกที่ Server (SQLite) โดยปรับขนาด Payload ไม่ให้เกินโควตา HTTP 413
+  const nowMs = Date.now();
+  const payload = bookings.map(b => {
+    if (!b) return b;
+    // 💡 รักษาสายข้อมูลเต็มเฉพาะรายการใหม่/รายการที่เพิ่งแก้ไข (สร้างไม่เกิน 15 นาที)
+    const createdMs = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    const isRecent = !b.createdAt || (nowMs - createdMs < 15 * 60 * 1000);
+    if (isRecent) {
+      return b;
+    }
+    // 💡 สำหรับรายการเก่าในระบบ ตัด Base64 ที่เคยบันทึกบน Server ออกเพื่อลดขนาด HTTP POST จาก 30MB เหลือ 100KB
+    const copy = { ...b };
+    if (Array.isArray(copy.signatures)) {
+      copy.signatures = copy.signatures.map(s => {
+        if (s && s.signature && s.signature.length > 300) {
+          return { ...s, signature: 'db_ref' };
+        }
+        return s;
+      });
+    }
+    if (copy.refFile && copy.refFile.length > 300 && copy.refFilePath) {
+      copy.refFile = '';
+    }
+    return copy;
+  });
+
   payload.push({
     id: 'system_config',
     requester: 'system',

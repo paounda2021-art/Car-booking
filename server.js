@@ -1023,6 +1023,23 @@ const server = http.createServer((req, res) => {
               map.set(cleanId, item);
             } else {
               const existing = map.get(cleanId);
+              // Preserve existing full signatures if incoming has 'db_ref' placeholder
+              if (Array.isArray(item.signatures) && Array.isArray(existing.signatures)) {
+                item.signatures = item.signatures.map((s, idx) => {
+                  const existSig = existing.signatures[idx] || existing.signatures.find(es => es && es.level === s.level);
+                  if (s && s.signature === 'db_ref' && existSig && existSig.signature && existSig.signature !== 'db_ref') {
+                    return { ...s, signature: existSig.signature };
+                  }
+                  return s;
+                });
+              }
+              // Preserve existing refFile base64 / path if incoming refFile is empty
+              if (!item.refFile && existing.refFile) {
+                item.refFile = existing.refFile;
+              }
+              if (!item.refFilePath && existing.refFilePath) {
+                item.refFilePath = existing.refFilePath;
+              }
               if (shouldOverwriteBooking(existing, item)) {
                 map.set(cleanId, item);
               }
