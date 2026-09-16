@@ -359,6 +359,7 @@ function sqliteSaveBookings(bookingsList) {
       );
     });
     console.log("SQLite Save completed (bookings count:", bookingsList.length + ")");
+    try { db.exec("PRAGMA wal_checkpoint(TRUNCATE);"); } catch(e) {}
     // Also keep bookings.json in sync as safe secondary backup
     safeWriteJsonFile(path.join(ROOT_DIR, 'bookings.json'), bookingsList);
     // Auto-update database_backup.db
