@@ -794,6 +794,7 @@ async function initDatabase() {
         dbBookings = deduplicateBookings(dbBookings);
         bookings = dbBookings;
         dbBookingsLoaded = true;
+        console.log("📅 Bookings database successfully loaded from server! Count:", bookings.length);
 
         // Force UI re-render when fresh server bookings are loaded
         if (typeof renderMonthCalendar === 'function') renderMonthCalendar();
