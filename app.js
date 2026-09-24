@@ -1138,26 +1138,18 @@ async function saveBookings() {
   const nowMs = Date.now();
   const payload = bookings.map(b => {
     if (!b) return b;
-    // 💡 รักษาสายข้อมูลเต็มเฉพาะรายการใหม่/รายการที่เพิ่งแก้ไข (สร้างไม่เกิน 15 นาที)
-    const createdMs = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    const isRecent = !b.createdAt || (nowMs - createdMs < 15 * 60 * 1000);
-    if (isRecent) {
-      return b;
-    }
-    // 💡 สำหรับรายการเก่าในระบบ ตัด Base64 ที่เคยบันทึกบน Server ออกเพื่อลดขนาด HTTP POST จาก 30MB เหลือ 100KB
     const copy = { ...b };
     if (Array.isArray(copy.signatures)) {
       copy.signatures = copy.signatures.map(s => {
         if (!s) return s;
-        const sigTime = s.timestamp ? new Date(s.timestamp).getTime() : 0;
-        const isSigRecent = s.timestamp && (nowMs - sigTime < 24 * 60 * 60 * 1000);
-        if (s.signature && s.signature.length > 300 && !isSigRecent) {
-          return { ...s, signature: 'db_ref' };
+        // Always preserve data:image signature strings so server receives and writes PNG signature files to disk
+        if (s.signature && typeof s.signature === 'string' && s.signature.startsWith('data:image')) {
+          return s;
         }
         return s;
       });
     }
-    if (copy.refFile && copy.refFile.length > 300 && copy.refFilePath) {
+    if (copy.refFile && copy.refFile.length > 500000 && copy.refFilePath) {
       copy.refFile = '';
     }
     return copy;
@@ -3752,7 +3744,7 @@ function renderApprovalPipeline(booking) {
       icon = '🟢';
       statusText = 'อนุมัติแล้ว';
       const timeStr = formatThaiDateTime(sig.timestamp);
-      const sigImg = getSignatureImg(step.level, sig.signature, sig.approverName);
+      const sigImg = getSignatureImg(step.level, sig.signature, sig.approverName, booking.id);
       
       let carAssignedText = '';
       if (step.level === 2) {
@@ -3772,7 +3764,7 @@ function renderApprovalPipeline(booking) {
           ${carAssignedText ? `<span style="color:var(--primary); font-weight:bold;">🚘 จัดรถยนต์: ${carAssignedText}</span><br>` : ''}
           ${(step.level === 2 || sig.driverName) ? `<span style="color:var(--primary); font-weight:bold;">👤 จัดพนักงานขับรถ: ${sig.driverName || booking.driverName || '-'}${getDriverPhoneByName(sig.driverName || booking.driverName) ? ` (โทร. ${getDriverPhoneByName(sig.driverName || booking.driverName)})` : ''}</span><br>` : ''}
           <div style="margin-top:0.25rem;">
-            ${(sigImg && sigImg.length > 30) ? `<img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;">` : ''}
+            ${(sigImg && sigImg.length > 5) ? `<img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;" onerror="this.style.display='none'">` : ''}
           </div>
         </div>
       `;
@@ -3781,7 +3773,7 @@ function renderApprovalPipeline(booking) {
       icon = '🔴';
       statusText = 'ปฏิเสธการใช้รถ';
       const timeStr = formatThaiDateTime(sig.timestamp);
-      const sigImg = getSignatureImg(step.level, sig.signature, sig.approverName);
+      const sigImg = getSignatureImg(step.level, sig.signature, sig.approverName, booking.id);
       detailsHtml = `
         <div class="pipeline-details" style="margin-top:0.4rem; padding-left:1.5rem; font-size:0.8rem; line-height:1.4;">
           <span>ลงนามโดย: <strong>${sig.approverName}</strong></span><br>
