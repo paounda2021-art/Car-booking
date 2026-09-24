@@ -187,7 +187,21 @@ function shouldOverwriteBooking(existing, incoming) {
   const existingTerminal = (existing.status === 'approved' || existing.status === 'rejected' || existing.status === 'cancelled');
   const incomingTerminal = (incoming.status === 'approved' || incoming.status === 'rejected' || incoming.status === 'cancelled');
 
-  // Rule 1: Terminal states override non-terminal states
+  // Rule 0: Allow L2 TAXI conversion / edit reset to overwrite terminal state
+  const isL2TaxiOrEditReset = (
+    incoming.waitingForRequesterInput === true ||
+    incoming.waitingForRequesterInput === 1 ||
+    incoming.status === 'waiting_taxi_amount' ||
+    incoming.status === 'waiting_for_requester_edit' ||
+    (incoming.carId === 'taxi' && (incoming.status === 'pending' || incoming.status === 'waiting_taxi_amount')) ||
+    (existingTerminal && (incoming.currentApprovalLevel || 0) < (existing.currentApprovalLevel || 0))
+  );
+
+  if (isL2TaxiOrEditReset) {
+    return true;
+  }
+
+  // Rule 1: Terminal states override non-terminal states (unless reset by L2/L0 above)
   if (incomingTerminal && !existingTerminal) return true;
   if (existingTerminal && !incomingTerminal) return false;
 

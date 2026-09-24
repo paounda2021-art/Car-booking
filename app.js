@@ -2285,7 +2285,7 @@ function helperCreateTableRow(b, isPendingForMe) {
   }
 
   let fillTaxiBtn = '';
-  if (b.waitingForRequesterInput && currentUser && b.requester === currentUser.name) {
+  if (b.waitingForRequesterInput && currentUser && checkIsMyRequest(b, currentUser)) {
     fillTaxiBtn = `<button class="btn btn-danger btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); openFillTaxiModal('${b.id}')">✍️ กรอกค่าพาหนะ</button>`;
   }
 
@@ -2505,7 +2505,7 @@ function renderBookingsLists() {
     }
 
     let fillTaxiBtn = '';
-    if (b.waitingForRequesterInput && currentUser && b.requester === currentUser.name) {
+    if (b.waitingForRequesterInput && currentUser && checkIsMyRequest(b, currentUser)) {
       fillTaxiBtn = `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); openFillTaxiModal('${b.id}')">✍️ กรอกค่าพาหนะ</button>`;
     }
 
@@ -3518,8 +3518,8 @@ async function openApprovalModal(bookingId) {
 
 
 
-  const showEditPanel = currentUser && currentUser.canApprove && currentUser.canApprove.includes(2) && 
-                        (booking.status === 'approved' || ((booking.status === 'pending' || booking.status.startsWith('pending')) && booking.currentApprovalLevel > 2));
+  const isL2User = currentUser && (currentUser.role === 'fleet_admin' || (currentUser.canApprove && currentUser.canApprove.includes(2)) || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase()));
+  const showEditPanel = isL2User && (booking.status === 'approved' || ((booking.status === 'pending' || booking.status.startsWith('pending')) && booking.currentApprovalLevel > 2));
 
   if (isMyTurn) {
     actionPanel.classList.remove('hidden');
@@ -3864,7 +3864,7 @@ async function handleApprovalAction(isApproved) {
   // Fleet admin (L2) validation for car selection and driver name assignment
   let assignedDriver = '';
   let assignedCarId = '';
-  if (currentUser.role === 'fleet_admin' && level === 2 && isApproved) {
+  if ((currentUser.role === 'fleet_admin' || userHasApproveLevel(currentUser, 2) || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())) && level === 2 && isApproved) {
     assignedCarId = document.getElementById('assign-car').value;
     if (!assignedCarId) {
       showToast("ในขั้นตอนผู้จัดรถ (L2) กรุณาเลือกรถยนต์ของ อสป. หรือแท็กซี่ (TAXI)", "warning");
@@ -5750,46 +5750,58 @@ function setupEventListeners() {
       booking.travelType = 'public_car';
       booking.carId = 'taxi';
       booking.driverName = '-';
-      booking.status = 'pending';
-      booking.currentApprovalLevel = 1;
-      booking.waitingForRequesterInput = true;
       
-      // Reset L1, L2, L3, L4 signatures
-      booking.signatures.forEach(sig => {
-        if (sig.level >= 1) {
-          sig.status = 'pending';
-          sig.approverName = '';
-          sig.comment = '';
-          sig.timestamp = '';
-          sig.signature = '';
-        }
-      });
-      
-      saveBookings();
-      document.getElementById('modal-approval').classList.remove('active');
-      
-      // Re-render UI views
-      updateStats();
-      renderDashboard();
-      renderBookingsLists();
-      renderMonthCalendar();
+      const hasValidFare = (booking.distance > 0 && booking.price > 0) || (booking.estimatedCost > 0);
 
-      // Trigger email notification (L2 -> L0 TAXI Loop)
-      const reqEmail = resolveRequesterEmail(booking);
-      const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
-      const body = `
-        <p>เรียน คุณ ${booking.requester},</p>
-        <p>ใบขออนุญาตใช้ยานพาหนะเลขที่ <strong>${booking.id}</strong> ของท่าน ได้รับความเห็นในการจัดสรรพาหนะเดินทางแบบ <strong>รถรับจ้างสาธารณะ (TAXI)</strong> เนื่องจากรถยนต์ส่วนกลางไม่ว่างปฏิบัติงานในช่วงเวลาดังกล่าว</p>
-        <p>รบกวนท่านเข้าสู่ระบบเพื่อดำเนินการกรอกข้อมูล <strong>ระยะทางประมาณการ (กิโลเมตร)</strong> และ <strong>วงเงินงบประมาณเบิกจ่ายโดยประมาณ (บาท)</strong> เพื่อส่งใบงานกลับไปดำเนินการเสนออนุมัติตามลำดับขั้นต่อไป</p>
-        <p>ท่านสามารถคลิกที่ปุ่มสีแดง <strong>[กรอกค่าพาหนะ]</strong> ในตารางรายการที่ฉันขอ เพื่อระบุข้อมูลได้ทันที:</p>
-        <div style="text-align: center; margin: 25px 0;">
-          <a href="https://car-booking.fishmarket.co.th/" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">กรอกรายละเอียดค่าพาหนะ</a>
-        </div>
-      `;
-      sendEmailNotification(reqEmail, subject, body);
-      
-      showToast(`ได้ส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกข้อมูลระยะทางและค่าใช้จ่ายรถรับจ้างเรียบร้อยแล้ว`, "success");
-      return;
+      if (!hasValidFare) {
+        booking.waitingForRequesterInput = true;
+        booking.status = 'waiting_taxi_amount';
+        booking.currentApprovalLevel = 1;
+        
+        // Reset L1, L2, L3, L4 signatures
+        booking.signatures.forEach(sig => {
+          if (sig.level >= 1) {
+            sig.status = 'pending';
+            sig.approverName = '';
+            sig.comment = '';
+            sig.timestamp = '';
+            sig.signature = '';
+            if (sig.level === 2) {
+              sig.driverName = '';
+            }
+          }
+        });
+
+        saveBookings();
+        document.getElementById('modal-approval').classList.remove('active');
+        
+        // Re-render UI views
+        updateStats();
+        renderDashboard();
+        renderBookingsLists();
+        renderMonthCalendar();
+
+        // Trigger email notification (L2 -> L0 TAXI Loop)
+        const reqEmail = resolveRequesterEmail(booking);
+        const subject = `[ระบบจองรถ อสป.] กรุณาระบุรายละเอียดค่าพาหนะรถรับจ้างสำหรับคำขอ เลขที่ ${booking.id}`;
+        const body = `
+          <p>เรียน คุณ ${booking.requester},</p>
+          <p>ใบขออนุญาตใช้ยานพาหนะเลขที่ <strong>${booking.id}</strong> ของท่าน ได้รับความเห็นในการจัดสรรพาหนะเดินทางแบบ <strong>รถรับจ้างสาธารณะ (TAXI)</strong> เนื่องจากรถยนต์ส่วนกลางไม่ว่างปฏิบัติงานในช่วงเวลาดังกล่าว</p>
+          <p>รบกวนท่านเข้าสู่ระบบเพื่อดำเนินการกรอกข้อมูล <strong>ระยะทางประมาณการ (กิโลเมตร)</strong> และ <strong>วงเงินงบประมาณเบิกจ่ายโดยประมาณ (บาท)</strong> เพื่อส่งใบงานกลับไปดำเนินการเสนออนุมัติตามลำดับขั้นต่อไป</p>
+          <p>ท่านสามารถคลิกที่ปุ่มสีแดง <strong>[กรอกค่าพาหนะ]</strong> ในตารางรายการที่ฉันขอ เพื่อระบุข้อมูลได้ทันที:</p>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #dc2626; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">กรอกรายละเอียดค่าพาหนะ</a>
+          </div>
+        `;
+        sendEmailNotification(reqEmail, subject, body);
+        
+        showToast(`ได้ปรับเปลี่ยนเป็น TAXI และส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกค่าพาหนะเรียบร้อยแล้ว`, "success");
+        return;
+      } else {
+        booking.waitingForRequesterInput = false;
+        booking.status = 'pending';
+        booking.currentApprovalLevel = 1;
+      }
     } else {
       // Conflict check (exclude the current booking id so it can re-select its current car if needed)
       if (hasBookingConflict(assignedCarId, booking.startDate, booking.endDate, booking.id)) {
