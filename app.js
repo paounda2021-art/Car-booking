@@ -654,12 +654,30 @@ function dataURItoBlob(dataURI) {
   }
 }
 
-// Get signature image (database base64 or generated mock signature)
-function getSignatureImg(level, signatureVal, approverName) {
+function getSignatureImg(level, signatureVal, approverName, bookingId) {
   if (signatureVal && typeof signatureVal === 'string' && signatureVal.trim().startsWith('data:image') && signatureVal.length > 30) {
     return signatureVal.trim().replace(/[\r\n]/g, '');
   }
   
+  // 1. Try matching by approverName in usersList first
+  if (approverName && typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+    const cleanApprover = approverName.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.ส\.|นางสาว|ดร\.)\s*/, '');
+    const u = usersList.find(x => {
+      if (!x.name) return false;
+      const cleanName = x.name.replace(/\s+/g, '').replace(/^(นาย|นาง|น\.ส\.|นางสาว|ดร\.)\s*/, '');
+      return cleanName === cleanApprover || (cleanName.length >= 3 && cleanApprover.length >= 3 && (cleanName.includes(cleanApprover) || cleanApprover.includes(cleanName)));
+    });
+    if (u && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.length > 30) {
+      return u.sign.trim().replace(/[\r\n]/g, '');
+    }
+  }
+
+  // 2. Fallback to server signature file URL if bookingId provided
+  if (bookingId && level !== undefined && level !== null) {
+    return `/signatures/SIG_L${level}_${bookingId}.png`;
+  }
+
+  // 3. Legacy hardcoded fallback by role/level
   let username = '';
   if (level === 1) username = 'prathum.c';
   else if (level === 2) username = 'chalong.c';
@@ -1130,7 +1148,10 @@ async function saveBookings() {
     const copy = { ...b };
     if (Array.isArray(copy.signatures)) {
       copy.signatures = copy.signatures.map(s => {
-        if (s && s.signature && s.signature.length > 300) {
+        if (!s) return s;
+        const sigTime = s.timestamp ? new Date(s.timestamp).getTime() : 0;
+        const isSigRecent = s.timestamp && (nowMs - sigTime < 24 * 60 * 60 * 1000);
+        if (s.signature && s.signature.length > 300 && !isSigRecent) {
           return { ...s, signature: 'db_ref' };
         }
         return s;
