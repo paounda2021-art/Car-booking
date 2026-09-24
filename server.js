@@ -543,27 +543,29 @@ function saveSignatureImages(list) {
       const match = l0SigData.match(/^data:image\/(\w+);base64,(.+)$/);
       if (match) {
         const buffer = Buffer.from(match[2], 'base64');
-        const fileName = `SIG_L0_${b.id}.png`;
-        const filePath = path.join(sigDir, fileName);
-        if (!fs.existsSync(filePath)) {
-          try { fs.writeFileSync(filePath, buffer); } catch(e) {}
-        }
+        const filePath = path.join(sigDir, `SIG_L0_${b.id}.png`);
+        try { fs.writeFileSync(filePath, buffer); } catch(e) {}
       }
     }
 
-    // Save L1 Signature (Supervisor / Approver)
-    const l1SigObj = b.signatures && b.signatures.find(s => s.level === 1);
-    const l1SigData = l1SigObj ? l1SigObj.signature : null;
-    if (l1SigData && typeof l1SigData === 'string' && l1SigData.startsWith('data:image')) {
-      const match = l1SigData.match(/^data:image\/(\w+);base64,(.+)$/);
-      if (match) {
-        const buffer = Buffer.from(match[2], 'base64');
-        const fileName = `SIG_L1_${b.id}.png`;
-        const filePath = path.join(sigDir, fileName);
-        if (!fs.existsSync(filePath)) {
-          try { fs.writeFileSync(filePath, buffer); } catch(e) {}
+    // Save or update L1, L2, L3, L4 Signatures
+    if (Array.isArray(b.signatures)) {
+      b.signatures.forEach(s => {
+        if (!s || s.level === 0) return;
+        const filePath = path.join(sigDir, `SIG_L${s.level}_${b.id}.png`);
+        if (s.signature && typeof s.signature === 'string' && s.signature.startsWith('data:image')) {
+          const match = s.signature.match(/^data:image\/(\w+);base64,(.+)$/);
+          if (match) {
+            const buffer = Buffer.from(match[2], 'base64');
+            try { fs.writeFileSync(filePath, buffer); } catch(e) {}
+          }
+        } else if (s.status === 'pending' && (!s.signature || s.signature === '')) {
+          // Unlink old signature file if signature level was reset to pending
+          if (fs.existsSync(filePath)) {
+            try { fs.unlinkSync(filePath); } catch(e) {}
+          }
         }
-      }
+      });
     }
   });
 }

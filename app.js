@@ -3969,8 +3969,17 @@ async function handleApprovalAction(isApproved) {
     sigBlock.approverName = nameToSave;
     sigBlock.status = isApproved ? 'approved' : 'rejected';
     sigBlock.comment = comment;
-    sigBlock.timestamp = new Date().toISOString();
-    sigBlock.signature = approverSig.getDataUrl();
+    const fullSigDataUrl = approverSig.getDataUrl();
+    sigBlock.signature = fullSigDataUrl;
+
+    if (currentUser && fullSigDataUrl && fullSigDataUrl.length > 50) {
+      currentUser.sign = fullSigDataUrl;
+      if (typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+        const uObj = usersList.find(u => u.username && u.username.toLowerCase() === (currentUser.username || '').toLowerCase());
+        if (uObj) uObj.sign = fullSigDataUrl;
+      }
+      try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
+    }
     
     if (assignedCarId && assignedCarId !== 'taxi') {
       booking.carId = assignedCarId;
