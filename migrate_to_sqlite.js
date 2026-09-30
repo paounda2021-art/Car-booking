@@ -52,6 +52,7 @@ try {
   db.exec(`
     CREATE TABLE IF NOT EXISTS bookings (
       id TEXT PRIMARY KEY,
+      createdAt TEXT,
       requester TEXT,
       requesterEmail TEXT,
       managerEmail TEXT,

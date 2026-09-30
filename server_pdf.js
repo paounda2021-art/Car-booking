@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 let puppeteer = null;
 try {
@@ -545,7 +546,7 @@ function buildReportHTMLContent(b, usersList, carsList) {
       </div>
     </div>
 
-    <div class="fmo-divider-title" style="margin-top:0.75rem; margin-bottom:1.5rem;">
+    <div class="fmo-divider-title" style="margin-top:0.35rem; margin-bottom:0.5rem;">
       ใบขออนุญาตใช้รถยนต์และใบเสนออนุมัติเบิกจ่ายค่าพาหนะ
     </div>
 
@@ -626,7 +627,7 @@ function buildReportHTMLContent(b, usersList, carsList) {
     </div>
 
     <!-- CONCLUDING PHRASE & SIGNATURES WRAPPER -->
-    <div style="width: 360px; margin-left: auto; margin-right: 0; text-align: left; margin-top: 0.8rem;">
+    <div style="width: 360px; margin-left: auto; margin-right: 0; text-align: left; margin-top: 0.35rem;">
       <!-- SIGNATURES ABOVE GRID (Requester & Supervisor) -->
       <table style="border: none; border-collapse: collapse; font-size: 12.5px; width: 100%;">
         <tr>
@@ -674,7 +675,7 @@ function buildReportHTMLContent(b, usersList, carsList) {
     </div>
 
     <!-- TWO COLUMN DECISION AREA -->
-    <div class="fmo-divider-title" style="margin-top: 1.5rem; margin-bottom: 0; border-bottom: none;">ความเห็นของผู้ควบคุมรถ/คำสั่งอนุญาต</div>
+    <div class="fmo-divider-title" style="margin-top: 0.5rem; margin-bottom: 0; border-bottom: none;">ความเห็นของผู้ควบคุมรถ/คำสั่งอนุญาต</div>
     <div class="fmo-decision-grid" style="margin-top: 0;">
       
       <!-- LEFT COLUMN -->
@@ -805,18 +806,36 @@ function buildReportHTMLContent(b, usersList, carsList) {
     </div>
 
     <!-- REMARK FOOTER -->
-    <div style="margin-top: 1.5rem; font-size: 11px; color: #555; line-height: 1.5; border-top: 1px dashed #bbb; padding-top: 0.5rem;">
+    <div class="fmo-remark-footer" style="margin-top: 0.45rem; font-size: 10px; color: #555; line-height: 1.35; border-top: 1px dashed #bbb; padding-top: 0.3rem;">
       * หมายเหตุ: ลายมือชื่ออิเล็กทรอนิกส์และบันทึกข้อความได้รับการลงนามผ่านระบบยืนยันตัวตนดิจิทัลอย่างเป็นทางการตามมาตรฐาน FMO<br>
       * ลำดับขั้นตอนพิจารณาอนุมัติ 4 ขั้นตอน: 1. หัวหน้างาน, 2. งานจัดรถยนต์พัสดุ, 3. หัวหน้าแผนกพัสดุ (หส.พด.), 4. ผู้อำนวยการฝ่ายการเงินอนุมัติเบิกจ่าย (ผฝ.บง.)
     </div>
   `;
 }
 
+function findSystemBrowser() {
+  const edgePaths = [
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+  ];
+  for (const p of edgePaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  const chromePaths = [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
+  ];
+  for (const p of chromePaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
 let sharedBrowser = null;
 
 async function getSharedBrowser() {
   if (!puppeteer) {
-    throw new Error('Puppeteer is not installed in local environment.');
+    return null;
   }
   if (sharedBrowser && sharedBrowser.isConnected()) {
     return sharedBrowser;
@@ -844,7 +863,7 @@ async function getSharedBrowser() {
 
 async function generatePDFReportServerSide(bookingId) {
   if (!bookingId) return null;
-  console.log(`🚀 Starting Server-Side Puppeteer PDF generation for booking: ${bookingId}...`);
+  console.log(`🚀 Starting Server-Side PDF generation for booking: ${bookingId}...`);
 
   try {
     const bookingsPath = path.join(ROOT_DIR, 'bookings.json');
@@ -884,21 +903,10 @@ async function generatePDFReportServerSide(bookingId) {
             padding: 0;
             background: #ffffff;
             color: #000000;
-            font-size: 12px;
-            line-height: 1.4;
+            font-size: 11px;
+            line-height: 1.25;
           }
           ${cssContent}
-          .report-sheet {
-            box-shadow: none !important;
-            border: none !important;
-            padding: 10px 15px !important;
-            max-width: 100% !important;
-            width: 100% !important;
-          }
-          .page-break {
-            page-break-before: always;
-            break-before: page;
-          }
         </style>
       </head>
       <body>
@@ -909,30 +917,58 @@ async function generatePDFReportServerSide(bookingId) {
       </html>
     `;
 
-    const browser = await getSharedBrowser();
-    if (!browser) return null;
-
-    const page = await browser.newPage();
     let pdfBuffer;
-    try {
-      page.setDefaultNavigationTimeout(10000);
-      page.setDefaultTimeout(10000);
-
+    if (puppeteer) {
       try {
-        await page.setContent(fullHTML, { waitUntil: 'domcontentloaded', timeout: 8000 });
+        const browser = await getSharedBrowser();
+        if (browser) {
+          const page = await browser.newPage();
+          try {
+            page.setDefaultNavigationTimeout(10000);
+            page.setDefaultTimeout(10000);
+            await page.setContent(fullHTML, { waitUntil: 'domcontentloaded', timeout: 8000 });
+            await new Promise(r => setTimeout(r, 200));
+            pdfBuffer = await page.pdf({
+              format: 'A4',
+              printBackground: true,
+              margin: { top: '5mm', bottom: '5mm', left: '8mm', right: '8mm' }
+            });
+          } finally {
+            try { await page.close(); } catch(e) {}
+          }
+        }
       } catch (e) {
-        console.warn(`[Puppeteer] setContent warning for ${b.id}:`, e.message);
+        console.warn('[PDF Module] Puppeteer generation failed, trying system browser fallback:', e.message);
       }
+    }
 
-      await new Promise(r => setTimeout(r, 200));
+    if (!pdfBuffer) {
+      const sysBrowser = findSystemBrowser();
+      if (!sysBrowser) {
+        throw new Error('Neither Puppeteer nor system Edge/Chrome found.');
+      }
+      const tempHtmlPath = path.join(reportDir, `temp_${b.id}.html`);
+      fs.writeFileSync(tempHtmlPath, fullHTML, 'utf8');
+      const tempPdfPath = path.join(reportDir, `temp_${b.id}.pdf`);
 
-      pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '8mm', bottom: '8mm', left: '8mm', right: '8mm' }
-      });
-    } finally {
-      try { await page.close(); } catch(e) {}
+      execFileSync(sysBrowser, [
+        '--headless',
+        '--disable-gpu',
+        '--no-pdf-header-footer',
+        `--print-to-pdf=${tempPdfPath}`,
+        tempHtmlPath
+      ]);
+
+      try { fs.unlinkSync(tempHtmlPath); } catch(e) {}
+
+      if (fs.existsSync(tempPdfPath)) {
+        pdfBuffer = fs.readFileSync(tempPdfPath);
+        try { fs.unlinkSync(tempPdfPath); } catch(e) {}
+      }
+    }
+
+    if (!pdfBuffer) {
+      throw new Error('Failed to produce PDF buffer.');
     }
 
     const fileName = `Report_${b.id}.pdf`;

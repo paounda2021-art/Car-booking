@@ -4148,11 +4148,11 @@ function buildReportHTMLContent(b) {
   const l3Sig = b.signatures.find(s => s.level === 3) || {};
   const l4Sig = b.signatures.find(s => s.level === 4) || {};
 
-  const l0SigImg = (l0Sig.status === 'approved') ? getSignatureImg(0, l0Sig.signature, b.requester) : '';
-  const l1SigImg = (l1Sig.status === 'approved') ? getSignatureImg(1, l1Sig.signature, l1Sig.approverName) : '';
-  const l2SigImg = (l2Sig.status === 'approved') ? getSignatureImg(2, l2Sig.signature, l2Sig.approverName) : '';
-  const l3SigImg = (l3Sig.status === 'approved') ? getSignatureImg(3, l3Sig.signature, l3Sig.approverName) : '';
-  const l4SigImg = (l4Sig.status === 'approved') ? getSignatureImg(4, l4Sig.signature, l4Sig.approverName) : '';
+  const l0SigImg = (l0Sig.status === 'approved') ? getSignatureImg(0, l0Sig.signature, b.requester, b.id) : '';
+  const l1SigImg = (l1Sig.status === 'approved') ? getSignatureImg(1, l1Sig.signature, l1Sig.approverName, b.id) : '';
+  const l2SigImg = (l2Sig.status === 'approved') ? getSignatureImg(2, l2Sig.signature, l2Sig.approverName, b.id) : '';
+  const l3SigImg = (l3Sig.status === 'approved') ? getSignatureImg(3, l3Sig.signature, l3Sig.approverName, b.id) : '';
+  const l4SigImg = (l4Sig.status === 'approved') ? getSignatureImg(4, l4Sig.signature, l4Sig.approverName, b.id) : '';
 
   const reqDate = formatThaiDate(l0Sig.timestamp || b.startDate);
   const l1Date = l1Sig.timestamp ? formatThaiDate(l1Sig.timestamp) : '';
@@ -4651,7 +4651,7 @@ function buildReportHTMLContent(b) {
       </div>
     </div>
 
-    <div class="fmo-divider-title" style="margin-top:0.75rem; margin-bottom:1.5rem;">
+    <div class="fmo-divider-title" style="margin-top:0.35rem; margin-bottom:0.5rem;">
       ใบขออนุญาตใช้รถยนต์และใบเสนออนุมัติเบิกจ่ายค่าพาหนะ
     </div>
 
@@ -4732,7 +4732,7 @@ function buildReportHTMLContent(b) {
     </div>
 
     <!-- CONCLUDING PHRASE & SIGNATURES WRAPPER -->
-    <div style="width: 360px; margin-left: auto; margin-right: 0; text-align: left; margin-top: 0.8rem;">
+    <div style="width: 360px; margin-left: auto; margin-right: 0; text-align: left; margin-top: 0.35rem;">
       <!-- SIGNATURES ABOVE GRID (Requester & Supervisor) -->
       <table style="border: none; border-collapse: collapse; font-size: 12.5px; width: 100%;">
         <tr>
@@ -4780,7 +4780,7 @@ function buildReportHTMLContent(b) {
     </div>
 
     <!-- TWO COLUMN DECISION AREA -->
-    <div class="fmo-divider-title" style="margin-top: 1.5rem; margin-bottom: 0; border-bottom: none;">ความเห็นของผู้ควบคุมรถ/คำสั่งอนุญาต</div>
+    <div class="fmo-divider-title" style="margin-top: 0.5rem; margin-bottom: 0; border-bottom: none;">ความเห็นของผู้ควบคุมรถ/คำสั่งอนุญาต</div>
     <div class="fmo-decision-grid" style="margin-top: 0;">
       
       <!-- LEFT COLUMN -->
@@ -4911,7 +4911,7 @@ function buildReportHTMLContent(b) {
     </div>
 
     <!-- REMARK FOOTER -->
-    <div style="margin-top: 1.5rem; font-size: 11px; color: #555; line-height: 1.5; border-top: 1px dashed #bbb; padding-top: 0.5rem;">
+    <div class="fmo-remark-footer" style="margin-top: 0.45rem; font-size: 10px; color: #555; line-height: 1.35; border-top: 1px dashed #bbb; padding-top: 0.3rem;">
       * หมายเหตุ: ลายมือชื่ออิเล็กทรอนิกส์และบันทึกข้อความได้รับการลงนามผ่านระบบยืนยันตัวตนดิจิทัลอย่างเป็นทางการตามมาตรฐาน FMO<br>
       * ลำดับขั้นตอนพิจารณาอนุมัติ 4 ขั้นตอน: 1. หัวหน้างาน, 2. งานจัดรถยนต์พัสดุ, 3. หัวหน้าแผนกพัสดุ (หส.พด.), 4. ผู้อำนวยการฝ่ายการเงินอนุมัติเบิกจ่าย (ผฝ.บง.)
     </div>

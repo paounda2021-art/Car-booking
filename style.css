@@ -1579,15 +1579,15 @@ body {
 /* Print Media Styles */
 @media print {
   @page {
-    size: A4;
-    margin: 8mm 12mm !important;
+    size: A4 portrait;
+    margin: 5mm 8mm !important;
   }
 
   body {
     background: white !important;
     color: black !important;
-    font-size: 12px !important;
-    line-height: 1.35 !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
   }
   
   .app-container {
@@ -1612,77 +1612,144 @@ body {
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
+    width: 100% !important;
     max-width: 100% !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  #view-report .report-sheet:not(.welfare-multi-page) {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    max-height: 282mm !important;
+    overflow: hidden !important;
   }
 
   /* Compact spacing for FMO Car / Taxi report form */
   .fmo-header-block {
-    margin-bottom: 0.25rem !important;
+    margin-bottom: 0.15rem !important;
   }
   .fmo-logo {
-    width: 55px !important;
-    height: 55px !important;
+    width: 46px !important;
+    height: 46px !important;
+  }
+  .fmo-title-main {
+    font-size: 16px !important;
   }
   .fmo-divider-title {
-    margin: 0.4rem 0 !important;
-    padding: 0.15rem 0 !important;
-    font-size: 13.5px !important;
+    margin: 0.2rem 0 !important;
+    padding: 0.1rem 0 !important;
+    font-size: 13px !important;
   }
   .fmo-subject-block {
+    font-size: 11px !important;
+  }
+  .fmo-subject-block > div[style*="display: grid"] {
+    margin-bottom: 0.35rem !important;
+    row-gap: 0.15rem !important;
     font-size: 12px !important;
   }
   .fmo-line {
-    margin-bottom: 0.25rem !important;
-    line-height: 1.4 !important;
-  }
-  .dotted-val, .dotted-fill {
-    padding: 0 0.25rem !important;
-  }
-  .fmo-decision-grid {
-    margin-top: 0.4rem !important;
-  }
-  .fmo-column {
-    padding: 0.35rem !important;
-    font-size: 11.5px !important;
-  }
-  .fmo-column div, .fmo-column span {
+    margin-top: 0.1rem !important;
+    margin-bottom: 0.1rem !important;
     line-height: 1.35 !important;
   }
-  
-  /* Compact signatures layout in printable FMO report */
-  .fmo-column .dotted-val {
-    min-width: 100px !important;
+  .fmo-line[style*="margin-top: 0.8rem"],
+  .fmo-line[style*="margin-top:0.8rem"] {
+    margin-top: 0.25rem !important;
   }
-  .fmo-column div[style*="margin-top: 0.8rem"] {
-    margin-top: 0.4rem !important;
+  .fmo-line[style*="line-height: 1.8"] {
+    line-height: 1.35 !important;
   }
+  .dotted-val, .dotted-fill {
+    padding: 0 0.2rem !important;
+  }
+  .fmo-subject-block div[style*="margin-left:1.5rem"] {
+    margin-top: 0.2rem !important;
+    gap: 0.2rem !important;
+  }
+  .fmo-subject-block div[style*="width: 360px"] {
+    margin-top: 0.3rem !important;
+  }
+  .fmo-subject-block table td {
+    padding: 1px 0 !important;
+    font-size: 11px !important;
+  }
+  .fmo-subject-block table tr[style*="height: 10px"] {
+    height: 2px !important;
+  }
+  .fmo-subject-block table td[style*="height: 40px"] {
+    height: 28px !important;
+  }
+  .fmo-subject-block table img {
+    max-height: 28px !important;
+  }
+  .fmo-decision-grid {
+    margin-top: 0.2rem !important;
+    border-top: 1.5px solid #000 !important;
+    border-bottom: 1.5px solid #000 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .fmo-column {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 11px !important;
+  }
+  .fmo-col-header {
+    margin-bottom: 0.25rem !important;
+    font-size: 12.5px !important;
+  }
+  .fmo-column div, .fmo-column span {
+    line-height: 1.3 !important;
+  }
+  .fmo-column div[style*="height: 35px"] {
+    height: 28px !important;
+  }
+  .fmo-column img {
+    max-height: 28px !important;
+  }
+  .fmo-column div[style*="margin-top: 0.8rem"],
   .fmo-column div[style*="margin-top:0.8rem"] {
-    margin-top: 0.4rem !important;
+    margin-top: 0.25rem !important;
   }
   .fmo-column div[style*="border-top"] {
-    margin-top: 0.4rem !important;
-    padding-top: 0.25rem !important;
+    margin-top: 0.25rem !important;
+    padding-top: 0.15rem !important;
+  }
+  .fmo-watermark {
+    font-size: 1.5rem !important;
+    padding: 0.25rem 0.6rem !important;
+  }
+  .fmo-remark-footer,
+  div[style*="border-top: 1px dashed #bbb"] {
+    margin-top: 0.35rem !important;
+    padding-top: 0.2rem !important;
+    font-size: 9.5px !important;
+    line-height: 1.3 !important;
   }
   
   /* Compact Welfare Car Request Form (Page 1) */
   .welfare-car-report {
-    font-size: 12.5px !important;
-    line-height: 1.4 !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
     padding: 0 !important;
   }
   .welfare-car-report div[style*="margin-bottom"] {
-    margin-bottom: 0.4rem !important;
+    margin-bottom: 0.3rem !important;
   }
   .welfare-car-report div[style*="line-height: 1.7"] {
-    line-height: 1.45 !important;
-    margin-bottom: 0.4rem !important;
+    line-height: 1.35 !important;
+    margin-bottom: 0.3rem !important;
   }
   .welfare-car-report div[style*="height: 35px"] {
-    height: 28px !important;
+    height: 26px !important;
   }
   .welfare-car-report img[style*="max-height: 35px"] {
-    max-height: 28px !important;
+    max-height: 26px !important;
   }
   
   .fmo-sig-img {
@@ -1692,65 +1759,116 @@ body {
 
 /* PDF Generation Mode (Compact Single Page A4 Fit) */
 .report-sheet.pdf-mode {
-  padding: 10px 20px !important;
-  font-size: 11.5px !important;
-  line-height: 1.35 !important;
+  padding: 6px 16px !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
   box-shadow: none !important;
   border: none !important;
   max-width: 100% !important;
-  width: 790px !important;
+  width: 100% !important;
   box-sizing: border-box !important;
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
 }
 
 .report-sheet.pdf-mode .fmo-logo {
-  width: 55px !important;
-  height: 55px !important;
+  width: 46px !important;
+  height: 46px !important;
 }
 
 .report-sheet.pdf-mode .fmo-header-block {
-  margin-bottom: 0.25rem !important;
+  margin-bottom: 0.15rem !important;
+}
+
+.report-sheet.pdf-mode .fmo-title-main {
+  font-size: 16px !important;
 }
 
 .report-sheet.pdf-mode .fmo-divider-title {
-  margin: 0.4rem 0 !important;
-  padding: 0.15rem 0 !important;
-  font-size: 13.5px !important;
+  margin: 0.2rem 0 !important;
+  padding: 0.1rem 0 !important;
+  font-size: 13px !important;
 }
 
 .report-sheet.pdf-mode .fmo-line {
-  margin-bottom: 0.25rem !important;
+  margin-top: 0.1rem !important;
+  margin-bottom: 0.1rem !important;
+  line-height: 1.35 !important;
+}
+
+.report-sheet.pdf-mode .fmo-line[style*="line-height: 1.8"] {
   line-height: 1.35 !important;
 }
 
 .report-sheet.pdf-mode .fmo-subject-block {
+  font-size: 11px !important;
+}
+
+.report-sheet.pdf-mode .fmo-subject-block > div[style*="display: grid"] {
+  margin-bottom: 0.35rem !important;
+  row-gap: 0.15rem !important;
   font-size: 12px !important;
 }
 
+.report-sheet.pdf-mode .fmo-subject-block table td {
+  padding: 1px 0 !important;
+  font-size: 11px !important;
+}
+
+.report-sheet.pdf-mode .fmo-subject-block table td[style*="height: 40px"] {
+  height: 28px !important;
+}
+
+.report-sheet.pdf-mode .fmo-subject-block table img {
+  max-height: 28px !important;
+}
+
 .report-sheet.pdf-mode .fmo-decision-grid {
-  margin-top: 0.4rem !important;
+  margin-top: 0.2rem !important;
+  border-top: 1.5px solid #000 !important;
+  border-bottom: 1.5px solid #000 !important;
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
 }
 
 .report-sheet.pdf-mode .fmo-column {
-  padding: 0.35rem !important;
-  font-size: 11.5px !important;
+  padding: 0.25rem 0.5rem !important;
+  font-size: 11px !important;
+}
+
+.report-sheet.pdf-mode .fmo-col-header {
+  margin-bottom: 0.25rem !important;
+  font-size: 12.5px !important;
 }
 
 .report-sheet.pdf-mode .fmo-column div,
 .report-sheet.pdf-mode .fmo-column span {
-  line-height: 1.35 !important;
+  line-height: 1.3 !important;
 }
 
-.report-sheet.pdf-mode .fmo-column div[style*="margin-top: 0.8rem"] {
-  margin-top: 0.35rem !important;
+.report-sheet.pdf-mode .fmo-column div[style*="height: 35px"] {
+  height: 28px !important;
 }
 
+.report-sheet.pdf-mode .fmo-column img {
+  max-height: 28px !important;
+}
+
+.report-sheet.pdf-mode .fmo-column div[style*="margin-top: 0.8rem"],
 .report-sheet.pdf-mode .fmo-column div[style*="margin-top:0.8rem"] {
-  margin-top: 0.35rem !important;
+  margin-top: 0.25rem !important;
 }
 
 .report-sheet.pdf-mode .fmo-column div[style*="border-top"] {
+  margin-top: 0.25rem !important;
+  padding-top: 0.15rem !important;
+}
+
+.report-sheet.pdf-mode div[style*="border-top: 1px dashed #bbb"] {
   margin-top: 0.35rem !important;
-  padding-top: 0.25rem !important;
+  padding-top: 0.2rem !important;
+  font-size: 9.5px !important;
+  line-height: 1.3 !important;
 }
 
 /* ========================================================
