@@ -1316,11 +1316,12 @@ function updateSidebarPermissions() {
     }
   }
 
-  // ตั้งค่าระบบ & รถยนต์: แสดงเฉพาะ L2, คุณณัฐอนงค์, admin
+  // ตั้งค่าระบบ & รถยนต์: แสดงเฉพาะ L2, คุณรณิดา, คุณณัฐอนงค์, admin
   if (itemAdminSettings) {
+    const isRanida = usernameLower === 'ranida.c';
     const isNattanong = usernameLower === 'natanong.s';
     const isAdmin = usernameLower === 'admin';
-    if (isL2 || isNattanong || isAdmin) itemAdminSettings.classList.remove('hidden');
+    if (isL2 || isRanida || isNattanong || isAdmin) itemAdminSettings.classList.remove('hidden');
     else itemAdminSettings.classList.add('hidden');
   }
 
@@ -1774,10 +1775,11 @@ function showView(viewName) {
   if (viewName === 'admin-settings') {
     // Control tabs visibility based on user
     const btnTabUsers = document.getElementById('btn-tab-users-settings');
+    const isRanida = currentUser && (currentUser.username || '').toLowerCase() === 'ranida.c';
     const isNattanong = currentUser && (currentUser.username || '').toLowerCase() === 'natanong.s';
     const isAdmin = currentUser && (currentUser.username || '').toLowerCase() === 'admin';
     if (btnTabUsers) {
-      if (isAdmin || isNattanong) {
+      if (isAdmin || isRanida || isNattanong) {
         btnTabUsers.style.display = 'block';
       } else {
         btnTabUsers.style.display = 'none';
