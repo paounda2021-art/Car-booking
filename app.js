@@ -1231,6 +1231,8 @@ function userHasApproveLevel(userObj, levelNum) {
   const usernameLower = (userObj.username || '').toLowerCase();
   const role = userObj.role || '';
   
+  if (usernameLower === 'ranida.c' || usernameLower === 'admin') return true;
+  
   if (levelInt === 1) {
     if (role === 'supervisor' || (list && list.includes(1)) || ['sarena.m', 'jaruwan.s', 'test.l1', 'suwanna.p', 'chalong.c', 'sakda.a', 'prathum.c'].includes(usernameLower)) return true;
     const uEmail = (userObj.email || '').toLowerCase();
@@ -3073,12 +3075,21 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
   // Fit resolution to client dimensions
   const resize = () => {
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    ctx.strokeStyle = '#0284c7';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    if (rect.width <= 0 || rect.height <= 0) return;
+    if (Math.abs(canvas.width - rect.width) > 5 || Math.abs(canvas.height - rect.height) > 5) {
+      const oldData = (canvas.width > 0 && canvas.height > 0) ? canvas.toDataURL() : null;
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      if (oldData && oldData.length > 500) {
+        const restoreImg = new Image();
+        restoreImg.onload = () => ctx.drawImage(restoreImg, 0, 0);
+        restoreImg.src = oldData;
+      }
+    }
   };
   resize();
   window.addEventListener('resize', resize);
@@ -3140,15 +3151,18 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
   };
 }
 
-async function autoDrawApproverSignature() {
+async function autoDrawApproverSignature(targetLevel) {
   const canvas = document.getElementById('canvas-approver-signature');
   const placeholder = document.getElementById('approver-sig-placeholder');
-  if (!canvas || !currentUser) return;
+  if (!canvas) return;
 
-  const uName = (currentUser.username || '').toLowerCase();
-  const uEmail = (currentUser.email || '').toLowerCase();
-  const uNameThai = (currentUser.name || '').replace(/\s+/g, '');
-  
+  const booking = (typeof activeBookingIdForApproval !== 'undefined' && activeBookingIdForApproval)
+    ? bookings.find(b => b.id === activeBookingIdForApproval)
+    : null;
+  const lvl = (targetLevel !== undefined && targetLevel !== null)
+    ? Number(targetLevel)
+    : (booking ? Number(booking.currentApprovalLevel) : null);
+
   // 1. ALWAYS load fresh users.json before resolving signature
   try {
     const resp = await fetch('users.json?t=' + Date.now());
@@ -3159,88 +3173,136 @@ async function autoDrawApproverSignature() {
     console.warn("Signature fetch usersList error:", e);
   }
 
-  // 2. Find target user in fresh usersList
+  // 2. Resolve target signature based on level and acting settings
   let targetSign = '';
-  if (usersList && Array.isArray(usersList)) {
-    let dbU = usersList.find(u => u.username && u.username.toLowerCase() === uName && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
-    if (!dbU && uEmail) {
-      dbU = usersList.find(u => u.email && u.email.toLowerCase() === uEmail && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
-    }
-    if (!dbU && uNameThai) {
-      dbU = usersList.find(u => u.name && u.name.replace(/\s+/g, '') === uNameThai && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
-    }
-    if (!dbU) {
-      const activeLvl = sessionStorage.getItem('activeApprovalLevel') || 'all';
-      if (activeLvl === '4' || userHasApproveLevel(currentUser, 4)) {
-        dbU = usersList.find(u => (u.username === 'piyawan.k' || u.username === 'supbhachart.c' || (u.name && u.name.includes('ปิยวรรณ'))) && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
-      } else if (activeLvl === '3' || userHasApproveLevel(currentUser, 3)) {
-        dbU = usersList.find(u => (u.username === 'saisunee.p' || (u.name && u.name.includes('สายสุนีย์'))) && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
-      } else if (activeLvl === '2' || userHasApproveLevel(currentUser, 2)) {
-        dbU = usersList.find(u => (u.username === 'chalong.c' || (u.name && u.name.includes('ฉลอง'))) && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
-      } else if (activeLvl === '1' || userHasApproveLevel(currentUser, 1)) {
-        dbU = usersList.find(u => (u.username === 'prathum.c' || (u.name && u.name.includes('ประทุม'))) && u.sign && typeof u.sign === 'string' && u.sign.trim().length > 30);
+
+  if (lvl === 3) {
+    const actingL3User = localStorage.getItem('acting_l3_user');
+    if (actingL3User && actingL3User.toLowerCase() === 'panadon.p') {
+      let uPanadon = usersList && usersList.find(u => u.username && u.username.toLowerCase() === 'panadon.p');
+      if (uPanadon && uPanadon.sign && uPanadon.sign.trim().startsWith('data:image') && uPanadon.sign.trim().length > 30) {
+        targetSign = uPanadon.sign.trim().replace(/[\r\n]/g, '');
+      } else if (currentUser && currentUser.username === 'panadon.p' && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+        targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
       }
     }
-
-    if (dbU && dbU.sign && typeof dbU.sign === 'string' && dbU.sign.trim().startsWith('data:image') && dbU.sign.trim().length > 30) {
-      targetSign = dbU.sign.trim().replace(/[\r\n]/g, '');
-      currentUser.sign = targetSign;
-      try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
+    // Default L3: Saisunee (คุณสายสุนีย์ พูลวณิชย์สกุล)
+    if (!targetSign && usersList && Array.isArray(usersList)) {
+      let uSaisunee = usersList.find(u => u.username && u.username.toLowerCase() === 'saisunee.p');
+      if (uSaisunee && uSaisunee.sign && uSaisunee.sign.trim().startsWith('data:image') && uSaisunee.sign.trim().length > 30) {
+        targetSign = uSaisunee.sign.trim().replace(/[\r\n]/g, '');
+      }
+    }
+    if (!targetSign && currentUser && currentUser.username === 'saisunee.p' && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+      targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
+    }
+    if (!targetSign) {
+      targetSign = '/signatures/SIG_L3_BGK-6909-031.png';
+    }
+  } else if (lvl === 4) {
+    const actingL4User = localStorage.getItem('acting_l4_user');
+    if (actingL4User && actingL4User.toLowerCase() === 'saisunee.p') {
+      let uSaisunee = usersList && usersList.find(u => u.username && u.username.toLowerCase() === 'saisunee.p');
+      if (uSaisunee && uSaisunee.sign && uSaisunee.sign.trim().startsWith('data:image') && uSaisunee.sign.trim().length > 30) {
+        targetSign = uSaisunee.sign.trim().replace(/[\r\n]/g, '');
+      } else if (currentUser && currentUser.username === 'saisunee.p' && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+        targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
+      }
+    } else if (actingL4User && actingL4User.toLowerCase() === 'sarena.m') {
+      let uSarena = usersList && usersList.find(u => u.username && u.username.toLowerCase() === 'sarena.m');
+      if (uSarena && uSarena.sign && uSarena.sign.trim().startsWith('data:image') && uSarena.sign.trim().length > 30) {
+        targetSign = uSarena.sign.trim().replace(/[\r\n]/g, '');
+      } else if (currentUser && currentUser.username === 'sarena.m' && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+        targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
+      }
+    }
+    // Default L4: Piyawan (คุณปิยวรรณ แก้วกล้า)
+    if (!targetSign && usersList && Array.isArray(usersList)) {
+      let uPiyawan = usersList.find(u => u.username && u.username.toLowerCase() === 'piyawan.k');
+      if (uPiyawan && uPiyawan.sign && uPiyawan.sign.trim().startsWith('data:image') && uPiyawan.sign.trim().length > 30) {
+        targetSign = uPiyawan.sign.trim().replace(/[\r\n]/g, '');
+      }
+    }
+    if (!targetSign && currentUser && currentUser.username === 'piyawan.k' && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+      targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
+    }
+    if (!targetSign) {
+      targetSign = '/signatures/SIG_L4_BGK-6909-031.png';
+    }
+  } else if (lvl === 2) {
+    if (currentUser && currentUser.username === 'chalong.c' && currentUser.sign && currentUser.sign.startsWith('data:image')) {
+      targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
+    } else if (usersList && Array.isArray(usersList)) {
+      let uChalong = usersList.find(u => u.username && u.username.toLowerCase() === 'chalong.c');
+      if (uChalong && uChalong.sign && uChalong.sign.trim().startsWith('data:image') && uChalong.sign.trim().length > 30) {
+        targetSign = uChalong.sign.trim().replace(/[\r\n]/g, '');
+      }
+    }
+    if (!targetSign) {
+      targetSign = '/signatures/SIG_L2_BGK-6909-031.png';
+    }
+  } else if (lvl === 1) {
+    if (currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 30) {
+      targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
+    } else if (usersList && Array.isArray(usersList) && currentUser) {
+      const uName = (currentUser.username || '').toLowerCase();
+      let dbU = usersList.find(u => u.username && u.username.toLowerCase() === uName && u.sign && u.sign.trim().startsWith('data:image'));
+      if (dbU) targetSign = dbU.sign.trim().replace(/[\r\n]/g, '');
+    }
+  } else if (currentUser) {
+    const uName = (currentUser.username || '').toLowerCase();
+    if (usersList && Array.isArray(usersList)) {
+      let dbU = usersList.find(u => u.username && u.username.toLowerCase() === uName && u.sign && typeof u.sign === 'string' && u.sign.trim().startsWith('data:image') && u.sign.trim().length > 30);
+      if (dbU) targetSign = dbU.sign.trim().replace(/[\r\n]/g, '');
+    }
+    if (!targetSign && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 30) {
+      targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
     }
   }
 
-  // 3. Fallback to currentUser.sign if usersList didn't have it
-  if (!targetSign && currentUser && currentUser.sign && currentUser.sign.startsWith('data:image') && currentUser.sign.length > 30) {
-    targetSign = currentUser.sign.trim().replace(/[\r\n]/g, '');
+  // 3. Ensure canvas dimensions
+  if (approverSig && typeof approverSig.resize === 'function') {
+    approverSig.resize();
   }
-
-  // 4. For L0 and L1 (or users without a saved signature image), keep canvas blank by default
-  if (!targetSign || !targetSign.startsWith('data:image') || targetSign.length < 30) {
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (placeholder) placeholder.style.display = 'flex';
-    return;
-  }
-
-  // Hide placeholder if valid signature image exists
-  if (placeholder) placeholder.style.display = 'none';
-
-  // 5. Ensure canvas width/height match parent box dimensions
+  const rect = canvas.getBoundingClientRect();
   const parent = canvas.parentElement || canvas.parentNode;
-  const parentWidth = parent ? parent.clientWidth : 500;
-  canvas.width = parentWidth > 100 ? parentWidth : 500;
-  canvas.height = 150;
+  const pWidth = rect.width > 50 ? rect.width : (parent && parent.clientWidth > 50 ? parent.clientWidth : 540);
+  const pHeight = rect.height > 50 ? rect.height : (parent && parent.clientHeight > 50 ? parent.clientHeight : 180);
+  canvas.width = Math.round(pWidth);
+  canvas.height = Math.round(pHeight);
 
-  // 6. Load and draw targetSign onto canvas using Blob URL ONLY (eliminates ERR_INVALID_URL)
-  const blob = dataURItoBlob(targetSign);
-  if (!blob) {
-    const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#0284c7';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // 4. Draw signature image or blank
+  if (!targetSign || targetSign.length < 10) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (placeholder) placeholder.style.display = 'flex';
     return;
   }
 
-  const objectUrl = URL.createObjectURL(blob);
-  const img = new Image();
-  img.onload = () => {
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const hRatio = canvas.width / img.width;
-    const vRatio = canvas.height / img.height;
-    const ratio = Math.min(hRatio, vRatio);
-    const x = (canvas.width - img.width * ratio) / 2;
-    const y = (canvas.height - img.height * ratio) / 2;
-    ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
-    if (placeholder) placeholder.style.display = 'none';
-    URL.revokeObjectURL(objectUrl);
-  };
-  img.onerror = () => {
-    URL.revokeObjectURL(objectUrl);
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (placeholder) placeholder.style.display = 'flex';
-  };
-  img.src = objectUrl;
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const hRatio = (canvas.width * 0.92) / img.width;
+      const vRatio = (canvas.height * 0.92) / img.height;
+      const ratio = Math.min(hRatio, vRatio);
+      const x = (canvas.width - img.width * ratio) / 2;
+      const y = (canvas.height - img.height * ratio) / 2;
+      ctx.drawImage(img, x, y, img.width * ratio, img.height * ratio);
+      if (placeholder) placeholder.style.display = 'none';
+      resolve();
+    };
+    img.onerror = () => {
+      if (placeholder) placeholder.style.display = 'flex';
+      resolve();
+    };
+    img.src = targetSign;
+  });
 }
 
 // Open Approval Details Modal
@@ -3538,8 +3600,11 @@ async function openApprovalModal(bookingId) {
     actionPanel.classList.remove('hidden');
     activeBookingIdForApproval = booking.id;
     setTimeout(async () => {
-      await autoDrawApproverSignature();
-    }, 150);
+      await autoDrawApproverSignature(booking.currentApprovalLevel);
+    }, 60);
+    setTimeout(async () => {
+      await autoDrawApproverSignature(booking.currentApprovalLevel);
+    }, 320);
   } else {
     actionPanel.classList.add('hidden');
     if (showEditPanel) {
@@ -3951,11 +4016,19 @@ async function handleApprovalAction(isApproved) {
       const actingL3User = localStorage.getItem('acting_l3_user');
       if (actingL3User && lUsername === actingL3User.toLowerCase()) {
         nameToSave = `${currentUser.name} / (ร.หส.พด.)`;
+      } else if (lUsername === 'ranida.c' || lUsername === 'admin') {
+        nameToSave = 'น.ส.สายสุนีย์  พูลวณิชย์สกุล';
       }
     } else if (level === 4) {
       const actingL4User = localStorage.getItem('acting_l4_user');
       if (actingL4User && lUsername === actingL4User.toLowerCase()) {
         nameToSave = `${currentUser.name} / (ร.ผฝ.บง.)`;
+      } else if (lUsername === 'ranida.c' || lUsername === 'admin') {
+        nameToSave = 'น.ส.ปิยวรรณ  แก้วกล้า';
+      }
+    } else if (level === 2) {
+      if (lUsername === 'ranida.c' || lUsername === 'admin') {
+        nameToSave = 'นายฉลอง  เจียมผักแว่น';
       }
     }
     sigBlock.approverName = nameToSave;
@@ -3965,12 +4038,14 @@ async function handleApprovalAction(isApproved) {
     sigBlock.signature = fullSigDataUrl;
 
     if (currentUser && fullSigDataUrl && fullSigDataUrl.length > 50) {
-      currentUser.sign = fullSigDataUrl;
-      if (typeof usersList !== 'undefined' && Array.isArray(usersList)) {
-        const uObj = usersList.find(u => u.username && u.username.toLowerCase() === (currentUser.username || '').toLowerCase());
-        if (uObj) uObj.sign = fullSigDataUrl;
+      if (lUsername !== 'ranida.c' && lUsername !== 'admin') {
+        currentUser.sign = fullSigDataUrl;
+        if (typeof usersList !== 'undefined' && Array.isArray(usersList)) {
+          const uObj = usersList.find(u => u.username && u.username.toLowerCase() === (currentUser.username || '').toLowerCase());
+          if (uObj) uObj.sign = fullSigDataUrl;
+        }
+        try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
       }
-      try { localStorage.setItem('current_user', JSON.stringify(currentUser)); } catch(e){}
     }
     
     if (assignedCarId && assignedCarId !== 'taxi') {
@@ -6306,8 +6381,12 @@ function assignUserPermissions(userObj) {
   const positionText = userObj.position || '';
   userObj.canApprove = []; // สร้าง Array เก็บสิทธิ์
 
+  // 0. ผู้ดูแลระบบ (Ranida / Admin): มีสิทธิ์อนุมัติทุกระดับ
+  if (username === 'ranida.c' || username === 'admin') {
+    userObj.canApprove = [1, 2, 3, 4];
+  }
   // 1. ซารีนา: เป็น L1 กับ รักษาการ L4 (หากได้รับเลือก)
-  if (username === 'sarena.m') {
+  else if (username === 'sarena.m') {
     userObj.canApprove = [1];
     const actingL4 = localStorage.getItem('acting_l4_user');
     if (actingL4 && actingL4.toLowerCase() === 'sarena.m') {
