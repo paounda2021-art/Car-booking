@@ -9,9 +9,8 @@ Write-Host "Syncing database and codebase in $rootDir..."
 $bookingsFile = Join-Path $rootDir "bookings.json"
 if (Test-Path $bookingsFile) {
     try {
-        $jsonContent = Get-Content -Path $bookingsFile -Raw -Encoding utf8
-        Invoke-RestMethod -Uri "https://car-booking-5l7.pages.dev/api/save-bookings" -Method Post -Body $jsonContent -ContentType "application/json" -ErrorAction Stop | Out-Null
-        Write-Host "Local bookings database successfully synced to Cloudflare Pages."
+        $curlResult = & curl.exe -s -X POST "https://car-booking-5l7.pages.dev/api/save-bookings" -H "Content-Type: application/json; charset=utf-8" --data-binary "@$bookingsFile"
+        Write-Host "Local bookings database successfully synced to Cloudflare Pages: $curlResult"
     } catch {
         Write-Warning "Could not push local bookings to Cloudflare: $_"
     }
