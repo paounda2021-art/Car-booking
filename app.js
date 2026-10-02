@@ -1231,10 +1231,10 @@ function userHasApproveLevel(userObj, levelNum) {
   const usernameLower = (userObj.username || '').toLowerCase();
   const role = userObj.role || '';
   
-  if (usernameLower === 'ranida.c' || usernameLower === 'admin') return true;
+  if (usernameLower === 'admin') return true;
   
   if (levelInt === 1) {
-    if (role === 'supervisor' || (list && list.includes(1)) || ['sarena.m', 'jaruwan.s', 'test.l1', 'suwanna.p', 'chalong.c', 'sakda.a', 'prathum.c'].includes(usernameLower)) return true;
+    if (role === 'supervisor' || (list && list.includes(1)) || ['ranida.c', 'sarena.m', 'jaruwan.s', 'test.l1', 'suwanna.p', 'chalong.c', 'sakda.a', 'prathum.c'].includes(usernameLower)) return true;
     const uEmail = (userObj.email || '').toLowerCase();
     if (uEmail && Array.isArray(bookings) && bookings.some(b => b.currentApprovalLevel === 1 && (b.managerEmail || '').toLowerCase() === uEmail)) return true;
   }
@@ -1316,11 +1316,11 @@ function updateSidebarPermissions() {
     }
   }
 
-  // ตั้งค่าระบบ & รถยนต์: แสดงเฉพาะ L2, คุณรณิดา, คุณณัฐอนงค์
+  // ตั้งค่าระบบ & รถยนต์: แสดงเฉพาะ L2, คุณณัฐอนงค์, admin
   if (itemAdminSettings) {
-    const isRanida = usernameLower === 'ranida.c';
     const isNattanong = usernameLower === 'natanong.s';
-    if (isL2 || isRanida || isNattanong) itemAdminSettings.classList.remove('hidden');
+    const isAdmin = usernameLower === 'admin';
+    if (isL2 || isNattanong || isAdmin) itemAdminSettings.classList.remove('hidden');
     else itemAdminSettings.classList.add('hidden');
   }
 
@@ -1342,7 +1342,7 @@ function loginUser(userObj) {
   // =====================================================================
   const positionText = userObj.position || '';
   const usernameLower = (userObj.username || '').toLowerCase();
-  const isSpecialUser = ['saisunee.p', 'sarena.m', 'chalong.c', 'sakda.a', 'panadon.p', 'piyawan.k', 'jaruwan.s', 'supachai.j', 'patiyoot.k'].includes(usernameLower);
+  const isSpecialUser = ['ranida.c', 'saisunee.p', 'sarena.m', 'chalong.c', 'sakda.a', 'panadon.p', 'piyawan.k', 'jaruwan.s', 'supachai.j', 'patiyoot.k'].includes(usernameLower);
   
   // ถ้าในชื่อตำแหน่งมีคำว่า "หัวหน้าสำนักงาน", "หัวหน้าแผนก", "ร.หส.", หรือ "ร.หผ." ให้จัดการอัปเกรดเป็น L1 ทันที
   if (!isSpecialUser && (
@@ -1374,11 +1374,13 @@ function loginUser(userObj) {
       primaryLevel = 3; // สายสุนีย์: สถานะหลักคือ L3
     } else if (username === 'sarena.m') {
       primaryLevel = 1; // ซารีนา: สถานะหลักคือ L1
+    } else if (username === 'ranida.c') {
+      primaryLevel = 1; // รณิดา: สถานะหลักคือ L1 เท่านั้น
     }
 
     if (primaryLevel === 1) {
       roleKey = 'supervisor';
-      roleName = (username === 'jaruwan.s' || username === 'supachai.j' || username === 'patiyoot.k') ? 'ผู้เสนอขอจองและหัวหน้างาน (L0 & L1)' : 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)';
+      roleName = (username === 'jaruwan.s' || username === 'supachai.j' || username === 'patiyoot.k' || username === 'ranida.c') ? 'ผู้เสนอขอจองและหัวหน้างาน (L0 & L1)' : 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)';
     } else if (primaryLevel === 2) {
       roleKey = 'fleet_admin';
       roleName = username === 'sakda.a' ? 'ผู้เสนอขอจองและผู้จัดรถ (L0 & L2)' : 'ผู้จัดรถ / งานยานพาหนะ (L2)';
@@ -1663,6 +1665,11 @@ function checkLoginStatus() {
       return;
     }
     let parsed = JSON.parse(cached);
+    if (parsed && (parsed.username || '').toLowerCase() === 'ranida.c') {
+      parsed.canApprove = [1];
+      parsed.role = 'supervisor';
+      parsed.roleName = 'หัวหน้าสำนักงาน/หัวหน้าแผนก (L1)';
+    }
     if (usersList && usersList.length > 0) {
       const dbUser = usersList.find(u => u.username.toLowerCase() === parsed.username.toLowerCase());
       if (dbUser) {
@@ -1767,15 +1774,15 @@ function showView(viewName) {
   if (viewName === 'admin-settings') {
     // Control tabs visibility based on user
     const btnTabUsers = document.getElementById('btn-tab-users-settings');
-    const isRanida = currentUser && (currentUser.username || '').toLowerCase() === 'ranida.c';
     const isNattanong = currentUser && (currentUser.username || '').toLowerCase() === 'natanong.s';
+    const isAdmin = currentUser && (currentUser.username || '').toLowerCase() === 'admin';
     if (btnTabUsers) {
-      if (isRanida || isNattanong) {
+      if (isAdmin || isNattanong) {
         btnTabUsers.style.display = 'block';
       } else {
         btnTabUsers.style.display = 'none';
         
-        // Force default tab to tab-cars for L2 (non-Ranida)
+        // Force default tab to tab-cars for L2
         document.querySelectorAll('.settings-tabs-bar .tab-btn').forEach(b => {
           if (b.getAttribute('data-settings-tab') === 'tab-cars') b.classList.add('active');
           else b.classList.remove('active');
@@ -4085,18 +4092,18 @@ async function handleApprovalAction(isApproved) {
       const actingL3User = localStorage.getItem('acting_l3_user');
       if (actingL3User && lUsername === actingL3User.toLowerCase()) {
         nameToSave = `${currentUser.name} / (ร.หส.พด.)`;
-      } else if (lUsername === 'ranida.c' || lUsername === 'admin') {
+      } else if (lUsername === 'admin') {
         nameToSave = 'น.ส.สายสุนีย์  พูลวณิชย์สกุล';
       }
     } else if (level === 4) {
       const actingL4User = localStorage.getItem('acting_l4_user');
       if (actingL4User && lUsername === actingL4User.toLowerCase()) {
         nameToSave = `${currentUser.name} / (ร.ผฝ.บง.)`;
-      } else if (lUsername === 'ranida.c' || lUsername === 'admin') {
+      } else if (lUsername === 'admin') {
         nameToSave = 'น.ส.ปิยวรรณ  แก้วกล้า';
       }
     } else if (level === 2) {
-      if (lUsername === 'ranida.c' || lUsername === 'admin') {
+      if (lUsername === 'admin') {
         nameToSave = 'นายฉลอง  เจียมผักแว่น';
       }
     }
@@ -4107,7 +4114,7 @@ async function handleApprovalAction(isApproved) {
     sigBlock.signature = fullSigDataUrl;
 
     if (currentUser && fullSigDataUrl && fullSigDataUrl.length > 50) {
-      if (lUsername !== 'ranida.c' && lUsername !== 'admin') {
+      if (lUsername !== 'admin') {
         currentUser.sign = fullSigDataUrl;
         if (typeof usersList !== 'undefined' && Array.isArray(usersList)) {
           const uObj = usersList.find(u => u.username && u.username.toLowerCase() === (currentUser.username || '').toLowerCase());
@@ -6455,9 +6462,14 @@ function assignUserPermissions(userObj) {
   const positionText = userObj.position || '';
   userObj.canApprove = []; // สร้าง Array เก็บสิทธิ์
 
-  // 0. ผู้ดูแลระบบ (Ranida / Admin): มีสิทธิ์อนุมัติทุกระดับ
-  if (username === 'ranida.c' || username === 'admin') {
+  // 0. ผู้ดูแลระบบ (Admin)
+  if (username === 'admin') {
     userObj.canApprove = [1, 2, 3, 4];
+  }
+  // รณิดา: เป็น L1 (หัวหน้างาน) เท่านั้น ไม่แสดงฟังก์ชัน L2
+  else if (username === 'ranida.c') {
+    userObj.canApprove = [1];
+    userObj.role = 'supervisor';
   }
   // 1. ซารีนา: เป็น L1 กับ รักษาการ L4 (หากได้รับเลือก)
   else if (username === 'sarena.m') {
