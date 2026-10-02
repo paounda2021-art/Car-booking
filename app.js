@@ -3062,6 +3062,9 @@ function renderMonthCalendar() {
   });
 }
 
+// Global sequence token to prevent race conditions during signature auto-drawing
+let approverSigDrawToken = 0;
+
 // Setup Interactive Signature Pads with pixel checks
 function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
   const canvas = document.getElementById(canvasId);
@@ -3071,13 +3074,16 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
 
   const ctx = canvas.getContext('2d');
   let drawing = false;
+  let restoreToken = 0;
 
   // Fit resolution to client dimensions
   const resize = () => {
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     if (Math.abs(canvas.width - rect.width) > 5 || Math.abs(canvas.height - rect.height) > 5) {
-      const oldData = (canvas.width > 0 && canvas.height > 0) ? canvas.toDataURL() : null;
+      // Do NOT capture or restore old canvas image on approver signature pad
+      // Approver signatures are managed dynamically per approval level by autoDrawApproverSignature
+      const oldData = (canvasId !== 'canvas-approver-signature' && canvas.width > 0 && canvas.height > 0) ? canvas.toDataURL() : null;
       canvas.width = rect.width;
       canvas.height = rect.height;
       ctx.strokeStyle = '#0284c7';
@@ -3085,8 +3091,13 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       if (oldData && oldData.length > 500) {
+        restoreToken++;
+        const currentRestoreToken = restoreToken;
         const restoreImg = new Image();
-        restoreImg.onload = () => ctx.drawImage(restoreImg, 0, 0);
+        restoreImg.onload = () => {
+          if (currentRestoreToken !== restoreToken) return;
+          ctx.drawImage(restoreImg, 0, 0);
+        };
         restoreImg.src = oldData;
       }
     }
@@ -3132,6 +3143,10 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
 
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
+      restoreToken++;
+      if (canvasId === 'canvas-approver-signature') {
+        approverSigDrawToken++;
+      }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (placeholder) placeholder.style.display = 'flex';
     });
@@ -3144,6 +3159,10 @@ function setupSignaturePad(canvasId, clearBtnId, placeholderId) {
     },
     getDataUrl: () => canvas.toDataURL(),
     clear: () => {
+      restoreToken++;
+      if (canvasId === 'canvas-approver-signature') {
+        approverSigDrawToken++;
+      }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       if (placeholder) placeholder.style.display = 'flex';
     },
@@ -3155,6 +3174,14 @@ async function autoDrawApproverSignature(targetLevel) {
   const canvas = document.getElementById('canvas-approver-signature');
   const placeholder = document.getElementById('approver-sig-placeholder');
   if (!canvas) return;
+
+  approverSigDrawToken++;
+  const thisDrawToken = approverSigDrawToken;
+
+  const ctx = canvas.getContext('2d');
+  // Immediately wipe previous canvas cleanly and show placeholder while loading
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (placeholder) placeholder.style.display = 'flex';
 
   const booking = (typeof activeBookingIdForApproval !== 'undefined' && activeBookingIdForApproval)
     ? bookings.find(b => b.id === activeBookingIdForApproval)
@@ -3172,6 +3199,9 @@ async function autoDrawApproverSignature(targetLevel) {
   } catch(e) {
     console.warn("Signature fetch usersList error:", e);
   }
+
+  // Token guard: Abort if newer draw request arrived while awaiting fetch
+  if (thisDrawToken !== approverSigDrawToken) return;
 
   // 2. Resolve target signature based on level and acting settings
   let targetSign = '';
@@ -3260,10 +3290,7 @@ async function autoDrawApproverSignature(targetLevel) {
     }
   }
 
-  // 3. Ensure canvas dimensions
-  if (approverSig && typeof approverSig.resize === 'function') {
-    approverSig.resize();
-  }
+  // 3. Ensure canvas dimensions directly without asynchronous restoreImg clobbering
   const rect = canvas.getBoundingClientRect();
   const parent = canvas.parentElement || canvas.parentNode;
   const pWidth = rect.width > 50 ? rect.width : (parent && parent.clientWidth > 50 ? parent.clientWidth : 540);
@@ -3271,11 +3298,11 @@ async function autoDrawApproverSignature(targetLevel) {
   canvas.width = Math.round(pWidth);
   canvas.height = Math.round(pHeight);
 
-  const ctx = canvas.getContext('2d');
   ctx.strokeStyle = '#0284c7';
   ctx.lineWidth = 3;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // 4. Draw signature image or blank
   if (!targetSign || targetSign.length < 10) {
@@ -3287,6 +3314,10 @@ async function autoDrawApproverSignature(targetLevel) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
+      if (thisDrawToken !== approverSigDrawToken) {
+        resolve();
+        return;
+      }
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const hRatio = (canvas.width * 0.92) / img.width;
       const vRatio = (canvas.height * 0.92) / img.height;
@@ -3298,12 +3329,37 @@ async function autoDrawApproverSignature(targetLevel) {
       resolve();
     };
     img.onerror = () => {
-      if (placeholder) placeholder.style.display = 'flex';
+      if (thisDrawToken === approverSigDrawToken) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (placeholder) placeholder.style.display = 'flex';
+      }
       resolve();
     };
     img.src = targetSign;
   });
 }
+
+// Cleanly close approval modal and reset approver signature state
+function closeApprovalModal() {
+  const modal = document.getElementById('modal-approval');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.style.display = 'none';
+  }
+  approverSigDrawToken++;
+  if (approverSig && typeof approverSig.clear === 'function') {
+    approverSig.clear();
+  }
+  const canvas = document.getElementById('canvas-approver-signature');
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  const placeholder = document.getElementById('approver-sig-placeholder');
+  if (placeholder) placeholder.style.display = 'flex';
+  activeBookingIdForApproval = null;
+}
+window.closeApprovalModal = closeApprovalModal;
 
 // Open Approval Details Modal
 function formatDateTimeForInput(dateStr) {
@@ -3362,6 +3418,19 @@ async function openApprovalModal(bookingId) {
   }
 
   activeBookingIdForApproval = booking.id;
+
+  // Immediately cancel any previous autoDraw operations and wipe canvas clean
+  approverSigDrawToken++;
+  if (approverSig && typeof approverSig.clear === 'function') {
+    approverSig.clear();
+  }
+  const prevCanvas = document.getElementById('canvas-approver-signature');
+  if (prevCanvas) {
+    const prevCtx = prevCanvas.getContext('2d');
+    prevCtx.clearRect(0, 0, prevCanvas.width, prevCanvas.height);
+  }
+  const prevPlaceholder = document.getElementById('approver-sig-placeholder');
+  if (prevPlaceholder) prevPlaceholder.style.display = 'flex';
 
   const modal = document.getElementById('modal-approval');
   if (!modal) return;
@@ -3961,7 +4030,7 @@ async function handleApprovalAction(isApproved) {
         booking.status = 'waiting_taxi_amount';
         
         await saveBookings();
-        document.getElementById('modal-approval').classList.remove('active');
+        closeApprovalModal();
         
         // Re-render UI views
         updateStats();
@@ -4070,7 +4139,7 @@ async function handleApprovalAction(isApproved) {
   }
 
   await saveBookings();
-  document.getElementById('modal-approval').classList.remove('active');
+  closeApprovalModal();
   
   // Re-render UI views
   updateStats();
@@ -5415,12 +5484,17 @@ function setupEventListeners() {
   });
 
   document.getElementById('btn-close-approval').addEventListener('click', () => {
-    const modal = document.getElementById('modal-approval');
-    if (modal) {
-      modal.classList.remove('active');
-      modal.style.display = 'none';
-    }
+    closeApprovalModal();
   });
+
+  const modalApprovalBackdrop = document.getElementById('modal-approval');
+  if (modalApprovalBackdrop) {
+    modalApprovalBackdrop.addEventListener('click', (e) => {
+      if (e.target === modalApprovalBackdrop) {
+        closeApprovalModal();
+      }
+    });
+  }
 
 
 
@@ -5697,7 +5771,7 @@ function setupEventListeners() {
       booking.cancelledBy = isFleetAdmin ? 'L2' : 'L0';
       saveBookings();
       showToast("ถอนคำขอและยกเลิกใบจองเรียบร้อยแล้ว", "success");
-      document.getElementById('modal-approval').classList.remove('active');
+      closeApprovalModal();
       updateStats();
       renderDashboard();
       renderBookingsLists();
@@ -5716,7 +5790,7 @@ function setupEventListeners() {
         booking.cancelReason = reason;
         saveBookings();
         showToast("ส่งคำขอร้องเรียนยกเลิกไปยังแอดมินแล้ว", "success");
-        document.getElementById('modal-approval').classList.remove('active');
+        closeApprovalModal();
         updateStats();
         renderDashboard();
         renderBookingsLists();
@@ -5730,7 +5804,7 @@ function setupEventListeners() {
         booking.cancelledBy = 'L2';
         saveBookings();
         showToast("ยกเลิกใบขอจองรถยนต์เรียบร้อยแล้ว", "success");
-        document.getElementById('modal-approval').classList.remove('active');
+        closeApprovalModal();
         updateStats();
         renderDashboard();
         renderBookingsLists();
@@ -5748,7 +5822,7 @@ function setupEventListeners() {
         booking.cancelledBy = 'L2';
         saveBookings();
         showToast("อนุมัติยกเลิกใบขอจองเรียบร้อยแล้ว", "success");
-        document.getElementById('modal-approval').classList.remove('active');
+        closeApprovalModal();
         updateStats();
         renderDashboard();
         renderBookingsLists();
@@ -5870,7 +5944,7 @@ function setupEventListeners() {
         });
 
         saveBookings();
-        document.getElementById('modal-approval').classList.remove('active');
+        closeApprovalModal();
         
         // Re-render UI views
         updateStats();
@@ -5917,7 +5991,7 @@ function setupEventListeners() {
     }
 
     saveBookings();
-    document.getElementById('modal-approval').classList.remove('active');
+    closeApprovalModal();
 
     // Trigger toast notification
     showToast("บันทึกการปรับเปลี่ยนยานพาหนะเรียบร้อยแล้ว", "success");
@@ -8392,8 +8466,7 @@ function openL0ScheduleEditModal(bookingId) {
   activeBookingIdForL0Edit = b.id;
 
   // Close any other open modals first to prevent overlap
-  const modalApproval = document.getElementById('modal-approval');
-  if (modalApproval) modalApproval.classList.remove('active');
+  closeApprovalModal();
 
   const modal = document.getElementById('modal-l0-schedule-edit');
   if (!modal) return;
@@ -8438,8 +8511,7 @@ document.addEventListener('DOMContentLoaded', () => {
       b.status = 'waiting_for_requester_edit';
       saveBookings();
 
-      const modalApproval = document.getElementById('modal-approval');
-      if (modalApproval) modalApproval.classList.remove('active');
+      closeApprovalModal();
 
       showToast("ส่งเรื่องกลับให้ผู้ขอ (L0) ปรับปรุง วัน/เวลา เรียบร้อยแล้ว", "success");
       renderDashboard();
@@ -8518,8 +8590,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
       });
 
-      const modalApproval = document.getElementById('modal-approval');
-      if (modalApproval) modalApproval.classList.remove('active');
+      closeApprovalModal();
 
       showToast("บันทึกการเปลี่ยนแปลงวัน/เวลาเรียบร้อยแล้ว พร้อมส่ง LINE แจ้งเตือน พขร. เรียบร้อย", "success");
       renderDashboard();
