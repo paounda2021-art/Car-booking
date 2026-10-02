@@ -7,7 +7,7 @@ const rootDir = __dirname;
 const bookingsPath = path.join(rootDir, 'bookings.json');
 const dbPath = path.join(rootDir, 'database.db');
 
-console.log(`[UPDATE] Updating booking ${targetId} to wait at L2...`);
+console.log(`[UPDATE] Resetting ${targetId} to wait at L2 (updating BOTH bookings.json and database.db)...`);
 
 // 1. Update bookings.json
 if (fs.existsSync(bookingsPath)) {
@@ -16,6 +16,8 @@ if (fs.existsSync(bookingsPath)) {
     if (index !== -1) {
         bookings[index].status = 'pending';
         bookings[index].currentApprovalLevel = 2;
+        bookings[index].carId = '';
+        bookings[index].driverName = '';
         
         if (Array.isArray(bookings[index].signatures)) {
             bookings[index].signatures.forEach(sig => {
@@ -58,9 +60,9 @@ if (fs.existsSync(dbPath)) {
                 });
             }
             const sigsJson = JSON.stringify(sigs);
-            db.prepare('UPDATE bookings SET status = ?, currentApprovalLevel = ?, signatures = ? WHERE id = ?')
-              .run('pending', 2, sigsJson, targetId);
-            console.log(`[SUCCESS] Updated ${targetId} in database.db`);
+            db.prepare('UPDATE bookings SET status = ?, currentApprovalLevel = ?, carId = ?, driverName = ?, signatures = ? WHERE id = ?')
+              .run('pending', 2, '', '', sigsJson, targetId);
+            console.log(`[SUCCESS] Updated ${targetId} in database.db (SQLite)`);
         }
     } catch(err) {
         console.error(`[ERROR] Database update failed:`, err);
