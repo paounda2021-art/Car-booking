@@ -10,10 +10,61 @@
   <meta property="og:image" content="https://car-booking.fishmarket.co.th/logoFMO.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="องค์การสะพานปลา">
-  <link rel="icon" type="image/x-icon" href="favicon.ico?v=1.0">
-  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?v=1.0">
-  <link rel="stylesheet" href="flatpickr.min.css?v=1.0">
-  <link rel="stylesheet" href="style.css?v=8.1_a4_pdf_fit">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=2.0">
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?v=2.0">
+  <link rel="stylesheet" href="flatpickr.min.css?v=2.0">
+  <link rel="stylesheet" href="style.css?v=20261006_cacheclear">
+  <script>
+    // FMO Car Booking - Early Cache Buster & Version Controller
+    window.APP_VERSION = "2026.10.06.2";
+    (function() {
+      try {
+        const storedVer = localStorage.getItem('fmo_car_app_version');
+        if (storedVer && storedVer !== window.APP_VERSION) {
+          console.log(`[CacheBuster] App version changed (${storedVer} -> ${window.APP_VERSION}). Purging stale data caches...`);
+          localStorage.removeItem('bookings_data');
+          localStorage.removeItem('cars_data');
+          localStorage.removeItem('email_logs_data');
+          if ('caches' in window) {
+            caches.keys().then(names => names.forEach(name => caches.delete(name)));
+          }
+        }
+        localStorage.setItem('fmo_car_app_version', window.APP_VERSION);
+      } catch (e) {
+        console.warn('[CacheBuster] Init error:', e);
+      }
+    })();
+
+    // Global helper callable from anywhere or UI button
+    window.clearAppCacheAndReload = async function(showConfirm = true) {
+      if (showConfirm && !confirm("ต้องการล้างแคชและรีเฟรชระบบเพื่อโหลดโค้ดเวอร์ชันล่าสุดหรือไม่?\n\n(ระบบจะล้างไฟล์แคชในเครื่องและโหลดข้อมูลล่าสุดจากเซิร์ฟเวอร์โดยตรง)")) {
+        return;
+      }
+      try {
+        if ('caches' in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map(name => caches.delete(name)));
+        }
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(r => r.unregister()));
+        }
+        const savedUser = localStorage.getItem('current_user');
+        localStorage.removeItem('bookings_data');
+        localStorage.removeItem('cars_data');
+        localStorage.removeItem('email_logs_data');
+        sessionStorage.clear();
+        if (savedUser) localStorage.setItem('current_user', savedUser);
+      } catch (err) {
+        console.error("Cache purge error:", err);
+      }
+      const cleanUrl = window.location.origin + window.location.pathname + '?nocache=' + Date.now();
+      window.location.replace(cleanUrl);
+    };
+  </script>
 </head>
 <body>
   <!-- MAINTENANCE SCREEN (Overlay) -->
@@ -170,6 +221,11 @@
             🔒 ปิดใช้งานระบบชั่วคราว
           </button>
         </div>
+
+        <!-- Clear Cache & Reload Button -->
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-force-clear-cache" onclick="window.clearAppCacheAndReload()" title="ล้างไฟล์แคชที่ค้างในเครื่องและโหลดโค้ดเวอร์ชันล่าสุด" style="width: 100%; color: var(--text-muted); border-color: var(--border-color); font-size: 0.72rem; padding: 0.35rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 6px; background: rgba(255,255,255,0.03);">
+          🔄 ล้างแคช & รีเฟรชระบบ
+        </button>
 
         <!-- Copyright Text -->
         <div style="font-size: 0.65rem; color: var(--text-muted); text-align: center; margin-top: 0.25rem; line-height: 1.3;">
@@ -1186,9 +1242,9 @@
     </div>
   </div>
 
-  <script src="flatpickr.min.js?v=1.0"></script>
-  <script src="flatpickr.th.js?v=1.0"></script>
-  <script src="html2pdf.bundle.min.js?v=1.0"></script>
-  <script src="app.js?v=62.0_http_413_payload_fix"></script>
+  <script src="flatpickr.min.js?v=2.0"></script>
+  <script src="flatpickr.th.js?v=2.0"></script>
+  <script src="html2pdf.bundle.min.js?v=2.0"></script>
+  <script src="app.js?v=20261006_cacheclear"></script>
 </body>
 </html>

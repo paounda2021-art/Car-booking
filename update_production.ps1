@@ -38,7 +38,7 @@ if (Test-Path $liveCars) { Copy-Item $liveCars $tempCars -Force; Write-Host "Sav
 
 # Zip archive for extra backup safety
 $itemsToZip = @()
-foreach ($item in @("database.db", "bookings.json", "users.json", "cars.json", "app.js", "server.js", "index.html")) {
+foreach ($item in @("database.db", "bookings.json", "users.json", "cars.json", "app.js", "server.js", "index.html", "version.json")) {
     $fullPath = Join-Path $rootDir $item
     if (Test-Path $fullPath) { $itemsToZip += $fullPath }
 }

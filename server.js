@@ -976,6 +976,31 @@ const server = http.createServer((req, res) => {
     }
   }
 
+  // API: version (Version & Cache Check)
+  if (urlPath === '/api/version' && req.method === 'GET') {
+    let appMtime = 0;
+    try {
+      appMtime = fs.statSync(path.join(ROOT_DIR, 'app.js')).mtimeMs;
+    } catch(e) {}
+    let verData = { version: "2026.10.06.2", timestamp: Math.floor(appMtime) };
+    const verFile = path.join(ROOT_DIR, 'version.json');
+    if (fs.existsSync(verFile)) {
+      try {
+        const fileVer = JSON.parse(fs.readFileSync(verFile, 'utf8'));
+        verData = Object.assign(verData, fileVer);
+        verData.timestamp = Math.floor(appMtime) || verData.timestamp;
+      } catch(e) {}
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+    res.end(JSON.stringify(verData));
+    return;
+  }
+
   // API: get-bookings
   if (urlPath === '/api/get-bookings' && req.method === 'GET') {
     let sqlData = sqliteGetBookings();
@@ -2628,9 +2653,37 @@ function sendLineNotifyFallback(token, messageText) {
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
+    // Anti-Cache Dynamic Busting for HTML files (Inject fresh mtime for app.js and style.css)
+    if (ext === '.html') {
+      try {
+        let html = fs.readFileSync(filePath, 'utf8');
+        let appMtime = stats.mtimeMs;
+        let styleMtime = stats.mtimeMs;
+        try {
+          appMtime = fs.statSync(path.join(ROOT_DIR, 'app.js')).mtimeMs;
+          styleMtime = fs.statSync(path.join(ROOT_DIR, 'style.css')).mtimeMs;
+        } catch(e) {}
+        
+        // Dynamically replace asset versions with exact file modification timestamp
+        html = html.replace(/app\.js(\?v=[^"']*)?/g, `app.js?v=${Math.floor(appMtime)}`);
+        html = html.replace(/style\.css(\?v=[^"']*)?/g, `style.css?v=${Math.floor(styleMtime)}`);
+
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        });
+        res.end(html);
+        return;
+      } catch(htmlErr) {
+        console.error('[Static HTML] Error serving dynamic html:', htmlErr);
+      }
+    }
+
     res.writeHead(200, {
       'Content-Type': contentType,
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
       'Pragma': 'no-cache',
       'Expires': '0'
     });

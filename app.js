@@ -711,7 +711,7 @@ async function initDatabase() {
   // Try to load cars from backend first
   let dbCarsLoaded = false;
   try {
-    const carsResponse = await fetch('/api/get-cars');
+    const carsResponse = await fetch('/api/get-cars?t=' + Date.now(), { cache: 'no-store' });
     if (carsResponse.ok) {
       const dbCars = await carsResponse.json();
       if (dbCars && dbCars.length > 0) {
@@ -6943,8 +6943,61 @@ window.toggleEmailBody = function(index) {
   }
 };
 
+// Auto-Update & Dynamic Cache Buster Engine
+function setupAutoUpdateChecker() {
+  const currentAppVersion = window.APP_VERSION || "2026.10.06.2";
+  let isUpdating = false;
+
+  async function checkForSystemUpdate() {
+    if (isUpdating) return;
+    try {
+      const res = await fetch('/version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) return;
+      const verInfo = await res.json();
+      if (!verInfo || !verInfo.version) return;
+
+      const installedVer = localStorage.getItem('fmo_car_app_version') || currentAppVersion;
+      if (verInfo.version !== installedVer) {
+        isUpdating = true;
+        console.log(`[AutoUpdate] 🚀 Server update detected: ${verInfo.version} (current: ${installedVer})`);
+        localStorage.setItem('fmo_car_app_version', verInfo.version);
+
+        if (typeof showToast === 'function') {
+          showToast("🚀 ตรวจพบการอัปเดตระบบเวอร์ชันใหม่! กำลังโหลดโค้ดล่าสุด...", "info");
+        }
+
+        setTimeout(() => {
+          if (typeof window.clearAppCacheAndReload === 'function') {
+            window.clearAppCacheAndReload(false);
+          } else {
+            window.location.replace(window.location.origin + window.location.pathname + '?reload=' + Date.now());
+          }
+        }, 1200);
+      }
+    } catch (e) {
+      // Ignore background fetch error when offline
+    }
+  }
+
+  // Initial check after page stabilizes
+  setTimeout(checkForSystemUpdate, 2500);
+
+  // Periodic polling every 5 minutes
+  setInterval(checkForSystemUpdate, 5 * 60 * 1000);
+
+  // Check immediately when user switches back to this browser tab/window
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkForSystemUpdate();
+    }
+  });
+}
+
 // Document Load entrypoint
 document.addEventListener('DOMContentLoaded', () => {
+  // 🟢 0. Initialize Auto-Update & Cache Purge Engine
+  setupAutoUpdateChecker();
+
   // 🟢 1. Render instant UI from local storage cache immediately (0ms)
   try {
     const cachedCars = localStorage.getItem('cars_data');
