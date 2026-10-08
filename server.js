@@ -2668,6 +2668,17 @@ function sendLineNotifyFallback(token, messageText) {
         html = html.replace(/app\.js(\?v=[^"']*)?/g, `app.js?v=${Math.floor(appMtime)}`);
         html = html.replace(/style\.css(\?v=[^"']*)?/g, `style.css?v=${Math.floor(styleMtime)}`);
 
+        // Dynamically sync window.APP_VERSION with version.json
+        try {
+          const verPath = path.join(ROOT_DIR, 'version.json');
+          if (fs.existsSync(verPath)) {
+            const verData = JSON.parse(fs.readFileSync(verPath, 'utf8'));
+            if (verData && verData.version) {
+              html = html.replace(/window\.APP_VERSION\s*=\s*["'][^"']+["']/g, `window.APP_VERSION = "${verData.version}"`);
+            }
+          }
+        } catch(e) {}
+
         res.writeHead(200, {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0',

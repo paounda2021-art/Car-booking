@@ -80,11 +80,11 @@ function buildReportHTMLContent(b, usersList, carsList) {
   const l3SigImg = (l3Sig.status === 'approved') ? getSignatureImg(3, l3Sig.signature, l3Sig.approverName, usersList) : getSignatureImg(3, '', l3Sig.approverName, usersList);
   const l4SigImg = (l4Sig.status === 'approved') ? getSignatureImg(4, l4Sig.signature, l4Sig.approverName, usersList) : getSignatureImg(4, '', l4Sig.approverName, usersList);
 
-  const reqDate = formatThaiDate(l0Sig.timestamp || b.startDate);
-  const l1Date = l1Sig.timestamp ? formatThaiDate(l1Sig.timestamp) : '';
-  const l2Date = l2Sig.timestamp ? formatThaiDate(l2Sig.timestamp) : '';
-  const l3Date = l3Sig.timestamp ? formatThaiDate(l3Sig.timestamp) : '';
-  const l4Date = l4Sig.timestamp ? formatThaiDate(l4Sig.timestamp) : '';
+  const reqDate = formatThaiDate(l0Sig.timestamp || b.createdAt || b.startDate);
+  const l1Date = (l1Sig.timestamp || (l1Sig.status === 'approved' && (b.createdAt || b.startDate))) ? formatThaiDate(l1Sig.timestamp || b.createdAt || b.startDate) : '';
+  const l2Date = (l2Sig.timestamp || (l2Sig.status === 'approved' && (l1Sig.timestamp || b.createdAt || b.startDate))) ? formatThaiDate(l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
+  const l3Date = (l3Sig.timestamp || (l3Sig.status === 'approved' && (l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate))) ? formatThaiDate(l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
+  const l4Date = (l4Sig.timestamp || (l4Sig.status === 'approved' && (l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate))) ? formatThaiDate(l4Sig.timestamp || l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
 
   const parseThaiDateParts = (isoString) => {
     if (!isoString) return { day: '...', month: '..........', year: '....', time: '.....' };
@@ -179,21 +179,25 @@ function buildReportHTMLContent(b, usersList, carsList) {
           </div>
           <div style="margin-top: 4px; font-size: 11.5px;">1. ( <span style="font-weight: bold;">${b.requester}</span> )</div>
           <div style="font-size: 11px; color: #555;">ผู้ขอยืมรถ</div>
+          <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ${reqDate || '........................................'}</div>
         </div>
         <div style="width: 22%;">
           <div style="height: 35px; border-bottom: 1px dotted #000;"></div>
           <div style="margin-top: 4px; font-size: 11.5px;">2. ( ................................. )</div>
           <div style="font-size: 11px; color: #555;">ผู้ขอยืมรถ</div>
+          <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ........................................</div>
         </div>
         <div style="width: 22%;">
           <div style="height: 35px; border-bottom: 1px dotted #000;"></div>
           <div style="margin-top: 4px; font-size: 11.5px;">3. ( ................................. )</div>
           <div style="font-size: 11px; color: #555;">ผู้ขอยืมรถ</div>
+          <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ........................................</div>
         </div>
         <div style="width: 22%;">
           <div style="height: 35px; border-bottom: 1px dotted #000;"></div>
           <div style="margin-top: 4px; font-size: 11.5px;">4. ( ................................. )</div>
           <div style="font-size: 11px; color: #555;">ผู้ขอยืมรถ</div>
+          <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ........................................</div>
         </div>
       </div>
 
@@ -649,6 +653,13 @@ function buildReportHTMLContent(b, usersList, carsList) {
           </td>
           <td></td>
         </tr>
+        <tr>
+          <td></td>
+          <td style="text-align: center; padding: 2px 0; font-size: 10px; color: #555;">
+            วันที่ ${reqDate || '........................................'}
+          </td>
+          <td></td>
+        </tr>
         <tr style="height: 10px;"><td></td><td></td><td></td></tr>
         <tr>
           <td style="padding: 2px 0; text-align: left; white-space: nowrap;">ลงชื่อ</td>
@@ -697,9 +708,9 @@ function buildReportHTMLContent(b, usersList, carsList) {
             </div>
             <span>ผู้จัดรถ</span>
           </div>
-          ${(b.travelType === 'fmo_car' && l2SigImg) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l2Sig.approverName} )</div>` : ''}
+          ${(b.travelType === 'fmo_car' && l2Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l2Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
-            วันที่ ${(b.travelType === 'fmo_car' && l2Sig.timestamp) ? l2Date : '-'}
+            วันที่ ${(b.travelType === 'fmo_car') ? (l2Date || '........................................') : '-'}
           </div>
         </div>
 
@@ -716,9 +727,9 @@ function buildReportHTMLContent(b, usersList, carsList) {
             </div>
             <span>หส.พด.</span>
           </div>
-          ${(b.travelType === 'fmo_car' && l3SigImg) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l3Sig.approverName} )</div>` : ''}
+          ${(b.travelType === 'fmo_car' && l3Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l3Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
-            วันที่ ${(b.travelType === 'fmo_car' && l3Sig.timestamp) ? l3Date : '-'}
+            วันที่ ${(b.travelType === 'fmo_car') ? (l3Date || '........................................') : '-'}
           </div>
         </div>
 
@@ -734,9 +745,9 @@ function buildReportHTMLContent(b, usersList, carsList) {
             </div>
             <span>ผฝ.บง.</span>
           </div>
-          ${(b.travelType === 'fmo_car' && l4SigImg) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : ''}
+          ${(b.travelType === 'fmo_car' && l4Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
-            วันที่ ${(b.travelType === 'fmo_car' && l4Sig.timestamp) ? l4Date : '-'}
+            วันที่ ${(b.travelType === 'fmo_car') ? (l4Date || '........................................') : '-'}
           </div>
         </div>
       </div>
@@ -759,9 +770,9 @@ function buildReportHTMLContent(b, usersList, carsList) {
             </div>
             <span>ผู้จัดรถ</span>
           </div>
-          ${(b.travelType === 'public_car' && l2SigImg) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l2Sig.approverName} )</div>` : ''}
+          ${(b.travelType === 'public_car' && l2Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l2Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
-            วันที่ ${(b.travelType === 'public_car' && l2Sig.timestamp) ? l2Date : '............/............/............'}
+            วันที่ ${(b.travelType === 'public_car') ? (l2Date || '........................................') : '............/............/............'}
           </div>
         </div>
 
@@ -778,9 +789,9 @@ function buildReportHTMLContent(b, usersList, carsList) {
             </div>
             <span>หส.พด.</span>
           </div>
-          ${(b.travelType === 'public_car' && l3SigImg) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l3Sig.approverName} )</div>` : ''}
+          ${(b.travelType === 'public_car' && l3Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l3Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
-            วันที่ ${(b.travelType === 'public_car' && l3Sig.timestamp) ? l3Date : '............/............/............'}
+            วันที่ ${(b.travelType === 'public_car') ? (l3Date || '........................................') : '............/............/............'}
           </div>
         </div>
 
@@ -796,9 +807,9 @@ function buildReportHTMLContent(b, usersList, carsList) {
             </div>
             <span>ผฝ.บง.</span>
           </div>
-          ${(b.travelType === 'public_car' && l4SigImg) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : ''}
+          ${(b.travelType === 'public_car' && l4Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
-            วันที่ ${(b.travelType === 'public_car' && l4Sig.timestamp) ? l4Date : '............/............/............'}
+            วันที่ ${(b.travelType === 'public_car') ? (l4Date || '........................................') : '............/............/............'}
           </div>
         </div>
       </div>
@@ -990,5 +1001,6 @@ async function generatePDFReportServerSide(bookingId) {
 }
 
 module.exports = {
-  generatePDFReportServerSide
+  generatePDFReportServerSide,
+  buildReportHTMLContent
 };
