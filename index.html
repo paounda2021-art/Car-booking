@@ -16,11 +16,19 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico?v=2.0">
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico?v=2.0">
   <link rel="stylesheet" href="flatpickr.min.css?v=2.0">
-  <link rel="stylesheet" href="style.css?v=20261006_cacheclear">
+  <link rel="stylesheet" href="style.css?v=2026.10.25.1">
   <script>
     // FMO Car Booking - Early Cache Buster & Version Controller
-    window.APP_VERSION = "2026.10.08.1";
+    window.APP_VERSION = "2026.10.25.1";
     (function() {
+      // Clean URL: Strip any lingering ?nocache=... or ?reload=... from browser address bar immediately
+      try {
+        if (window.location.search && (window.location.search.includes('nocache') || window.location.search.includes('reload'))) {
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState(null, document.title, cleanUrl);
+        }
+      } catch (e) {}
+
       try {
         const storedVer = localStorage.getItem('fmo_car_app_version');
         if (storedVer && storedVer !== window.APP_VERSION) {
@@ -28,8 +36,14 @@
           localStorage.removeItem('bookings_data');
           localStorage.removeItem('cars_data');
           localStorage.removeItem('email_logs_data');
+          localStorage.removeItem('acting_l3_user');
+          localStorage.removeItem('acting_l4_user');
+          sessionStorage.clear();
           if ('caches' in window) {
             caches.keys().then(names => names.forEach(name => caches.delete(name)));
+          }
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
           }
         }
         localStorage.setItem('fmo_car_app_version', window.APP_VERSION);
@@ -61,8 +75,14 @@
       } catch (err) {
         console.error("Cache purge error:", err);
       }
-      const cleanUrl = window.location.origin + window.location.pathname + '?nocache=' + Date.now();
-      window.location.replace(cleanUrl);
+      // Clean URL: Reload cleanly without appending query parameters
+      const cleanUrl = window.location.origin + window.location.pathname;
+      if (window.location.search) {
+        try {
+          window.history.replaceState(null, document.title, cleanUrl);
+        } catch (e) {}
+      }
+      window.location.reload();
     };
   </script>
 </head>
@@ -109,8 +129,11 @@
       <button type="button" id="btn-close-login" style="position: absolute; top: 1rem; right: 1.25rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.75rem; cursor: pointer; line-height: 1; transition: var(--transition-smooth); z-index: 10;" onmouseover="this.style.color='var(--text-main)'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
       <div class="login-header">
         <img src="logoFMO.png" alt="โลโก้ อสป." style="width: 90px; height: 90px; margin-bottom: 0.5rem; object-fit: contain;">
-        <h2>องค์การสะพานปลา</h2>
-        <p>ระบบขออนุมัติและจองใช้รถยนต์ภายในองค์กร</p>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+          <h2 style="margin: 0;">องค์การสะพานปลา</h2>
+          <span class="version-badge" style="font-size: 0.72rem; background: rgba(2, 132, 199, 0.12); color: #0284c7; border: 1px solid rgba(2, 132, 199, 0.25); padding: 2px 7px; border-radius: 999px; font-weight: 700;">v2026.10.25.1</span>
+        </div>
+        <p style="margin-top: 4px;">ระบบขออนุมัติและจองใช้รถยนต์ภายในองค์กร</p>
       </div>
       <form id="form-login">
         <div class="form-group">
@@ -135,8 +158,11 @@
       <div class="logo-section">
         <img src="logoFMO.png" alt="โลโก้ อสป." style="width: 45px; height: 45px; object-fit: contain; background: white; padding: 2px; border-radius: 6px;">
         <div class="logo-text">
-          <h1>องค์การสะพานปลา</h1>
-          <p>ระบบขออนุญาตใช้รถยนต์</p>
+          <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+            <h1 style="margin: 0;">องค์การสะพานปลา</h1>
+            <span id="sidebar-app-version" class="version-badge" title="เวอร์ชันระบบปัจจุบัน" style="font-size: 0.68rem; background: rgba(2, 132, 199, 0.15); color: #0284c7; border: 1px solid rgba(2, 132, 199, 0.3); padding: 1px 6px; border-radius: 999px; font-weight: 700; letter-spacing: 0.02em;">v2026.10.25.1</span>
+          </div>
+          <p style="margin-top: 2px;">ระบบขออนุญาตใช้รถยนต์</p>
         </div>
       </div>
       
@@ -243,8 +269,11 @@
   <header class="topbar no-print" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 2rem;">
       
       <div class="page-title">
-        <h2 id="view-title">รายการจองรถยนต์</h2>
-        <p id="view-subtitle">จัดการ อนุมัติ และติดตามความคืบหน้าคำขอทั้งหมด</p>
+        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+          <h2 id="view-title" style="margin: 0;">รายการจองรถยนต์</h2>
+          <span id="topbar-app-version" class="version-badge" title="เวอร์ชันระบบปัจจุบัน" style="font-size: 0.72rem; background: rgba(2, 132, 199, 0.12); color: #0284c7; border: 1px solid rgba(2, 132, 199, 0.25); padding: 2px 8px; border-radius: 999px; font-weight: 700; display: inline-flex; align-items: center; vertical-align: middle;">v2026.10.25.1</span>
+        </div>
+        <p id="view-subtitle" style="margin-top: 2px;">จัดการ อนุมัติ และติดตามความคืบหน้าคำขอทั้งหมด</p>
       </div>
 
       <div class="header-actions" style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; width: 320px; flex-shrink: 0;">
@@ -641,7 +670,7 @@
         <button class="modal-close" id="btn-close-booking">&times;</button>
       </div>
       <div class="modal-body">
-        <form id="form-create-booking">
+                <form id="form-create-booking">
           
           <h4 style="color: var(--primary); margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">ข้อมูลผู้ขอจอง</h4>
           <div class="form-row">
@@ -829,6 +858,7 @@
         <button class="modal-close" id="btn-close-approval">&times;</button>
       </div>
       <div class="modal-body">
+        <div id="modal-approval-alert-container"></div>
         
         <!-- Summary of request -->
         <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
@@ -915,6 +945,22 @@
               <label for="assign-driver">ชื่อพนักงานขับรถปฏิบัติหน้าที่</label>
               <input type="text" id="assign-driver" class="form-control" placeholder="ระบุชื่อพนักงานขับรถ" value="นายดีเลิศ สมใจ">
             </div>
+
+            <!-- Taxi input fields when L2 selects TAXI -->
+            <div id="fleet-admin-taxi-inputs" style="display:none; margin-top:0.75rem; background:rgba(2, 132, 199, 0.05); border:1px dashed var(--primary); padding:0.75rem; border-radius:6px;">
+              <div style="font-size:0.85rem; font-weight:bold; color:var(--primary); margin-bottom:0.5rem;">🚕 ข้อมูลการเดินทางด้วยรถแท็กซี่ (TAXI)</div>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                <div class="form-group" style="margin:0;">
+                  <label for="assign-taxi-distance" style="font-size:0.8rem;">ระยะทางโดยประมาณ (กม.)</label>
+                  <input type="number" id="assign-taxi-distance" class="form-control" placeholder="กิโลเมตร" min="0" step="0.1">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label for="assign-taxi-price" style="font-size:0.8rem;">วงเงินประมาณการค่าพาหนะ (บาท)</label>
+                  <input type="number" id="assign-taxi-price" class="form-control" placeholder="บาท" min="0" step="1">
+                </div>
+              </div>
+              <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:0.35rem;">* หากระบุระยะทางและราคา ระบบจะส่งต่อให้ L3 ได้ทันที หรือหากเว้นว่างไว้ ระบบจะส่งกลับให้ผู้ขอ (L0) กรอกข้อมูล</small>
+            </div>
           </div>
 
           <div class="form-group">
@@ -954,6 +1000,24 @@
           <div class="form-group" style="margin-top:0.5rem;" id="fleet-admin-edit-driver-group">
             <label for="edit-assign-driver">ชื่อพนักงานขับรถปฏิบัติหน้าที่</label>
             <input type="text" id="edit-assign-driver" class="form-control" placeholder="ระบุชื่อพนักงานขับรถ">
+          </div>
+
+          <!-- Taxi input fields when L2 selects TAXI in Edit Panel -->
+          <div id="fleet-admin-edit-taxi-inputs" style="display:none; margin-top:0.75rem; background:rgba(234, 179, 8, 0.08); border:1px dashed #eab308; padding:0.75rem; border-radius:6px;">
+            <div style="font-size:0.85rem; font-weight:bold; color:#ca8a04; margin-bottom:0.5rem;">🚕 ข้อมูลค่าพาหนะรถรับจ้าง (TAXI) (ระบุได้ทันที หรือเว้นว่างเพื่อให้ผู้ขอระบุ)</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+              <div class="form-group" style="margin:0;">
+                <label for="edit-assign-taxi-distance" style="font-size:0.8rem;">ระยะทางโดยประมาณ (กม.)</label>
+                <input type="number" id="edit-assign-taxi-distance" class="form-control" placeholder="กิโลเมตร" min="0" step="0.1">
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label for="edit-assign-taxi-price" style="font-size:0.8rem;">วงเงินประมาณการค่าพาหนะ (บาท)</label>
+                <input type="number" id="edit-assign-taxi-price" class="form-control" placeholder="บาท" min="0" step="1">
+              </div>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;">
+              💡 <em>หากเว้นว่างไว้ ระบบจะปรับสถานะเป็น "รอระบุค่าพาหนะ" และส่งอีเมลแจ้งผู้ขอรถ (L0) ให้กรอกข้อมูลเอง</em>
+            </div>
           </div>
 
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.25rem; flex-wrap:wrap; gap:0.5rem;">
@@ -1245,6 +1309,6 @@
   <script src="flatpickr.min.js?v=2.0"></script>
   <script src="flatpickr.th.js?v=2.0"></script>
   <script src="html2pdf.bundle.min.js?v=2.0"></script>
-  <script src="app.js?v=20261006_cacheclear"></script>
+  <script src="app.js?v=2026.10.25.1"></script>
 </body>
 </html>

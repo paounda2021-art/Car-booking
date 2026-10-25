@@ -1,6 +1,6 @@
 {
-  "version": "2026.10.08.1",
-  "buildTime": "2026-10-08 17:30:00",
-  "timestamp": 1728383400000,
-  "description": "Fix report form date display under requester and approvers"
+  "version": "2026.10.25.1",
+  "buildTime": "2026-10-25 20:30:00",
+  "timestamp": 1729863000000,
+  "description": "Fix L1 approval multi-level loop bug, display version badge top-left, and purge client cache"
 }

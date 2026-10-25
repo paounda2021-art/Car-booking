@@ -32,3 +32,8 @@ diff.txt
 completed_forms_pdf/
 signatures/
 uploads/
+
+# Media files
+*.MOV
+*.mov
+*.mp4

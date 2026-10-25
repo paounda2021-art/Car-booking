@@ -3459,6 +3459,31 @@ async function openApprovalModal(bookingId) {
 
   // We will resize and load signature in setTimeout to ensure proper layout and avoid signature clear
 
+  // Render Taxi Alert Banner if applicable
+  const alertContainer = document.getElementById('modal-approval-alert-container');
+  if (alertContainer) {
+    if (booking.waitingForRequesterInput && currentUser && checkIsMyRequest(booking, currentUser)) {
+      alertContainer.innerHTML = `
+        <div style="background: rgba(220, 38, 38, 0.08); border: 1px solid #ef4444; border-radius: 8px; padding: 12px 16px; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-weight: bold; color: #dc2626; font-size: 0.95rem;">🚕 รายการนี้ได้รับการจัดสรรเป็น รถรับจ้างสาธารณะ (TAXI)</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">กรุณากรอกระยะทางและค่าพาหนะประมาณการ เพื่อส่งเสนออนุมัติตามลำดับขั้นต่อไป</div>
+          </div>
+          <button type="button" class="btn btn-danger btn-sm" onclick="closeApprovalModal(); openFillTaxiModal('${booking.id}');" style="font-weight: bold; padding: 6px 14px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer;">✍️ กรอกค่าพาหนะ</button>
+        </div>
+      `;
+    } else if (booking.status === 'waiting_taxi_amount') {
+      alertContainer.innerHTML = `
+        <div style="background: rgba(234, 179, 8, 0.08); border: 1px dashed #eab308; border-radius: 8px; padding: 10px 14px; margin-bottom: 1.25rem;">
+          <div style="font-weight: bold; color: #ca8a04; font-size: 0.9rem;">🚕 จัดสรรเป็น รถรับจ้างสาธารณะ (TAXI)</div>
+          <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">สถานะปัจจุบัน: รอผู้ขอรถ (${booking.requester}) ระบุระยะทางและวงเงินค่าพาหนะ</div>
+        </div>
+      `;
+    } else {
+      alertContainer.innerHTML = '';
+    }
+  }
+
   // Fill details table
   document.getElementById('detail-title').textContent = `ใบขออนุญาตใช้รถยนต์ เลขที่ ${booking.id}`;
   document.getElementById('detail-requester').textContent = booking.requester;
@@ -3479,7 +3504,10 @@ async function openApprovalModal(bookingId) {
     const c = cars.find(car => car.id === booking.carId);
     document.getElementById('detail-car').innerHTML = `เลือกรถยนต์: <strong>${c ? c.name : 'ไม่พบข้อมูล'}</strong> (ทะเบียน: ${c ? c.plate : '-'}) [ทิศทาง: ${booking.goCheck ? 'ไป' : ''}${booking.goCheck && booking.backCheck ? '-' : ''}${booking.backCheck ? 'กลับ' : ''}]`;
   } else {
-    document.getElementById('detail-car').innerHTML = `รถสาธารณะ: ระยะทาง <strong>${booking.distance} กม.</strong> (ราคาประมาณ <strong>${booking.price} บาท</strong>) [ทิศทาง: ${booking.goCheck ? 'ไป' : ''}${booking.goCheck && booking.backCheck ? '-' : ''}${booking.backCheck ? 'กลับ' : ''}]`;
+    const fareInfo = (booking.distance > 0 && booking.price > 0)
+      ? `ระยะทาง <strong>${booking.distance} กม.</strong> (ราคาประมาณ <strong>${booking.price} บาท</strong>)`
+      : `<span class="badge warning" style="color:#d97706; background:rgba(217,119,6,0.1); font-weight:600;">⏳ รอระบุระยะทางและค่าพาหนะ</span>`;
+    document.getElementById('detail-car').innerHTML = `รถสาธารณะ (TAXI): ${fareInfo} [ทิศทาง: ${booking.goCheck ? 'ไป' : ''}${booking.goCheck && booking.backCheck ? '-' : ''}${booking.backCheck ? 'กลับ' : ''}]`;
   }
 
   // เติมข้อมูลพนักงานขับรถและเบอร์โทรศัพท์ (ถ้ามี)
@@ -3653,7 +3681,7 @@ async function openApprovalModal(bookingId) {
 
       if (booking.travelType === 'public_car' || booking.carId === 'taxi') {
         carSelect.value = 'taxi';
-        if (driverGroup) driverGroup.style.display = 'block';
+        if (driverGroup) driverGroup.style.display = 'none';
         if (driverInput) {
           driverInput.value = '-';
           driverInput.disabled = true;
@@ -3760,18 +3788,31 @@ async function openApprovalModal(bookingId) {
       });
 
       const editDriverInput = document.getElementById('edit-assign-driver');
-      if (booking.travelType === 'public_car') {
+      const editDriverGroup = document.getElementById('fleet-admin-edit-driver-group');
+      const editTaxiInputs = document.getElementById('fleet-admin-edit-taxi-inputs');
+      const editTaxiDist = document.getElementById('edit-assign-taxi-distance');
+      const editTaxiPrice = document.getElementById('edit-assign-taxi-price');
+
+      if (booking.travelType === 'public_car' || booking.carId === 'taxi') {
         editCarSelect.value = 'taxi';
+        if (editDriverGroup) editDriverGroup.style.display = 'none';
         if (editDriverInput) {
           editDriverInput.value = '-';
           editDriverInput.disabled = true;
         }
+        if (editTaxiInputs) editTaxiInputs.style.display = 'block';
+        if (editTaxiDist) editTaxiDist.value = booking.distance || '';
+        if (editTaxiPrice) editTaxiPrice.value = booking.price || '';
       } else {
         editCarSelect.value = booking.carId || '';
+        if (editDriverGroup) editDriverGroup.style.display = 'block';
+        if (editTaxiInputs) editTaxiInputs.style.display = 'none';
         if (editDriverInput) {
           editDriverInput.value = booking.driverName || (booking.controlUnit === 'รถสวัสดิการ' ? booking.requester : 'นายดีเลิศ สมใจ');
           editDriverInput.disabled = false;
         }
+        if (editTaxiDist) editTaxiDist.value = '';
+        if (editTaxiPrice) editTaxiPrice.value = '';
       }
     }
   }
@@ -3914,7 +3955,11 @@ function renderApprovalPipeline(booking) {
           <span>เมื่อ: ${timeStr}</span><br>
           ${sig.comment ? `<span>ความเห็น: "${sig.comment}"</span><br>` : ''}
           ${carAssignedText ? `<span style="color:var(--primary); font-weight:bold;">🚘 จัดรถยนต์: ${carAssignedText}</span><br>` : ''}
-          ${(step.level === 2 || sig.driverName) ? `<span style="color:var(--primary); font-weight:bold;">👤 จัดพนักงานขับรถ: ${sig.driverName || booking.driverName || '-'}${getDriverPhoneByName(sig.driverName || booking.driverName) ? ` (โทร. ${getDriverPhoneByName(sig.driverName || booking.driverName)})` : ''}</span><br>` : ''}
+          ${(step.level === 2 || sig.driverName) ? (
+  (booking.travelType === 'public_car' || booking.carId === 'taxi')
+    ? `<span style="color:var(--primary); font-weight:bold;">👤 พนักงานขับรถ: ไม่ระบุ (รถรับจ้างสาธารณะ TAXI)</span><br>`
+    : `<span style="color:var(--primary); font-weight:bold;">👤 จัดพนักงานขับรถ: ${sig.driverName || booking.driverName || '-'}${getDriverPhoneByName(sig.driverName || booking.driverName) ? ` (โทร. ${getDriverPhoneByName(sig.driverName || booking.driverName)})` : ''}</span><br>`
+) : ''}
           <div style="margin-top:0.25rem;">
             ${(sigImg && sigImg.length > 5) ? `<img src="${sigImg}" alt="Sign" style="height:35px; border-bottom:1px dashed #777;" onerror="this.style.display='none'">` : ''}
           </div>
@@ -4003,17 +4048,17 @@ function renderSignatureVerificationBox(booking) {
   }
 }
 
+let isApprovalActionInProgress = false;
+
 // Handle Approve / Reject Actions
 async function handleApprovalAction(isApproved) {
   console.log('[handleApprovalAction] called, isApproved=', isApproved, 'activeBookingIdForApproval=', activeBookingIdForApproval);
-  if (!activeBookingIdForApproval) {
-    console.warn('[handleApprovalAction] No active booking ID. Aborting.');
+  if (isApprovalActionInProgress) {
+    console.warn('[handleApprovalAction] Duplicate submission blocked!');
     return;
   }
-  
-  // Guard: approverSig อาจยัง null ถ้า canvas ยังไม่ถูก initialize
-  if (!approverSig || approverSig.isEmpty()) {
-    showToast("กรุณาเซ็นชื่อลงในกระดานลงนามดิจิทัลก่อนกดยืนยันการทำรายการ", "warning");
+  if (!activeBookingIdForApproval) {
+    console.warn('[handleApprovalAction] No active booking ID. Aborting.');
     return;
   }
 
@@ -4023,13 +4068,58 @@ async function handleApprovalAction(isApproved) {
     return;
   }
 
-  const comment = document.getElementById('approval-comment').value;
-  const level = booking.currentApprovalLevel;
+  const level = Number(booking.currentApprovalLevel);
 
-  // Fleet admin (L2) validation for car selection and driver name assignment
-  let assignedDriver = '';
-  let assignedCarId = '';
-  if ((currentUser.role === 'fleet_admin' || userHasApproveLevel(currentUser, 2) || ['chalong.c', 'sakda.a'].includes((currentUser.username || '').toLowerCase())) && level === 2 && isApproved) {
+  // 1. Strict Permission Guard: Verify currentUser has explicit authority for this specific approval level
+  let canApprove = false;
+  if (currentUser) {
+    const uUsername = (currentUser.username || '').toLowerCase();
+    if (uUsername === 'admin') {
+      canApprove = true;
+    } else if (level === 1) {
+      canApprove = isL1PendingForUser(booking, currentUser) || checkIsManagerOrApprover(booking, currentUser) || userHasApproveLevel(currentUser, 1);
+    } else if (level === 2) {
+      canApprove = currentUser.role === 'fleet_admin' || userHasApproveLevel(currentUser, 2) || ['chalong.c', 'sakda.a'].includes(uUsername);
+    } else if (level === 3) {
+      const actingL3User = (localStorage.getItem('acting_l3_user') || '').toLowerCase();
+      canApprove = userHasApproveLevel(currentUser, 3) || (actingL3User && uUsername === actingL3User);
+    } else if (level === 4) {
+      const actingL4User = (localStorage.getItem('acting_l4_user') || '').toLowerCase();
+      canApprove = userHasApproveLevel(currentUser, 4) || (actingL4User && uUsername === actingL4User);
+    }
+  }
+
+  if (!canApprove) {
+    showToast(`ขออภัย! ท่านไม่มีสิทธิ์ในการอนุมัติขั้นตอนระดับที่ ${level} (L${level})`, "error");
+    closeApprovalModal();
+    return;
+  }
+
+  // 2. Guard: approverSig must not be empty
+  if (!approverSig || approverSig.isEmpty()) {
+    showToast("กรุณาเซ็นชื่อลงในกระดานลงนามดิจิทัลก่อนกดยืนยันการทำรายการ", "warning");
+    return;
+  }
+
+  // Lock UI buttons to prevent double-clicks
+  const btnApprove = document.getElementById('btn-approve-request');
+  const btnReject = document.getElementById('btn-reject-request');
+  if (btnApprove) {
+    btnApprove.disabled = true;
+    btnApprove.innerHTML = '⏳ กำลังบันทึก...';
+  }
+  if (btnReject) {
+    btnReject.disabled = true;
+  }
+  isApprovalActionInProgress = true;
+
+  try {
+    const comment = document.getElementById('approval-comment').value;
+
+    // Fleet admin (L2) validation for car selection and driver name assignment
+    let assignedDriver = '';
+    let assignedCarId = '';
+    if (level === 2 && isApproved) {
     assignedCarId = document.getElementById('assign-car').value;
     if (!assignedCarId) {
       showToast("ในขั้นตอนผู้จัดรถ (L2) กรุณาเลือกรถยนต์ของ อสป. หรือแท็กซี่ (TAXI)", "warning");
@@ -4040,15 +4130,38 @@ async function handleApprovalAction(isApproved) {
       booking.travelType = 'public_car';
       booking.carId = 'taxi';
       booking.driverName = '-';
+      assignedDriver = '-';
+      
+      const inputDist = parseFloat(document.getElementById('assign-taxi-distance')?.value || 0);
+      const inputPrice = parseFloat(document.getElementById('assign-taxi-price')?.value || 0);
+      if (inputDist > 0 && inputPrice > 0) {
+        booking.distance = inputDist;
+        booking.price = inputPrice;
+      }
       
       const hasValidFare = (booking.distance > 0 && booking.price > 0) || (booking.estimatedCost > 0);
       
       if (!hasValidFare) {
         booking.waitingForRequesterInput = true;
         booking.status = 'waiting_taxi_amount';
+        booking.currentApprovalLevel = 1;
         
-        await saveBookings();
+        // Reset approval signatures from L1 onwards
+        booking.signatures.forEach(sig => {
+          if (sig.level >= 1) {
+            sig.status = 'pending';
+            sig.approverName = '';
+            sig.comment = '';
+            sig.timestamp = '';
+            sig.signature = '';
+            if (sig.level === 2) {
+              sig.driverName = '';
+            }
+          }
+        });
+        
         closeApprovalModal();
+        await saveBookings();
         
         // Re-render UI views
         updateStats();
@@ -4146,19 +4259,21 @@ async function handleApprovalAction(isApproved) {
     }
   }
 
-  // Update status routing workflow
+  // Update status routing workflow: strictly capped at maxLevel = 4
   if (!isApproved) {
     booking.status = 'rejected';
   } else {
-    booking.currentApprovalLevel = level + 1;
-    const maxLevel = 4;
-    if (booking.currentApprovalLevel > maxLevel) {
+    if (level >= 4) {
+      booking.currentApprovalLevel = 5;
       booking.status = 'approved';
+    } else {
+      booking.currentApprovalLevel = level + 1;
+      booking.status = 'pending';
     }
   }
 
-  await saveBookings();
   closeApprovalModal();
+  await saveBookings();
   
   // Re-render UI views
   updateStats();
@@ -4286,6 +4401,16 @@ async function handleApprovalAction(isApproved) {
     isApproved ? `ทำการอนุมัติรหัส ${booking.id} เรียบร้อยแล้ว` : `ปฏิเสธการจองใช้รถยนต์รหัส ${booking.id} เรียบร้อยแล้ว`,
     isApproved ? "success" : "info"
   );
+  } finally {
+    isApprovalActionInProgress = false;
+    if (btnApprove) {
+      btnApprove.disabled = false;
+      btnApprove.innerHTML = 'อนุมัติคำขอ';
+    }
+    if (btnReject) {
+      btnReject.disabled = false;
+    }
+  }
 }
 
 // Format Date object to official Thai text format
@@ -4318,10 +4443,10 @@ function buildReportHTMLContent(b) {
   const l4SigImg = (l4Sig.status === 'approved') ? getSignatureImg(4, l4Sig.signature, l4Sig.approverName, b.id) : '';
 
   const reqDate = formatThaiDate(l0Sig.timestamp || b.createdAt || b.startDate);
-  const l1Date = (l1Sig.timestamp || (l1Sig.status === 'approved' && (b.createdAt || b.startDate))) ? formatThaiDate(l1Sig.timestamp || b.createdAt || b.startDate) : '';
-  const l2Date = (l2Sig.timestamp || (l2Sig.status === 'approved' && (l1Sig.timestamp || b.createdAt || b.startDate))) ? formatThaiDate(l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
-  const l3Date = (l3Sig.timestamp || (l3Sig.status === 'approved' && (l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate))) ? formatThaiDate(l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
-  const l4Date = (l4Sig.timestamp || (l4Sig.status === 'approved' && (l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate))) ? formatThaiDate(l4Sig.timestamp || l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
+  const l1Date = (l1Sig.status === 'approved' && (l1Sig.timestamp || b.createdAt || b.startDate)) ? formatThaiDate(l1Sig.timestamp || b.createdAt || b.startDate) : '';
+  const l2Date = (l2Sig.status === 'approved' && (l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate)) ? formatThaiDate(l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
+  const l3Date = (l3Sig.status === 'approved' && (l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate)) ? formatThaiDate(l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
+  const l4Date = (l4Sig.status === 'approved' && (l4Sig.timestamp || l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate)) ? formatThaiDate(l4Sig.timestamp || l3Sig.timestamp || l2Sig.timestamp || l1Sig.timestamp || b.createdAt || b.startDate) : '';
 
   const parseThaiDateParts = (isoString) => {
     if (!isoString) return { day: '...', month: '..........', year: '....', time: '.....' };
@@ -4495,7 +4620,7 @@ function buildReportHTMLContent(b) {
                 <span>ผู้จัดรถ</span>
               </div>
               <div style="margin-top: 2px;">
-                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${l2Sig.approverName || '........................................'}</span> )
+                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${(l2Sig.status === "approved" && l2Sig.approverName) ? l2Sig.approverName : "........................................"}</span> )
               </div>
               <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ${l2Date || '........................................'}</div>
             </div>
@@ -4517,7 +4642,7 @@ function buildReportHTMLContent(b) {
                 <span>หส.พด.</span>
               </div>
               <div style="margin-top: 2px;">
-                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${l3Sig.approverName || '........................................'}</span> )
+                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${(l3Sig.status === "approved" && l3Sig.approverName) ? l3Sig.approverName : "........................................"}</span> )
               </div>
               <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ${l3Date || '........................................'}</div>
             </div>
@@ -4536,7 +4661,7 @@ function buildReportHTMLContent(b) {
                 <span>ผู้อนุมัติ</span>
               </div>
               <div style="margin-top: 2px;">
-                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${l4Sig.approverName || '........................................'}</span> )
+                ( <span style="min-width: 100px; display: inline-block; text-align: center;">${(l4Sig.status === "approved" && l4Sig.approverName) ? l4Sig.approverName : "........................................"}</span> )
               </div>
               <div style="font-size: 10px; color: #555; margin-top: 2px;">วันที่: ${l4Date || '........................................'}</div>
             </div>
@@ -4976,7 +5101,7 @@ function buildReportHTMLContent(b) {
             </div>
             <span>ผู้จัดรถ</span>
           </div>
-          ${(b.travelType === 'fmo_car' && l2Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l2Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
+          ${(b.travelType === 'fmo_car' && l2Sig.status === 'approved' && l2Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l2Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
             วันที่ ${(b.travelType === 'fmo_car') ? (l2Date || '........................................') : '-'}
           </div>
@@ -4995,7 +5120,7 @@ function buildReportHTMLContent(b) {
             </div>
             <span>หส.พด.</span>
           </div>
-          ${(b.travelType === 'fmo_car' && l3Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l3Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
+          ${(b.travelType === 'fmo_car' && l3Sig.status === 'approved' && l3Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l3Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
             วันที่ ${(b.travelType === 'fmo_car') ? (l3Date || '........................................') : '-'}
           </div>
@@ -5013,7 +5138,7 @@ function buildReportHTMLContent(b) {
             </div>
             <span>ผฝ.บง.</span>
           </div>
-          ${(b.travelType === 'fmo_car' && l4Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
+          ${(b.travelType === 'fmo_car' && l4Sig.status === 'approved' && l4Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : (b.travelType === 'fmo_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
             วันที่ ${(b.travelType === 'fmo_car') ? (l4Date || '........................................') : '-'}
           </div>
@@ -5038,7 +5163,7 @@ function buildReportHTMLContent(b) {
             </div>
             <span>ผู้จัดรถ</span>
           </div>
-          ${(b.travelType === 'public_car' && l2Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l2Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
+          ${(b.travelType === 'public_car' && l2Sig.status === 'approved' && l2Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l2Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
             วันที่ ${(b.travelType === 'public_car') ? (l2Date || '........................................') : '............/............/............'}
           </div>
@@ -5057,7 +5182,7 @@ function buildReportHTMLContent(b) {
             </div>
             <span>หส.พด.</span>
           </div>
-          ${(b.travelType === 'public_car' && l3Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l3Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
+          ${(b.travelType === 'public_car' && l3Sig.status === 'approved' && l3Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l3Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
             วันที่ ${(b.travelType === 'public_car') ? (l3Date || '........................................') : '............/............/............'}
           </div>
@@ -5075,7 +5200,7 @@ function buildReportHTMLContent(b) {
             </div>
             <span>ผฝ.บง.</span>
           </div>
-          ${(b.travelType === 'public_car' && l4Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
+          ${(b.travelType === 'public_car' && l4Sig.status === 'approved' && l4Sig.approverName) ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ${l4Sig.approverName} )</div>` : (b.travelType === 'public_car' ? `<div style="font-size: 11.5px; color: #111; margin-top: 0.15rem; text-align: center;">( ........................................ )</div>` : '')}
           <div style="color: #555; text-align: center; margin-top: 0.2rem; width: 100%; font-size: 10.5px;">
             วันที่ ${(b.travelType === 'public_car') ? (l4Date || '........................................') : '............/............/............'}
           </div>
@@ -5897,37 +6022,56 @@ function setupEventListeners() {
   });
 
   document.getElementById('assign-car').addEventListener('change', (e) => {
+    const driverGroup = document.getElementById('fleet-admin-driver-group');
     const driverInput = document.getElementById('assign-driver');
     const taxiInputsBox = document.getElementById('fleet-admin-taxi-inputs');
-    if (driverInput) {
-      if (e.target.value === 'taxi') {
+    if (e.target.value === 'taxi') {
+      if (driverInput) {
         driverInput.value = '-';
         driverInput.disabled = true;
-        if (taxiInputsBox) taxiInputsBox.style.display = 'block';
-        
-        const booking = bookings.find(b => b.id === activeBookingIdForApproval);
-        if (booking && booking.distance > 0 && booking.price > 0) {
+      }
+      if (driverGroup) driverGroup.style.display = 'none';
+      if (taxiInputsBox) taxiInputsBox.style.display = 'block';
+      
+      const booking = bookings.find(b => b.id === activeBookingIdForApproval);
+      if (booking) {
+        const taxiDistInput = document.getElementById('assign-taxi-distance');
+        const taxiPriceInput = document.getElementById('assign-taxi-price');
+        if (taxiDistInput && booking.distance) taxiDistInput.value = booking.distance;
+        if (taxiPriceInput && booking.price) taxiPriceInput.value = booking.price;
+        if (booking.distance > 0 && booking.price > 0) {
           const commentEl = document.getElementById('approval-comment');
           if (commentEl && !commentEl.value) {
             commentEl.value = `ระบุค่าพาหนะเรียบร้อยแล้ว ระยะทาง ${booking.distance} กม. (ราคาประมาณ ${booking.price} บาท)`;
           }
         }
-      } else {
+      }
+    } else {
+      if (driverGroup) driverGroup.style.display = 'block';
+      if (driverInput) {
         driverInput.disabled = false;
-        if (taxiInputsBox) taxiInputsBox.style.display = 'none';
         const car = cars.find(c => c.id === e.target.value);
         driverInput.value = car ? (car.driverName || '') : '';
       }
+      if (taxiInputsBox) taxiInputsBox.style.display = 'none';
     }
   });
 
   document.getElementById('edit-assign-car').addEventListener('change', (e) => {
     const editDriverInput = document.getElementById('edit-assign-driver');
-    if (editDriverInput) {
-      if (e.target.value === 'taxi') {
+    const editDriverGroup = document.getElementById('fleet-admin-edit-driver-group');
+    const editTaxiInputs = document.getElementById('fleet-admin-edit-taxi-inputs');
+    if (e.target.value === 'taxi') {
+      if (editDriverGroup) editDriverGroup.style.display = 'none';
+      if (editTaxiInputs) editTaxiInputs.style.display = 'block';
+      if (editDriverInput) {
         editDriverInput.value = '-';
         editDriverInput.disabled = true;
-      } else {
+      }
+    } else {
+      if (editDriverGroup) editDriverGroup.style.display = 'block';
+      if (editTaxiInputs) editTaxiInputs.style.display = 'none';
+      if (editDriverInput) {
         editDriverInput.disabled = false;
         const car = cars.find(c => c.id === e.target.value);
         editDriverInput.value = car ? (car.driverName || '') : '';
@@ -5952,26 +6096,34 @@ function setupEventListeners() {
       booking.carId = 'taxi';
       booking.driverName = '-';
       
+      const editDist = parseFloat(document.getElementById('edit-assign-taxi-distance')?.value || 0);
+      const editPrice = parseFloat(document.getElementById('edit-assign-taxi-price')?.value || 0);
+      if (editDist > 0 && editPrice > 0) {
+        booking.distance = editDist;
+        booking.price = editPrice;
+      }
+
       const hasValidFare = (booking.distance > 0 && booking.price > 0) || (booking.estimatedCost > 0);
+
+      // In both cases (whether fare is known or unknown), reset L1..L4 signatures cleanly
+      // because changing to TAXI creates a reimbursement budget/expense that must be re-approved!
+      booking.signatures.forEach(sig => {
+        if (sig.level >= 1) {
+          sig.status = 'pending';
+          sig.approverName = '';
+          sig.comment = '';
+          sig.timestamp = '';
+          sig.signature = '';
+          if (sig.level === 2) {
+            sig.driverName = '';
+          }
+        }
+      });
 
       if (!hasValidFare) {
         booking.waitingForRequesterInput = true;
         booking.status = 'waiting_taxi_amount';
         booking.currentApprovalLevel = 1;
-        
-        // Reset L1, L2, L3, L4 signatures
-        booking.signatures.forEach(sig => {
-          if (sig.level >= 1) {
-            sig.status = 'pending';
-            sig.approverName = '';
-            sig.comment = '';
-            sig.timestamp = '';
-            sig.signature = '';
-            if (sig.level === 2) {
-              sig.driverName = '';
-            }
-          }
-        });
 
         saveBookings();
         closeApprovalModal();
@@ -5999,9 +6151,45 @@ function setupEventListeners() {
         showToast(`ได้ปรับเปลี่ยนเป็น TAXI และส่งใบคำขอรหัส ${booking.id} กลับไปยังผู้ขอรถ (${booking.requester}) เพื่อกรอกค่าพาหนะเรียบร้อยแล้ว`, "success");
         return;
       } else {
+        // When fare is known (e.g. L2 entered distance & price)
         booking.waitingForRequesterInput = false;
         booking.status = 'pending';
         booking.currentApprovalLevel = 1;
+
+        saveBookings();
+        closeApprovalModal();
+
+        updateStats();
+        renderDashboard();
+        renderBookingsLists();
+        renderMonthCalendar();
+
+        // Send email to L1 manager so they can approve the new taxi fare!
+        const toEmail = resolveManagerEmail(booking);
+        const mgrSubject = `[ระบบจองรถ อสป.] รายการขออนุมัติใหม่ (ปรับเปลี่ยนเป็น TAXI) เลขที่ ${booking.id} รอการตรวจสอบเห็นชอบ`;
+        const mgrBody = `
+          <p>เรียน หัวหน้าแผนกผู้ควบคุม,</p>
+          <p>ใบขออนุญาตใช้ยานพาหนะเลขที่ <strong>${booking.id}</strong> ได้รับการปรับเปลี่ยนการจัดสรรยานพาหนะเป็น <strong>รถรับจ้างสาธารณะ (TAXI)</strong> (ระยะทาง ${booking.distance} กม. ประมาณการค่าพาหนะ ${booking.price} บาท) และเสนอขึ้นมายังท่านเพื่อพิจารณาตรวจเห็นชอบในระดับ <strong>หัวหน้าแผนก (L1)</strong> อีกครั้ง</p>
+          <p>ท่านสามารถคลิกเข้าสู่ระบบเพื่อพิจารณาลงความเห็นชอบได้ที่ลิงก์ด้านล่างนี้:</p>
+          <div style="text-align: center; margin: 25px 0;">
+            <a href="https://car-booking.fishmarket.co.th/" style="background-color: #0284c7; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">เข้าสู่ระบบเพื่อพิจารณาอนุมัติ</a>
+          </div>
+        `;
+        sendEmailNotification(toEmail, mgrSubject, mgrBody);
+
+        // Also notify requester
+        const reqEmail = resolveRequesterEmail(booking);
+        const reqSubject = `[ระบบจองรถ อสป.] แจ้งเปลี่ยนประเภทพาหนะเป็น TAXI สำหรับคำขอ เลขที่ ${booking.id}`;
+        const reqBody = `
+          <p>เรียน คุณ ${booking.requester},</p>
+          <p>งานยานพาหนะ (L2) ได้ดำเนินการปรับเปลี่ยนการจัดสรรยานพาหนะสำหรับใบเสนอจองเลขที่ <strong>${booking.id}</strong> ของท่าน เป็น <strong>รถรับจ้างสาธารณะ (TAXI)</strong></p>
+          <p>ระยะทางประมาณการ: <strong>${booking.distance} กม.</strong> | งบประมาณค่าพาหนะ: <strong>${booking.price} บาท</strong></p>
+          <p>ระบบได้ส่งใบคำขอดังกล่าวกลับไปยังหัวหน้าแผนก (L1) เพื่อพิจารณาให้ความเห็นชอบตามขั้นตอนแล้วครับ</p>
+        `;
+        sendEmailNotification(reqEmail, reqSubject, reqBody);
+
+        showToast(`ได้ปรับเปลี่ยนเป็น TAXI (ระบุค่าพาหนะ ${booking.price} บาท) และส่งไปยังหัวหน้าแผนก (L1) เพื่อพิจารณาอนุมัติเรียบร้อยแล้ว`, "success");
+        return;
       }
     } else {
       // Conflict check (exclude the current booking id so it can re-select its current car if needed)
@@ -6966,7 +7154,7 @@ window.toggleEmailBody = function(index) {
 
 // Auto-Update & Dynamic Cache Buster Engine
 function setupAutoUpdateChecker() {
-  const currentAppVersion = window.APP_VERSION || "2026.10.08.1";
+  const currentAppVersion = window.APP_VERSION || "2026.10.25.1";
   let isUpdating = false;
 
   async function checkForSystemUpdate() {
@@ -6998,7 +7186,13 @@ function setupAutoUpdateChecker() {
           if (typeof window.clearAppCacheAndReload === 'function') {
             window.clearAppCacheAndReload(false);
           } else {
-            window.location.replace(window.location.origin + window.location.pathname + '?reload=' + Date.now());
+            const cleanUrl = window.location.origin + window.location.pathname;
+            if (window.location.search) {
+              try {
+                window.history.replaceState(null, document.title, cleanUrl);
+              } catch (e) {}
+            }
+            window.location.reload();
           }
         }, 1200);
       }
@@ -7025,6 +7219,13 @@ function setupAutoUpdateChecker() {
 document.addEventListener('DOMContentLoaded', () => {
   // 🟢 0. Initialize Auto-Update & Cache Purge Engine
   setupAutoUpdateChecker();
+
+  // 🏷️ Display current system version in UI badges
+  const verText = 'v' + (window.APP_VERSION || "2026.10.25.1");
+  const sVer = document.getElementById('sidebar-app-version');
+  if (sVer) sVer.textContent = verText;
+  const tVer = document.getElementById('topbar-app-version');
+  if (tVer) tVer.textContent = verText;
 
   // 🟢 1. Render instant UI from local storage cache immediately (0ms)
   try {

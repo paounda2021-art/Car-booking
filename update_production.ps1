@@ -71,6 +71,11 @@ if (Test-Path $tempBookings) { Copy-Item $tempBookings $liveBookings -Force }
 if (Test-Path $tempUsers) { Copy-Item $tempUsers $liveUsers -Force }
 if (Test-Path $tempCars) { Copy-Item $tempCars $liveCars -Force }
 
+# 5.1 Auto-run repair migrations if present
+if (Test-Path "update_bgk_6910_048.js") {
+    node update_bgk_6910_048.js
+}
+
 # 6. Restart PM2 server
 Write-Host "Restarting car-booking server in PM2..." -ForegroundColor Green
 try {
