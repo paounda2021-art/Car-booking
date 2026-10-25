@@ -183,6 +183,23 @@ function compressImage(file, callback) {
   reader.readAsDataURL(file);
 }
 
+// Helper to check if a booking belongs to the current user (handles spelling, prefix, and spacing robustly)
+function checkIsMyRequest(b, userObj) {
+  if (!userObj || !b) return false;
+  const uEmail = (userObj.email || '').trim().toLowerCase();
+  const bEmail = (b.requesterEmail || '').trim().toLowerCase();
+  if (bEmail && uEmail && bEmail === uEmail) return true;
+
+  const uUsername = (userObj.username || '').trim().toLowerCase();
+  if (uUsername && bEmail && bEmail.startsWith(uUsername)) return true;
+
+  const normalize = (n) => n ? String(n).replace(/\s+/g, '').replace(/\(.*?\)/g, '').replace(/^(นาย|นาง|น\.ส\.|ว่าที่ร\.ต\.|ว่าที่ร้อยตรี|ดร\.)\s*/, '') : '';
+  const uNameNormalized = normalize(userObj.name);
+  const bNameNormalized = normalize(b.requester);
+  
+  return (uNameNormalized && bNameNormalized && uNameNormalized === bNameNormalized);
+}
+
 // Helper to dynamically resolve the manager email of a booking
 function resolveManagerEmail(booking) {
   if (!booking) return 'ranida.c@fishmarket.co.th';
@@ -214,8 +231,8 @@ function isL1PendingForUser(b, user) {
   if (!b || !user) return false;
   if (b.currentApprovalLevel !== 1 || b.status === 'cancellation_requested') return false;
 
-  const canApproveL1 = userHasApproveLevel(user, 1) || (user.canApprove && user.canApprove.includes(1)) || (user.username || '').toLowerCase() === 'prathum.c';
-  if (!canApproveL1) return false;
+  // 1. Strict Self-Approval Guard: Requester can NEVER approve their own booking at L1
+  if (checkIsMyRequest(b, user)) return false;
 
   const cEmail = (user.email || '').toLowerCase().trim();
   const cUsername = (user.username || '').toLowerCase().trim();
@@ -223,22 +240,16 @@ function isL1PendingForUser(b, user) {
   const bManagerEmail = (b.managerEmail || '').toLowerCase().trim();
   const resolvedEmail = resolveManagerEmail(b).toLowerCase().trim();
 
-  // Direct email match with booking's managerEmail or resolved managerEmail
-  if (cEmail && (bManagerEmail === cEmail || resolvedEmail === cEmail)) return true;
+  // 2. Direct designated manager match (Email or Username prefix)
+  const isDirectManager = (cEmail && (bManagerEmail === cEmail || resolvedEmail === cEmail)) ||
+                          (cUsername && ((bManagerEmail && (bManagerEmail.startsWith(cUsername) || bManagerEmail.includes(cUsername))) ||
+                                         (resolvedEmail && (resolvedEmail.startsWith(cUsername) || resolvedEmail.includes(cUsername)))));
+  if (isDirectManager) return true;
 
-  // Username match with email prefix (e.g. pratum.c vs prathum.c)
-  if (cUsername) {
-    if (bManagerEmail && (bManagerEmail.startsWith(cUsername) || bManagerEmail.includes(cUsername))) return true;
-    if (resolvedEmail && (resolvedEmail.startsWith(cUsername) || resolvedEmail.includes(cUsername))) return true;
-  }
-
-  // Special fallback for Mr. Pratum (prathum.c / pratum.c)
+  // 3. Fallback for Mr. Pratum if explicitly targeted as manager
   const isPratum = (cUsername === 'prathum.c' || cEmail.includes('pratum') || cEmail.includes('prathum'));
   const isTargetPratum = (bManagerEmail.includes('pratum') || bManagerEmail.includes('prathum') || resolvedEmail.includes('pratum') || resolvedEmail.includes('prathum'));
   if (isPratum && isTargetPratum) return true;
-
-  const isFallbackManager = (resolvedEmail === '' || resolvedEmail === 'ranida.c@fishmarket.co.th') && isPratum;
-  if (isFallbackManager) return true;
 
   return false;
 }
@@ -1243,7 +1254,9 @@ function userHasApproveLevel(userObj, levelNum) {
   if (usernameLower === 'admin') return true;
   
   if (levelInt === 1) {
-    if (role === 'supervisor' || (list && list.includes(1)) || ['ranida.c', 'sarena.m', 'jaruwan.s', 'test.l1', 'suwanna.p', 'chalong.c', 'sakda.a', 'prathum.c'].includes(usernameLower)) return true;
+    const pos = (userObj.position || '');
+    const isSupervisorTitle = pos.includes('หัวหน้าสำนักงาน') || pos.includes('หัวหน้าแผนก') || pos.includes('ร.หส.') || pos.includes('ร.หผ.') || pos.includes('ผู้อำนวยการ') || pos.includes('ผอ.');
+    if (role === 'supervisor' || role === 'director' || isSupervisorTitle || (list && list.includes(1)) || ['ranida.c', 'sarena.m', 'jaruwan.s', 'test.l1', 'suwanna.p', 'chalong.c', 'sakda.a', 'prathum.c'].includes(usernameLower)) return true;
     const uEmail = (userObj.email || '').toLowerCase();
     if (uEmail && Array.isArray(bookings) && bookings.some(b => b.currentApprovalLevel === 1 && (b.managerEmail || '').toLowerCase() === uEmail)) return true;
   }
@@ -1868,7 +1881,9 @@ function checkCanSeeAll(userObj) {
 
 // Helper to check if a supervisor is the manager or approver for a subordinate's booking
 function checkIsManagerOrApprover(b, userObj) {
-  if (!userObj) return false;
+  if (!userObj || !b) return false;
+  // Strict Self-Approval Guard: Requester can NEVER be the manager/approver of their own booking
+  if (checkIsMyRequest(b, userObj)) return false;
   
   const uEmail = (userObj.email || '').trim().toLowerCase();
   const uUsername = (userObj.username || '').trim().toLowerCase();
@@ -3633,7 +3648,7 @@ async function openApprovalModal(bookingId) {
     const lvl = booking.currentApprovalLevel;
 
     if (lvl === 1) {
-      if (isL1PendingForUser(booking, currentUser)) {
+      if (!checkIsMyRequest(booking, currentUser) && isL1PendingForUser(booking, currentUser)) {
         isMyTurn = true;
       }
     }
@@ -4077,7 +4092,8 @@ async function handleApprovalAction(isApproved) {
     if (uUsername === 'admin') {
       canApprove = true;
     } else if (level === 1) {
-      canApprove = isL1PendingForUser(booking, currentUser) || checkIsManagerOrApprover(booking, currentUser) || userHasApproveLevel(currentUser, 1);
+      const isSelf = checkIsMyRequest(booking, currentUser);
+      canApprove = !isSelf && (isL1PendingForUser(booking, currentUser) || checkIsManagerOrApprover(booking, currentUser));
     } else if (level === 2) {
       canApprove = currentUser.role === 'fleet_admin' || userHasApproveLevel(currentUser, 2) || ['chalong.c', 'sakda.a'].includes(uUsername);
     } else if (level === 3) {
@@ -6844,11 +6860,9 @@ function autoGenerateMissingEmailLogs() {
       
       if (currentUser.canApprove && currentUser.canApprove.includes(lvl)) {
         if (lvl === 1) {
-          const mEmail = resolveManagerEmail(b).toLowerCase();
-          const cEmail = (currentUser.email || '').toLowerCase();
-          if (mEmail === cEmail || mEmail === '') {
+          if (!checkIsMyRequest(b, currentUser) && isL1PendingForUser(b, currentUser)) {
             isForCurrentUser = true;
-            targetEmail = currentUser.email || 'ranida.c@fishmarket.co.th';
+            targetEmail = currentUser.email || '';
           }
         } else {
           isForCurrentUser = true;
